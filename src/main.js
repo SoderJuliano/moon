@@ -253,7 +253,7 @@ function animate() {
   // labaredas do Sol: mais intensas quando a câmera está perto
   const sunDist = camera.position.length(); // Sol está na origem
   const flareIntensity = THREE.MathUtils.clamp(1.4 - sunDist / (sun.radius * 12), 0.25, 1);
-  sunFlares.update(dt, sun.radius, flareIntensity);
+  sunFlares.update(dt, sun.radius, camera.position, flareIntensity);
 
   // atualiza a data ~4x por segundo
   dateAccumulator += dt;

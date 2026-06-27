@@ -119,6 +119,50 @@ function approach(current, target, dt) {
 
 const _lodPos = new THREE.Vector3();
 
+// LOD por distância (reutilizado por planetas e luas): textura real (NASA/2k) só
+// quando a câmera chega perto; de longe volta pra procedural e DESCARTA a hi-res
+// (libera VRAM no tablet). Só no modo real. Limiar generoso com piso absoluto
+// pra valer também pra corpos pequenos (Marte/Lua), cujo raio é minúsculo.
+function makeDetailLOD(mesh, descriptor) {
+  const proceduralMap = mesh.material.map;
+  let hiresMap = null;
+  let on = false;
+  return function (cameraPos, currentMode) {
+    if (!descriptor.hiresTextureUrl) return;
+    if (currentMode !== "real") {
+      if (on) {
+        mesh.material.map = proceduralMap;
+        mesh.material.needsUpdate = true;
+        on = false;
+      }
+      return;
+    }
+    mesh.getWorldPosition(_lodPos);
+    const dist = cameraPos.distanceTo(_lodPos);
+    const r = mesh.scale.x;
+    const onAt = r * 7 + 6;
+    const offAt = r * 12 + 12; // histerese pra não piscar
+    if (!on && dist < onAt) {
+      if (!hiresMap) {
+        hiresMap = textureLoader.load(descriptor.hiresTextureUrl);
+        hiresMap.colorSpace = THREE.SRGBColorSpace;
+        hiresMap.anisotropy = 8;
+      }
+      mesh.material.map = hiresMap;
+      mesh.material.needsUpdate = true;
+      on = true;
+    } else if (on && dist > offAt) {
+      mesh.material.map = proceduralMap;
+      mesh.material.needsUpdate = true;
+      on = false;
+      if (hiresMap) {
+        hiresMap.dispose();
+        hiresMap = null;
+      }
+    }
+  };
+}
+
 export function createBody(descriptor, mode) {
   const mesh = makeMesh(descriptor, descriptor.isSun);
   const ringMesh = descriptor.ring ? addRing(mesh, descriptor.ring) : null;
@@ -129,12 +173,7 @@ export function createBody(descriptor, mode) {
   const orbitGroup = new THREE.Object3D();
   orbitGroup.add(pivot);
 
-  // LOD por distância: textura detalhada (NASA/2k) só quando a câmera chega
-  // perto; de longe volta pra procedural e DESCARTA a hi-res (libera VRAM no
-  // tablet). Só no modo real — no aproximado o visual procedural é proposital.
-  const lodProceduralMap = mesh.material.map;
-  let lodHiresMap = null;
-  let lodHiresOn = false;
+  const lod = makeDetailLOD(mesh, descriptor);
 
   const body = {
     descriptor,
@@ -177,39 +216,11 @@ export function createBody(descriptor, mode) {
       return mesh.getWorldPosition(target);
     },
 
-    // chamado a cada frame com a posição da câmera e o modo atual
+    // chamado a cada frame com a posição da câmera e o modo atual; cascateia
+    // pras luas (que têm seu próprio LOD)
     updateDetail(cameraPos, currentMode) {
-      if (!descriptor.hiresTextureUrl) return;
-      if (currentMode !== "real") {
-        if (lodHiresOn) {
-          mesh.material.map = lodProceduralMap;
-          mesh.material.needsUpdate = true;
-          lodHiresOn = false;
-        }
-        return;
-      }
-      mesh.getWorldPosition(_lodPos);
-      const dist = cameraPos.distanceTo(_lodPos);
-      const r = mesh.scale.x;
-      if (!lodHiresOn && dist < r * 8) {
-        if (!lodHiresMap) {
-          lodHiresMap = textureLoader.load(descriptor.hiresTextureUrl);
-          lodHiresMap.colorSpace = THREE.SRGBColorSpace;
-          lodHiresMap.anisotropy = 8;
-        }
-        mesh.material.map = lodHiresMap;
-        mesh.material.needsUpdate = true;
-        lodHiresOn = true;
-      } else if (lodHiresOn && dist > r * 14) {
-        // histerese (8↔14) evita piscar; descarta a textura ao afastar
-        mesh.material.map = lodProceduralMap;
-        mesh.material.needsUpdate = true;
-        lodHiresOn = false;
-        if (lodHiresMap) {
-          lodHiresMap.dispose();
-          lodHiresMap = null;
-        }
-      }
+      lod(cameraPos, currentMode);
+      for (const m of this.moons) if (m.updateDetail) m.updateDetail(cameraPos, currentMode);
     },
   };
 
@@ -229,6 +240,7 @@ export function attachMoon(planet, descriptor, mode) {
   // raio "fantasia" do planeta é constante; usado para posicionar a lua perto
   // dele no modo fantasia
   const planetFantasyRadius = bodyRadius(planet.descriptor.realRadiusKm, "fantasy");
+  const lod = makeDetailLOD(mesh, descriptor);
 
   const moon = {
     descriptor,
@@ -261,6 +273,10 @@ export function attachMoon(planet, descriptor, mode) {
 
     worldPosition(target) {
       return mesh.getWorldPosition(target);
+    },
+
+    updateDetail(cameraPos, currentMode) {
+      lod(cameraPos, currentMode);
     },
   };
 

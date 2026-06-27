@@ -276,6 +276,38 @@ export function radialGlowTexture(color = "#ffdd88") {
   return tex;
 }
 
+// --- Chama/proeminência: língua de fogo (base larga e quente embaixo, afina e
+// esfria pra cima). Usada nas labaredas do Sol pra NÃO parecerem discos. -----
+export function flameTexture() {
+  const w = 128;
+  const h = 256;
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+  // gradiente vertical: base branco-amarelada quente -> topo laranja-vermelho -> transparente
+  for (let y = 0; y < h; y++) {
+    const t = y / h; // 0 base, 1 topo
+    // largura afunila pra cima
+    const halfW = (w / 2) * (1 - t) * (0.85 + 0.15 * Math.sin(t * 9));
+    const cx = w / 2 + Math.sin(t * 6) * (w * 0.06); // leve ondulação
+    const r = Math.round(255);
+    const g = Math.round(230 - t * 150);
+    const b = Math.round(150 - t * 150);
+    const alpha = (1 - t) * (1 - t); // some no topo
+    const grad = ctx.createLinearGradient(cx - halfW, 0, cx + halfW, 0);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(0.5, `rgba(${r},${g},${Math.max(b, 0)},${alpha})`);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, h - 1 - y, w, 1); // base no rodapé do canvas
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // --- Anel (Saturno/Urano): faixas radiais com transparência ----------------
 export function ringTexture({ inner = "#caa97a", outer = "#9c8559", seed = 3 }) {
   const size = 256;

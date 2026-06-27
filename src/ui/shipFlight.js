@@ -22,9 +22,45 @@ const NAV_KEYS = new Set([
   "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight",
 ]);
 
-const SHIP_SIZE = 0.06; // fração de unidade (1 unidade = 1 raio terrestre no real)
+const SHIP_SIZE = 0.03; // fração de unidade (nave bem pequena: planeta parece gigante)
 const KM_PER_UNIT = 6371; // 1 unidade = 1 raio terrestre (modo real)
 const C_KM_S = 299792.458; // velocidade da luz, p/ mostrar % da luz
+
+// textura de asteroide pra billboards de meteoro: rocha cinza sombreada com
+// crateras, fundo transparente. Uma só, compartilhada (leve). De perto a 256px
+// já mostra detalhe; de longe/voando vira pontinho.
+function makeRockTexture() {
+  const s = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, s, s);
+  // disco rochoso iluminado de cima-esquerda
+  const g = ctx.createRadialGradient(s * 0.38, s * 0.36, s * 0.05, s * 0.5, s * 0.5, s * 0.5);
+  g.addColorStop(0, "#b9b2a6");
+  g.addColorStop(0.5, "#8a8175");
+  g.addColorStop(0.85, "#544c43");
+  g.addColorStop(1, "rgba(40,36,32,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2);
+  ctx.fill();
+  // crateras/manchas
+  for (let i = 0; i < 26; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const rr = Math.random() * s * 0.42;
+    const x = s / 2 + Math.cos(a) * rr;
+    const y = s / 2 + Math.sin(a) * rr;
+    const cr = 3 + Math.random() * 12;
+    ctx.fillStyle = `rgba(${30 + Math.random() * 40},${28 + Math.random() * 36},${24 + Math.random() * 30},${0.25 + Math.random() * 0.4})`;
+    ctx.beginPath();
+    ctx.arc(x, y, cr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 // suaviza 0→1 (acelera no início, desacelera no fim) para a entrada cinematográfica
 function easeInOut(t) {
@@ -121,12 +157,15 @@ export class ShipFlight {
     this.liftRate = 3.5; // velocidade de subir/descer (Shift/Ctrl, ↑/↓)
     this.arcadeResponse = 3.5;
     this.gravity = 9;
-    this.trailBack = 0.5;
-    this.trailUp = 0.18;
-    this.lookAhead = 2.2;
+    // câmera proporcional ao tamanho da nave: enquadra a nave pequena e deixa o
+    // planeta (raio ~1) dominar a tela quando perto
+    this.trailBack = SHIP_SIZE * 7;
+    this.trailUp = SHIP_SIZE * 2.5;
+    this.lookAhead = SHIP_SIZE * 38;
     this.camLag = 6;
     this.speed = 0;
     this.bank = 0;
+    this._stretch = 1; // alongamento da nave no boost (efeito de velocidade)
     this.yawVel = 0; // velocidade angular suavizada (curva)
     this.liftVel = 0; // velocidade vertical suavizada
     this._pitchTilt = 0; // inclinação cosmética do bico ao subir/descer
@@ -188,6 +227,22 @@ export class ShipFlight {
       s.visible = false;
       scene.add(s);
       this.sparks.push({ sprite: s, life: 0 });
+    }
+
+    // meteoros: billboards rochosos que aparecem à frente em alta velocidade,
+    // passam voando e somem atrás (não são físicos). Se você freia perto de um,
+    // ele fica visível pra apreciar (a textura 256px já mostra detalhe de perto).
+    this.rockTex = makeRockTexture();
+    this.meteors = [];
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: this.rockTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false,
+        })
+      );
+      m.visible = false;
+      scene.add(m);
+      this.meteors.push({ sprite: m, size: 0, spawned: false });
     }
 
     // mira de distância: ao apontar o bico pra um corpo, mostra "Nome — dist"
@@ -265,7 +320,8 @@ export class ShipFlight {
     // nasce ENTRE a câmera e o planeta, deslocada pro lado/baixo (entra no quadro).
     if (this.referenceBody) {
       this.referenceBody.worldPosition(this._refPos);
-      const approach = this.referenceBody.radius * 4 + 7;
+      // perto o bastante pra o planeta DOMINAR a tela (parecer gigante)
+      const approach = this.referenceBody.radius * 2 + 1.2;
       this._toPlanet.copy(this.camera.position).sub(this._refPos); // planeta -> câmera
       if (this._toPlanet.lengthSq() < 1e-4) this._toPlanet.copy(this._fwd).negate();
       this._toPlanet.normalize();
@@ -297,15 +353,18 @@ export class ShipFlight {
     this.yawVel = 0;
     this.liftVel = 0;
     this._pitchTilt = 0;
+    this._stretch = 1;
     this.model.rotation.set(0, 0, 0);
+    this.model.scale.set(1, 1, 1);
     this.velocity.set(0, 0, 0);
     this._initStreaks();
+    this._initMeteors();
 
     // tween de entrada: câmera vai da pose atual até a 3ª pessoa atrás da nave
     this.intro = {
       t: 0,
-      dur: 2.2,
-      glideSpeed: 1.3, // aproximação lenta: dá tempo de admirar e manobrar ao assumir
+      dur: 2.0,
+      glideSpeed: 0.4, // quase pairando: não mergulha dentro do planeta gigante
       fromPos: this.camera.position.clone(),
       fromTgt: this.controls.target.clone(),
     };
@@ -419,6 +478,7 @@ export class ShipFlight {
       s.life = 0;
       s.sprite.visible = false;
     }
+    for (const m of this.meteors) m.sprite.visible = false;
     this.targetLabel.style.display = "none";
   }
 
@@ -489,6 +549,49 @@ export class ShipFlight {
         s.sprite.scale.setScalar(0.012 + (1 - l) * 0.02);
         if (s.life <= 0) s.sprite.visible = false;
       }
+    }
+  }
+
+  // posiciona um meteoro à frente da nave, espalhado num disco perpendicular
+  _respawnMeteor(m) {
+    this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
+    this._up.set(0, 1, 0).applyQuaternion(this.ship.quaternion);
+    this._tmp.set(1, 0, 0).applyQuaternion(this.ship.quaternion);
+    const ang = Math.random() * Math.PI * 2;
+    const rad = 0.4 + Math.random() * 2.2; // afastados do eixo (passam pela lateral)
+    const a = 3 + Math.random() * 5; // distância à frente
+    m.sprite.position
+      .copy(this.ship.position)
+      .addScaledVector(this._fwd, a)
+      .addScaledVector(this._tmp, Math.cos(ang) * rad)
+      .addScaledVector(this._up, Math.sin(ang) * rad);
+    m.size = 0.05 + Math.random() * 0.22;
+    m.spawned = true;
+  }
+
+  _initMeteors() {
+    for (const m of this.meteors) this._respawnMeteor(m);
+  }
+
+  // meteoros passando: estáticos no mundo, a nave os atravessa. Aparecem em alta
+  // velocidade; se você freia perto de um, ele fica visível pra apreciar.
+  _updateMeteors(spN) {
+    const op = THREE.MathUtils.clamp((spN - 0.4) / 0.6, 0, 1);
+    for (const m of this.meteors) {
+      this._tmp2.copy(m.sprite.position).sub(this.ship.position);
+      const along = this._tmp2.dot(this._fwd);
+      const dist = this._tmp2.length();
+      if (along < -1 || dist > 12) this._respawnMeteor(m); // passou/longe: recicla à frente
+      // perto e devagar = inspeção: aparece mesmo parado (a 256px mostra detalhe)
+      const inspecting = dist < 1.2;
+      const vis = Math.max(op, inspecting ? 1 : 0);
+      if (vis <= 0.01) {
+        m.sprite.visible = false;
+        continue;
+      }
+      m.sprite.visible = true;
+      m.sprite.material.opacity = vis;
+      m.sprite.scale.setScalar(m.size);
     }
   }
 
@@ -583,11 +686,20 @@ export class ShipFlight {
       this._prevRef.copy(this._refPos);
     }
 
+    // amortecimento de proximidade: perto do planeta a velocidade máxima cai,
+    // pra dar pra sobrevoar devagar e apreciar (longe = cheia, com boost)
+    let proxScale = 1;
+    if (this.referenceBody) {
+      const r = this.referenceBody.radius;
+      const distRef = this._refPos.distanceTo(this.ship.position);
+      proxScale = THREE.MathUtils.clamp((distRef - r * 1.2) / (r * 5), 0.16, 1);
+    }
+
     // 2) empuxo escalar ao longo do nariz (ré no máximo 1/3 do avanço).
     // Shift+W = boost (afterburner): libera a velocidade máxima maior.
     const shiftHeld = k.has("ShiftLeft") || k.has("ShiftRight");
     const boosting = k.has("KeyW") && shiftHeld;
-    const cap = boosting ? this.boostSpeed : this.maxSpeed;
+    const cap = (boosting ? this.boostSpeed : this.maxSpeed) * proxScale;
     if (k.has("KeyW")) this.speed += this.accel * (boosting ? 1.8 : 1) * dt;
     else if (k.has("KeyS")) this.speed -= this.accel * dt;
     else this.speed *= Math.max(0, 1 - 0.5 * dt);
@@ -612,6 +724,12 @@ export class ShipFlight {
     this._pitchTilt = THREE.MathUtils.lerp(this._pitchTilt, lift * 0.35, 1 - Math.exp(-5 * dt));
     this.model.rotation.x = this._pitchTilt;
     this.model.rotation.z = this.bank;
+
+    // boost: a nave estica ao longo do nariz (efeito de velocidade/warp)
+    const targetStretch = boosting && this.speed > this.maxSpeed * 0.85 ? 2.0 : 1;
+    this._stretch = THREE.MathUtils.lerp(this._stretch, targetStretch, 1 - Math.exp(-5 * dt));
+    const squash = 1 / Math.sqrt(this._stretch);
+    this.model.scale.set(squash, squash, this._stretch);
 
     // 3) velocidade alinha ao nariz (arcade) + gravidade do planeta
     this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
@@ -706,8 +824,9 @@ export class ShipFlight {
       this.readout.textContent = formatSpeed(sp);
     }
 
-    // efeitos de navegação: partículas, faíscas e mira de distância
+    // efeitos de navegação: partículas, meteoros, faíscas e mira de distância
     this._updateStreaks(spN);
+    this._updateMeteors(spN);
     this._updateSparks(dt, spN);
     this._updateTargetLabel();
   }
