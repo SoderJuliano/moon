@@ -18,12 +18,16 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture } from "../core/textures.js";
 
 const NAV_KEYS = new Set([
-  "KeyW", "KeyS", "KeyA", "KeyD",
+  "KeyW", "KeyS", "KeyA", "KeyD", "KeyX", "KeyZ", "KeyQ", "KeyE",
   "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-  "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight",
+  "ShiftLeft", "ShiftRight",
 ]);
 
-const SHIP_SIZE = 0.03; // fração de unidade (nave bem pequena: planeta parece gigante)
+const SHIP_SIZE = 0.06; // fração de unidade (1 unidade = 1 raio terrestre no real)
+// ao pilotar, o planeta focado cresce: vira gigante (nave = grão de areia). Tamanho
+// mínimo gigante pra os pequenos (Marte/Mercúrio) também terem folga pra navegar.
+const APPROACH_MUL = 40;
+const MIN_APPROACH_R = 60;
 const KM_PER_UNIT = 6371; // 1 unidade = 1 raio terrestre (modo real)
 const C_KM_S = 299792.458; // velocidade da luz, p/ mostrar % da luz
 
@@ -112,25 +116,23 @@ export class ShipFlight {
     this.earthPromptShown = false;
     this.keys = new Set();
     this.referenceBody = null;
+    this._hiddenMoons = []; // luas escondidas do planeta gigante durante o voo
 
-    this.maxSpeed = 7; // cruzeiro (metade do antigo); Shift+W faz boost
-    this.boostSpeed = 14; // velocidade máxima só no boost (Shift+W)
-    this.accel = 5; // aceleração mais gradual (era brusca perto do planeta)
+    this.maxSpeed = 3.3; // cruzeiro ~7% da luz
+    this.boostSpeed = 14; // boost ~30% da luz (Shift+W)
+    this.accel = 2.5; // aceleração devagar até o cruzeiro
     this.reverseFrac = 1 / 3; // ré no máximo 1/3 do avanço
     this.turnRate = 0.9; // curva mais mansa
     this.turnResponse = 4; // rampa suave da curva/subida (sem solavanco)
     this.liftRate = 3.5; // velocidade de subir/descer (Shift/Ctrl, ↑/↓)
     this.arcadeResponse = 3.5;
-    this.gravity = 9;
-    // câmera proporcional ao tamanho da nave: enquadra a nave pequena e deixa o
-    // planeta (raio ~1) dominar a tela quando perto
-    this.trailBack = SHIP_SIZE * 7;
-    this.trailUp = SHIP_SIZE * 2.5;
-    this.lookAhead = SHIP_SIZE * 38;
+    this.gravity = 4; // suave (com planeta gigante, gravidade ~r² ficaria brutal)
+    this.trailBack = 0.5;
+    this.trailUp = 0.18;
+    this.lookAhead = 2.2;
     this.camLag = 6;
     this.speed = 0;
     this.bank = 0;
-    this._stretch = 1; // alongamento da nave no boost (efeito de velocidade)
     this.yawVel = 0; // velocidade angular suavizada (curva)
     this.liftVel = 0; // velocidade vertical suavizada
     this._pitchTilt = 0; // inclinação cosmética do bico ao subir/descer
@@ -230,8 +232,8 @@ export class ShipFlight {
     window.addEventListener("blur", () => this.keys.clear());
   }
 
-  // carrega a nave 3D (GLB leve, 62KB). Centraliza, gira o nariz pra -Z, escala
-  // pra ~1 unidade e troca pela procedural. Se falhar, mantém a procedural.
+  // carrega a nave 3D (GLB leve). Centraliza, gira o nariz pra -Z, escala pra
+  // caber no enquadramento da master e troca a procedural. Se falhar, mantém ela.
   _loadShipModel(fallback) {
     new GLTFLoader().load(
       "models/Spaceship.glb",
@@ -242,7 +244,7 @@ export class ShipFlight {
         const size = new THREE.Vector3();
         box.getCenter(center);
         box.getSize(size);
-        s.position.sub(center); // centraliza na origem
+        s.position.sub(center);
         s.traverse((o) => {
           if (o.isMesh && o.material) {
             o.material.metalness = Math.min(o.material.metalness ?? 0, 0.35);
@@ -253,17 +255,13 @@ export class ShipFlight {
         fix.add(s);
         fix.rotation.y = Math.PI; // o modelo tem o nariz em +Z; nossa convenção é -Z
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
-        const k = 1.1 / maxDim;
-        fix.scale.setScalar(k);
+        fix.scale.setScalar(1.6 / maxDim); // ~equivalente ao tamanho da procedural
         this.model.remove(fallback);
         this.model.add(fix);
-        // brilho do motor na traseira (+Z), atrás do casco
-        this.engineGlow.position.set(0, 0, (size.z * k) / 2 + 0.05);
+        this.engineGlow.position.set(0, 0, (size.z * (1.6 / maxDim)) / 2 + 0.1);
       },
       undefined,
-      () => {
-        /* falhou: segue com a nave procedural */
-      }
+      () => {}
     );
   }
 
@@ -308,17 +306,27 @@ export class ShipFlight {
     // o planeta antes de qualquer colisão (escala com o raio do corpo). A nave
     // nasce ENTRE a câmera e o planeta, deslocada pro lado/baixo (entra no quadro).
     if (this.referenceBody) {
+      // planeta cresce pra escala gigante (mínimo grande pros pequenos); esconde
+      // as luas dele (ficariam dentro do planeta agora enorme)
+      const base = this.referenceBody.baseRadius || 1;
+      this.referenceBody.setApproach(Math.max(APPROACH_MUL, MIN_APPROACH_R / base));
+      this._hiddenMoons = [];
+      for (const m of this.referenceBody.moons || []) {
+        if (m.mesh.visible) {
+          m.mesh.visible = false;
+          this._hiddenMoons.push(m);
+        }
+      }
       this.referenceBody.worldPosition(this._refPos);
-      // perto o bastante pra o planeta DOMINAR a tela (parecer gigante)
-      const approach = this.referenceBody.radius * 2 + 1.2;
+      const approach = this.referenceBody.approachRadius * 2.4 + 2; // nasce bem fora
       this._toPlanet.copy(this.camera.position).sub(this._refPos); // planeta -> câmera
       if (this._toPlanet.lengthSq() < 1e-4) this._toPlanet.copy(this._fwd).negate();
       this._toPlanet.normalize();
       this.ship.position
         .copy(this._refPos)
         .addScaledVector(this._toPlanet, approach)
-        .addScaledVector(this._tmp, approach * 0.22)
-        .addScaledVector(this._up, -approach * 0.1);
+        .addScaledVector(this._tmp, approach * 0.18)
+        .addScaledVector(this._up, -approach * 0.08);
     } else {
       this.ship.position
         .copy(this.camera.position)
@@ -342,22 +350,35 @@ export class ShipFlight {
     this.yawVel = 0;
     this.liftVel = 0;
     this._pitchTilt = 0;
-    this._stretch = 1;
     this.model.rotation.set(0, 0, 0);
-    this.model.scale.set(1, 1, 1);
     this.velocity.set(0, 0, 0);
     this._initStreaks();
 
-    // tween de entrada: câmera vai da pose atual até a 3ª pessoa atrás da nave
-    this.intro = {
-      t: 0,
-      dur: 2.0,
-      glideSpeed: 0.4, // quase pairando: não mergulha dentro do planeta gigante
-      fromPos: this.camera.position.clone(),
-      fromTgt: this.controls.target.clone(),
-    };
+    // tween de entrada: começa de um ponto seguro ATRÁS da nave (a pose antiga,
+    // de foco, cairia DENTRO do planeta que está crescendo pra gigante).
+    let fromPos, fromTgt;
+    if (this.referenceBody) {
+      const a = this.referenceBody.approachRadius;
+      fromPos = this._tmp2
+        .copy(this.ship.position)
+        .addScaledVector(this._toPlanet, a * 0.6)
+        .addScaledVector(this._worldUp, a * 0.2)
+        .clone();
+      fromTgt = this._refPos.clone();
+    } else {
+      fromPos = this.camera.position.clone();
+      fromTgt = this.controls.target.clone();
+    }
+    this.intro = { t: 0, dur: 2.2, glideSpeed: 0.4, fromPos, fromTgt };
 
     if (this.onEngage) this.onEngage();
+  }
+
+  // devolve o planeta ao tamanho normal e mostra as luas de volta
+  _restoreApproach() {
+    if (this.referenceBody) this.referenceBody.setApproach(1);
+    for (const m of this._hiddenMoons) m.mesh.visible = true;
+    this._hiddenMoons = [];
   }
 
   disengage() {
@@ -367,6 +388,7 @@ export class ShipFlight {
     this.intro = null;
     this.ship.visible = false;
     this._hideFx();
+    this._restoreApproach();
     this.readout.style.display = "none";
     this.speed = 0;
     this.velocity.set(0, 0, 0);
@@ -381,6 +403,7 @@ export class ShipFlight {
     this.exploding = true;
     this.ship.visible = false;
     this._hideFx();
+    this._restoreApproach();
     this.readout.style.display = "none";
 
     const grp = new THREE.Group();
@@ -630,22 +653,14 @@ export class ShipFlight {
       this._prevRef.copy(this._refPos);
     }
 
-    // amortecimento de proximidade: perto do planeta a velocidade máxima cai,
-    // pra dar pra sobrevoar devagar e apreciar (longe = cheia, com boost)
-    let proxScale = 1;
-    if (this.referenceBody) {
-      const r = this.referenceBody.radius;
-      const distRef = this._refPos.distanceTo(this.ship.position);
-      proxScale = THREE.MathUtils.clamp((distRef - r * 1.2) / (r * 5), 0.16, 1);
-    }
-
-    // 2) empuxo escalar ao longo do nariz (ré no máximo 1/3 do avanço).
-    // Shift+W = boost (afterburner): libera a velocidade máxima maior.
+    // 2) empuxo. Frente = W ou ↑; ré = S ou ↓ (≤1/3). Shift+W (ou Shift+↑) = boost.
     const shiftHeld = k.has("ShiftLeft") || k.has("ShiftRight");
-    const boosting = k.has("KeyW") && shiftHeld;
-    const cap = (boosting ? this.boostSpeed : this.maxSpeed) * proxScale;
-    if (k.has("KeyW")) this.speed += this.accel * (boosting ? 1.8 : 1) * dt;
-    else if (k.has("KeyS")) this.speed -= this.accel * dt;
+    const fwdKey = k.has("KeyW") || k.has("ArrowUp");
+    const revKey = k.has("KeyS") || k.has("ArrowDown");
+    const boosting = fwdKey && shiftHeld;
+    const cap = boosting ? this.boostSpeed : this.maxSpeed;
+    if (fwdKey) this.speed += this.accel * (boosting ? 1.8 : 1) * dt;
+    else if (revKey) this.speed -= this.accel * dt;
     else this.speed *= Math.max(0, 1 - 0.5 * dt);
     this.speed = THREE.MathUtils.clamp(this.speed, -this.maxSpeed * this.reverseFrac, cap);
 
@@ -657,28 +672,16 @@ export class ShipFlight {
     this.ship.rotateY(this.yawVel * dt);
     this.bank = THREE.MathUtils.lerp(this.bank, yawInput * 0.5, 1 - Math.exp(-4 * dt));
 
-    // subir/descer no plano: Shift (ou ↑) sobe, Ctrl (ou ↓) desce — translação
-    // vertical suave; o bico inclina junto (empina/abaixa). Durante o boost
-    // (Shift+W) o Shift vira acelerador, então não conta como subida.
+    // subir/descer no plano: X sobe, Z desce (Ctrl saiu: fecha o navegador).
+    // o bico inclina junto (empina/abaixa).
     let lift = 0;
-    if (k.has("ArrowUp") || (shiftHeld && !boosting)) lift += 1;
-    if (k.has("ControlLeft") || k.has("ControlRight") || k.has("ArrowDown")) lift -= 1;
+    if (k.has("KeyX")) lift += 1;
+    if (k.has("KeyZ")) lift -= 1;
     this.liftVel = THREE.MathUtils.lerp(this.liftVel, lift * this.liftRate, 1 - Math.exp(-this.turnResponse * dt));
     this.ship.position.y += this.liftVel * dt;
     this._pitchTilt = THREE.MathUtils.lerp(this._pitchTilt, lift * 0.35, 1 - Math.exp(-5 * dt));
     this.model.rotation.x = this._pitchTilt;
     this.model.rotation.z = this.bank;
-
-    // boost: a nave estica ao longo do nariz e TREME (turbulência)
-    const boostFast = boosting && this.speed > this.maxSpeed * 0.7;
-    this._stretch = THREE.MathUtils.lerp(this._stretch, boostFast ? 2.2 : 1, 1 - Math.exp(-5 * dt));
-    const squash = 1 / Math.sqrt(this._stretch);
-    this.model.scale.set(squash, squash, this._stretch);
-    if (boostFast) {
-      const j = 0.03 * (this._stretch - 1); // tremor cresce com o esticar
-      this.model.rotation.x += (Math.random() - 0.5) * j;
-      this.model.rotation.z += (Math.random() - 0.5) * j;
-    }
 
     // 3) velocidade alinha ao nariz (arcade) + gravidade do planeta
     this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
@@ -754,21 +757,13 @@ export class ShipFlight {
     this.engineGlow.scale.setScalar(0.25 + spN * 0.6);
     this.engineGlow.material.opacity = 0.35 + Math.min(spN, 1) * 0.5;
 
-    // 6) câmera 3ª pessoa. No boost a câmera CHEGA PERTO (nave grande na tela) e
-    // TREME (turbulência); fora do boost mantém o enquadramento normal.
-    const camBack = boosting ? this.trailBack * 0.45 : this.trailBack;
+    // 6) câmera 3ª pessoa
     this._up.set(0, 1, 0).applyQuaternion(this.ship.quaternion);
     const desired = this._tmp
       .copy(this.ship.position)
-      .addScaledVector(this._fwd, -camBack)
+      .addScaledVector(this._fwd, -this.trailBack)
       .addScaledVector(this._up, this.trailUp);
     this.camera.position.lerp(desired, 1 - Math.exp(-this.camLag * dt));
-    if (boostFast) {
-      const shake = SHIP_SIZE * 0.5 * Math.min(this.speed / this.boostSpeed, 1);
-      this.camera.position.x += (Math.random() - 0.5) * shake;
-      this.camera.position.y += (Math.random() - 0.5) * shake;
-      this.camera.position.z += (Math.random() - 0.5) * shake;
-    }
     const look = this._tmp2.copy(this.ship.position).addScaledVector(this._fwd, this.lookAhead);
     this.controls.target.copy(look);
     this.camera.lookAt(look);
@@ -781,9 +776,10 @@ export class ShipFlight {
       this.readout.textContent = formatSpeed(sp);
     }
 
-    // efeitos de navegação: partículas, faíscas e mira de distância
-    this._updateStreaks(spN);
-    this._updateSparks(dt, spN);
+    // efeitos de navegação: partículas/faíscas SÓ no boost (Shift segurado)
+    const fx = boosting ? spN : 0;
+    this._updateStreaks(fx);
+    this._updateSparks(dt, fx);
     this._updateTargetLabel();
   }
 }

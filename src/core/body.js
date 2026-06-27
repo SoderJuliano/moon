@@ -186,9 +186,27 @@ export function createBody(descriptor, mode) {
 
     _targetX: 0,
     _targetScale: 1,
+    _approachMul: 1, // multiplicador de escala ao pilotar perto (planeta gigante)
+    _approachTargetMul: 1,
 
     get radius() {
       return mesh.scale.x;
+    },
+
+    // raio "real" na escala atual (sem o multiplicador de aproximação)
+    get baseRadius() {
+      return this._targetScale;
+    },
+
+    // raio que o corpo terá no fim da escala atual (sem esperar a animação) —
+    // usado pra posicionar a nave fora do planeta já no tamanho gigante
+    get approachRadius() {
+      return this._targetScale * this._approachTargetMul;
+    },
+
+    // ao pilotar, mul>>1 deixa o planeta gigante (nave vira grão de areia)
+    setApproach(mul) {
+      this._approachTargetMul = mul;
     },
 
     applyMode(currentMode, instant = true) {
@@ -197,14 +215,15 @@ export function createBody(descriptor, mode) {
       switchTexture(currentMode);
       if (instant) {
         pivot.position.x = this._targetX;
-        mesh.scale.setScalar(this._targetScale);
+        mesh.scale.setScalar(this._targetScale * this._approachMul);
       }
       for (const m of this.moons) m.applyMode(currentMode, instant);
     },
 
     update(simDays, dSimDays, dt) {
       pivot.position.x = approach(pivot.position.x, this._targetX, dt);
-      mesh.scale.setScalar(approach(mesh.scale.x, this._targetScale, dt));
+      this._approachMul = approach(this._approachMul, this._approachTargetMul, dt);
+      mesh.scale.setScalar(approach(mesh.scale.x, this._targetScale * this._approachMul, dt));
       orbitGroup.rotation.y = longitudeRad(descriptor, simDays);
       // giro no próprio eixo amarrado ao TEMPO SIMULADO (1 volta por rotDays);
       // negativo = retrógrado. Desacelera junto com a velocidade do tempo.
@@ -250,9 +269,23 @@ export function attachMoon(planet, descriptor, mode) {
     parent: planet,
     _targetX: 0,
     _targetScale: 1,
+    _approachMul: 1,
+    _approachTargetMul: 1,
 
     get radius() {
       return mesh.scale.x;
+    },
+
+    get baseRadius() {
+      return this._targetScale;
+    },
+
+    get approachRadius() {
+      return this._targetScale * this._approachTargetMul;
+    },
+
+    setApproach(mul) {
+      this._approachTargetMul = mul;
     },
 
     applyMode(currentMode, instant = true) {
@@ -260,13 +293,14 @@ export function attachMoon(planet, descriptor, mode) {
       this._targetScale = bodyRadius(descriptor.realRadiusKm, currentMode);
       if (instant) {
         pivot.position.x = this._targetX;
-        mesh.scale.setScalar(this._targetScale);
+        mesh.scale.setScalar(this._targetScale * this._approachMul);
       }
     },
 
     update(simDays, dSimDays, dt) {
       pivot.position.x = approach(pivot.position.x, this._targetX, dt);
-      mesh.scale.setScalar(approach(mesh.scale.x, this._targetScale, dt));
+      this._approachMul = approach(this._approachMul, this._approachTargetMul, dt);
+      mesh.scale.setScalar(approach(mesh.scale.x, this._targetScale * this._approachMul, dt));
       orbitGroup.rotation.y = moonLongitudeRad(descriptor, simDays);
       mesh.rotation.y += ((2 * Math.PI) / (descriptor.rotDays ?? 1)) * dSimDays;
     },

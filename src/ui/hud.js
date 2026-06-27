@@ -82,7 +82,7 @@ export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMod
   const navHint = document.createElement("div");
   navHint.className = "nav-hint";
   navHint.innerHTML =
-    "<b>W</b> acelera &nbsp;·&nbsp; <b>S</b> ré &nbsp;·&nbsp; <b>A/D</b> vira &nbsp;·&nbsp; <b>Shift/Ctrl</b> (ou ↑↓) sobe/desce &nbsp;·&nbsp; <b>Esc</b> sai da nave";
+    "<b>W</b>/↑ acelera &nbsp;·&nbsp; <b>S</b>/↓ ré &nbsp;·&nbsp; <b>A/D</b> (←→) vira &nbsp;·&nbsp; <b>X</b> sobe &nbsp;·&nbsp; <b>Z</b> desce &nbsp;·&nbsp; <b>Shift+W</b> turbo &nbsp;·&nbsp; <b>Esc</b> sai";
   navHint.style.display = "none";
   document.body.appendChild(navHint);
 
