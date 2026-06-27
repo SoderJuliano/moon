@@ -7,7 +7,6 @@
 import * as THREE from "three";
 import { createScene, makeOrbitLine } from "./core/scene.js";
 import { createBody, attachMoon } from "./core/body.js";
-import { createSunFlares } from "./core/sunFlares.js";
 import { orbitRadius } from "./core/scales.js";
 import { simDate } from "./core/ephemeris.js";
 import { SUN, ORBITERS, MOONS } from "./bodies/index.js";
@@ -72,7 +71,6 @@ scene.add(sun.orbitGroup);
 bodyById.set(sun.id, sun);
 glow.position.set(0, 0, 0);
 glow.scale.setScalar(sun.radius * 7);
-const sunFlares = createSunFlares(scene); // labaredas procedurais na borda do Sol
 
 // Planetas + anões e suas linhas de órbita
 const orbitLines = []; // { line, aAU }
@@ -250,10 +248,6 @@ function animate() {
   // glow do Sol acompanha o tamanho atual (muda entre fantasia e real) + pulso
   glow.scale.setScalar(sun.radius * 7);
   glow.material.opacity = 0.85 + Math.sin(performance.now() * 0.001) * 0.07;
-  // labaredas do Sol: mais intensas quando a câmera está perto
-  const sunDist = camera.position.length(); // Sol está na origem
-  const flareIntensity = THREE.MathUtils.clamp(1.4 - sunDist / (sun.radius * 12), 0.25, 1);
-  sunFlares.update(dt, sun.radius, camera.position, flareIntensity);
 
   // atualiza a data ~4x por segundo
   dateAccumulator += dt;

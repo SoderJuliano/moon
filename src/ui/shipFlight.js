@@ -14,6 +14,7 @@
 // Controles: W acelera · S freia/ré · A/D (←/→) vira · ↑/↓ sobe/desce · Esc sai.
 
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture } from "../core/textures.js";
 
 const NAV_KEYS = new Set([
@@ -25,42 +26,6 @@ const NAV_KEYS = new Set([
 const SHIP_SIZE = 0.03; // fração de unidade (nave bem pequena: planeta parece gigante)
 const KM_PER_UNIT = 6371; // 1 unidade = 1 raio terrestre (modo real)
 const C_KM_S = 299792.458; // velocidade da luz, p/ mostrar % da luz
-
-// textura de asteroide pra billboards de meteoro: rocha cinza sombreada com
-// crateras, fundo transparente. Uma só, compartilhada (leve). De perto a 256px
-// já mostra detalhe; de longe/voando vira pontinho.
-function makeRockTexture() {
-  const s = 256;
-  const c = document.createElement("canvas");
-  c.width = c.height = s;
-  const ctx = c.getContext("2d");
-  ctx.clearRect(0, 0, s, s);
-  // disco rochoso iluminado de cima-esquerda
-  const g = ctx.createRadialGradient(s * 0.38, s * 0.36, s * 0.05, s * 0.5, s * 0.5, s * 0.5);
-  g.addColorStop(0, "#b9b2a6");
-  g.addColorStop(0.5, "#8a8175");
-  g.addColorStop(0.85, "#544c43");
-  g.addColorStop(1, "rgba(40,36,32,0)");
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2);
-  ctx.fill();
-  // crateras/manchas
-  for (let i = 0; i < 26; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const rr = Math.random() * s * 0.42;
-    const x = s / 2 + Math.cos(a) * rr;
-    const y = s / 2 + Math.sin(a) * rr;
-    const cr = 3 + Math.random() * 12;
-    ctx.fillStyle = `rgba(${30 + Math.random() * 40},${28 + Math.random() * 36},${24 + Math.random() * 30},${0.25 + Math.random() * 0.4})`;
-    ctx.beginPath();
-    ctx.arc(x, y, cr, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
 
 // suaviza 0→1 (acelera no início, desacelera no fim) para a entrada cinematográfica
 function easeInOut(t) {
@@ -174,8 +139,11 @@ export class ShipFlight {
     this.ship = new THREE.Group();
     this.ship.scale.setScalar(SHIP_SIZE);
     this.ship.visible = false;
-    this.model = buildShipModel();
+    this.model = new THREE.Group();
+    const procShip = buildShipModel(); // fallback até o GLB carregar (ou se falhar)
+    this.model.add(procShip);
     this.ship.add(this.model);
+    this._loadShipModel(procShip);
 
     this.engineGlow = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -229,22 +197,6 @@ export class ShipFlight {
       this.sparks.push({ sprite: s, life: 0 });
     }
 
-    // meteoros: billboards rochosos que aparecem à frente em alta velocidade,
-    // passam voando e somem atrás (não são físicos). Se você freia perto de um,
-    // ele fica visível pra apreciar (a textura 256px já mostra detalhe de perto).
-    this.rockTex = makeRockTexture();
-    this.meteors = [];
-    for (let i = 0; i < 14; i++) {
-      const m = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: this.rockTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false,
-        })
-      );
-      m.visible = false;
-      scene.add(m);
-      this.meteors.push({ sprite: m, size: 0, spawned: false });
-    }
-
     // mira de distância: ao apontar o bico pra um corpo, mostra "Nome — dist"
     this.targetLabel = document.createElement("div");
     Object.assign(this.targetLabel.style, {
@@ -276,6 +228,43 @@ export class ShipFlight {
     window.addEventListener("keydown", (e) => this._onKeyDown(e));
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
+  }
+
+  // carrega a nave 3D (GLB leve, 62KB). Centraliza, gira o nariz pra -Z, escala
+  // pra ~1 unidade e troca pela procedural. Se falhar, mantém a procedural.
+  _loadShipModel(fallback) {
+    new GLTFLoader().load(
+      "models/Spaceship.glb",
+      (gltf) => {
+        const s = gltf.scene;
+        const box = new THREE.Box3().setFromObject(s);
+        const center = new THREE.Vector3();
+        const size = new THREE.Vector3();
+        box.getCenter(center);
+        box.getSize(size);
+        s.position.sub(center); // centraliza na origem
+        s.traverse((o) => {
+          if (o.isMesh && o.material) {
+            o.material.metalness = Math.min(o.material.metalness ?? 0, 0.35);
+            if (o.material.roughness == null) o.material.roughness = 0.6;
+          }
+        });
+        const fix = new THREE.Group();
+        fix.add(s);
+        fix.rotation.y = Math.PI; // o modelo tem o nariz em +Z; nossa convenção é -Z
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const k = 1.1 / maxDim;
+        fix.scale.setScalar(k);
+        this.model.remove(fallback);
+        this.model.add(fix);
+        // brilho do motor na traseira (+Z), atrás do casco
+        this.engineGlow.position.set(0, 0, (size.z * k) / 2 + 0.05);
+      },
+      undefined,
+      () => {
+        /* falhou: segue com a nave procedural */
+      }
+    );
   }
 
   get isActive() {
@@ -358,7 +347,6 @@ export class ShipFlight {
     this.model.scale.set(1, 1, 1);
     this.velocity.set(0, 0, 0);
     this._initStreaks();
-    this._initMeteors();
 
     // tween de entrada: câmera vai da pose atual até a 3ª pessoa atrás da nave
     this.intro = {
@@ -478,7 +466,6 @@ export class ShipFlight {
       s.life = 0;
       s.sprite.visible = false;
     }
-    for (const m of this.meteors) m.sprite.visible = false;
     this.targetLabel.style.display = "none";
   }
 
@@ -549,49 +536,6 @@ export class ShipFlight {
         s.sprite.scale.setScalar(0.012 + (1 - l) * 0.02);
         if (s.life <= 0) s.sprite.visible = false;
       }
-    }
-  }
-
-  // posiciona um meteoro à frente da nave, espalhado num disco perpendicular
-  _respawnMeteor(m) {
-    this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
-    this._up.set(0, 1, 0).applyQuaternion(this.ship.quaternion);
-    this._tmp.set(1, 0, 0).applyQuaternion(this.ship.quaternion);
-    const ang = Math.random() * Math.PI * 2;
-    const rad = 0.4 + Math.random() * 2.2; // afastados do eixo (passam pela lateral)
-    const a = 3 + Math.random() * 5; // distância à frente
-    m.sprite.position
-      .copy(this.ship.position)
-      .addScaledVector(this._fwd, a)
-      .addScaledVector(this._tmp, Math.cos(ang) * rad)
-      .addScaledVector(this._up, Math.sin(ang) * rad);
-    m.size = 0.05 + Math.random() * 0.22;
-    m.spawned = true;
-  }
-
-  _initMeteors() {
-    for (const m of this.meteors) this._respawnMeteor(m);
-  }
-
-  // meteoros passando: estáticos no mundo, a nave os atravessa. Aparecem em alta
-  // velocidade; se você freia perto de um, ele fica visível pra apreciar.
-  _updateMeteors(spN) {
-    const op = THREE.MathUtils.clamp((spN - 0.4) / 0.6, 0, 1);
-    for (const m of this.meteors) {
-      this._tmp2.copy(m.sprite.position).sub(this.ship.position);
-      const along = this._tmp2.dot(this._fwd);
-      const dist = this._tmp2.length();
-      if (along < -1 || dist > 12) this._respawnMeteor(m); // passou/longe: recicla à frente
-      // perto e devagar = inspeção: aparece mesmo parado (a 256px mostra detalhe)
-      const inspecting = dist < 1.2;
-      const vis = Math.max(op, inspecting ? 1 : 0);
-      if (vis <= 0.01) {
-        m.sprite.visible = false;
-        continue;
-      }
-      m.sprite.visible = true;
-      m.sprite.material.opacity = vis;
-      m.sprite.scale.setScalar(m.size);
     }
   }
 
@@ -725,11 +669,16 @@ export class ShipFlight {
     this.model.rotation.x = this._pitchTilt;
     this.model.rotation.z = this.bank;
 
-    // boost: a nave estica ao longo do nariz (efeito de velocidade/warp)
-    const targetStretch = boosting && this.speed > this.maxSpeed * 0.85 ? 2.0 : 1;
-    this._stretch = THREE.MathUtils.lerp(this._stretch, targetStretch, 1 - Math.exp(-5 * dt));
+    // boost: a nave estica ao longo do nariz e TREME (turbulência)
+    const boostFast = boosting && this.speed > this.maxSpeed * 0.7;
+    this._stretch = THREE.MathUtils.lerp(this._stretch, boostFast ? 2.2 : 1, 1 - Math.exp(-5 * dt));
     const squash = 1 / Math.sqrt(this._stretch);
     this.model.scale.set(squash, squash, this._stretch);
+    if (boostFast) {
+      const j = 0.03 * (this._stretch - 1); // tremor cresce com o esticar
+      this.model.rotation.x += (Math.random() - 0.5) * j;
+      this.model.rotation.z += (Math.random() - 0.5) * j;
+    }
 
     // 3) velocidade alinha ao nariz (arcade) + gravidade do planeta
     this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
@@ -805,13 +754,21 @@ export class ShipFlight {
     this.engineGlow.scale.setScalar(0.25 + spN * 0.6);
     this.engineGlow.material.opacity = 0.35 + Math.min(spN, 1) * 0.5;
 
-    // 6) câmera 3ª pessoa
+    // 6) câmera 3ª pessoa. No boost a câmera CHEGA PERTO (nave grande na tela) e
+    // TREME (turbulência); fora do boost mantém o enquadramento normal.
+    const camBack = boosting ? this.trailBack * 0.45 : this.trailBack;
     this._up.set(0, 1, 0).applyQuaternion(this.ship.quaternion);
     const desired = this._tmp
       .copy(this.ship.position)
-      .addScaledVector(this._fwd, -this.trailBack)
+      .addScaledVector(this._fwd, -camBack)
       .addScaledVector(this._up, this.trailUp);
     this.camera.position.lerp(desired, 1 - Math.exp(-this.camLag * dt));
+    if (boostFast) {
+      const shake = SHIP_SIZE * 0.5 * Math.min(this.speed / this.boostSpeed, 1);
+      this.camera.position.x += (Math.random() - 0.5) * shake;
+      this.camera.position.y += (Math.random() - 0.5) * shake;
+      this.camera.position.z += (Math.random() - 0.5) * shake;
+    }
     const look = this._tmp2.copy(this.ship.position).addScaledVector(this._fwd, this.lookAhead);
     this.controls.target.copy(look);
     this.camera.lookAt(look);
@@ -824,9 +781,8 @@ export class ShipFlight {
       this.readout.textContent = formatSpeed(sp);
     }
 
-    // efeitos de navegação: partículas, meteoros, faíscas e mira de distância
+    // efeitos de navegação: partículas, faíscas e mira de distância
     this._updateStreaks(spN);
-    this._updateMeteors(spN);
     this._updateSparks(dt, spN);
     this._updateTargetLabel();
   }
