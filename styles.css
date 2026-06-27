@@ -1,8 +1,310 @@
+:root {
+  --panel: rgba(14, 18, 30, 0.72);
+  --panel-border: rgba(255, 255, 255, 0.12);
+  --text: #e8ecf5;
+  --accent: #6ea8ff;
+  --accent-real: #ffb45e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   overflow: hidden;
-  background-color: black;
+  background-color: #000;
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 canvas {
   display: block;
+}
+
+.loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  color: #9fb0cc;
+  background: #000;
+  z-index: 50;
+}
+
+/* ---------------- HUD (canto superior direito) ---------------- */
+.hud {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 200px;
+}
+
+.hud-toggle,
+.hud-btn {
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  color: var(--text);
+  backdrop-filter: blur(8px);
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.hud-toggle:hover,
+.hud-btn:hover {
+  background: rgba(30, 38, 58, 0.82);
+}
+.hud-toggle b {
+  font-weight: 600;
+}
+.hud-toggle .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+.hud-toggle .dot.real {
+  background: var(--accent-real);
+  box-shadow: 0 0 8px var(--accent-real);
+}
+.hud-btn.active {
+  border-color: var(--accent);
+  background: rgba(40, 64, 110, 0.85);
+}
+
+.hud-speed {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hud-speed input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.hud-speed-val {
+  font-variant-numeric: tabular-nums;
+  color: #9fb0cc;
+  align-self: flex-end;
+}
+
+.hud-date {
+  text-align: right;
+  font-size: 12px;
+  color: #9fb0cc;
+  font-variant-numeric: tabular-nums;
+  padding-right: 2px;
+}
+
+.nav-hint {
+  position: fixed;
+  left: 14px;
+  top: 14px;
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #cdd6e6;
+  max-width: 260px;
+  line-height: 1.5;
+}
+.nav-hint b {
+  color: #fff;
+  font-weight: 600;
+}
+
+.ship-readout {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 21;
+  background: rgba(10, 16, 28, 0.7);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(8px);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: #bfe3ff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+}
+
+/* janelinha "entrar em órbita da Terra" */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 20px 22px;
+  max-width: 340px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.modal h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+.modal p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #b9c4d6;
+  line-height: 1.5;
+}
+.modal-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.modal-btn {
+  appearance: none;
+  border: 1px solid var(--panel-border);
+  background: rgba(30, 38, 58, 0.8);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.modal-btn:hover {
+  background: rgba(45, 58, 86, 0.9);
+}
+.modal-btn.yes {
+  border-color: var(--accent);
+  background: rgba(40, 64, 110, 0.9);
+  font-weight: 600;
+}
+
+/* ---------------- Menu de miniaturas (rodapé) ---------------- */
+.menu {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 12px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent);
+}
+.menu-strip,
+.menu-moons {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  max-width: 100%;
+  padding: 2px;
+  scrollbar-width: thin;
+}
+.menu-dwarfs {
+  align-items: center;
+}
+.menu-moons {
+  align-items: center;
+  display: none;
+}
+.menu-moons.visible {
+  display: flex;
+}
+.menu-moons-tip {
+  font-size: 11px;
+  color: #9fb0cc;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.thumb {
+  appearance: none;
+  border: 1px solid transparent;
+  background: rgba(16, 20, 32, 0.6);
+  border-radius: 10px;
+  padding: 6px 8px 5px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 54px;
+  transition: border-color 0.15s, transform 0.12s, background 0.15s;
+}
+.thumb:hover {
+  background: rgba(30, 38, 58, 0.8);
+  transform: translateY(-2px);
+}
+.thumb.active {
+  border-color: var(--accent);
+  background: rgba(40, 64, 110, 0.7);
+}
+.thumb-ball {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  box-shadow: inset -3px -3px 6px rgba(0, 0, 0, 0.5);
+}
+.thumb-moon .thumb-ball {
+  width: 22px;
+  height: 22px;
+}
+/* planetas anões: miniaturas menores na linha de baixo */
+.thumb-dwarf {
+  min-width: 46px;
+  padding: 4px 6px 3px;
+}
+.thumb-dwarf .thumb-ball {
+  width: 18px;
+  height: 18px;
+}
+.thumb-dwarf .thumb-label {
+  font-size: 9.5px;
+}
+.thumb-label {
+  font-size: 11px;
+  color: #cdd6e6;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .hud {
+    width: 168px;
+  }
+  .thumb {
+    min-width: 48px;
+  }
+  .thumb-label {
+    font-size: 10px;
+  }
 }

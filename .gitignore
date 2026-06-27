@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# nave 3d baixada pra avaliar depois (não usar ainda)
+src/assets/
+*.rar

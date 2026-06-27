@@ -1,0 +1,270 @@
+// Fábrica de corpos celestes.
+//
+// Hierarquia Three.js:
+//
+//   orbitGroup (gira em Y -> longitude correta)
+//     └─ pivot (na distância da órbita; SEM escala/spin)
+//          ├─ mesh (escala = raio do corpo; gira em si)  └─ [anel]
+//          └─ [orbitGroup de luas]  (pendurado no pivot, não no mesh, para não
+//                                     herdar a escala/rotação do planeta)
+//
+// As esferas são unitárias (raio 1) e o tamanho é dado por mesh.scale. Assim
+// trocar de modo (fantasia<->real) só anima escala e distância — sem recriar
+// geometria. Isso permite o modo real ter proporções de tamanho VERDADEIRAS.
+
+import * as THREE from "three";
+import { bodyRadius, orbitRadius, moonOrbitRadius } from "./scales.js";
+import { longitudeRad, moonLongitudeRad } from "./ephemeris.js";
+import { ringTexture } from "./textures.js";
+
+const SEGMENTS = 64; // silhueta lisa mesmo de perto (custo trivial)
+
+function makeMesh(descriptor, isSun) {
+  const texture = descriptor.makeTexture();
+  const material = isSun
+    ? new THREE.MeshBasicMaterial({ map: texture }) // Sol não depende de luz
+    : new THREE.MeshStandardMaterial({
+        map: texture,
+        roughness: descriptor.roughness ?? 0.9,
+        metalness: 0,
+      });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, SEGMENTS, SEGMENTS), material);
+  mesh.userData.bodyId = descriptor.id;
+  if (descriptor.axialTilt) mesh.rotation.z = THREE.MathUtils.degToRad(descriptor.axialTilt);
+  return mesh;
+}
+
+// anel construído relativo ao raio base 1 (escala junto com o mesh do planeta)
+function addRing(mesh, ring) {
+  const inner = ring.inner;
+  const outer = ring.outer;
+  const geo = new THREE.RingGeometry(inner, outer, 96);
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  const v3 = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v3.fromBufferAttribute(pos, i);
+    const t = (v3.length() - inner) / (outer - inner);
+    uv.setXY(i, t, 0.5);
+  }
+  const mat = new THREE.MeshBasicMaterial({
+    map: ringTexture(ring.colors),
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.9,
+  });
+  const ringMesh = new THREE.Mesh(geo, mat);
+  ringMesh.rotation.x = Math.PI / 2;
+  mesh.add(ringMesh);
+  return ringMesh;
+}
+
+const textureLoader = new THREE.TextureLoader();
+
+// Troca o mapa entre a textura procedural (fantasia) e a real/NASA (real),
+// carregando a real sob demanda na primeira vez que o modo real é usado.
+function makeTextureSwitcher(mesh, ringMesh, descriptor) {
+  const proceduralMap = mesh.material.map;
+  const proceduralRingMap = ringMesh ? ringMesh.material.map : null;
+  let realMap = null;
+  let realRingMap = null;
+
+  function loadReal(url) {
+    const t = textureLoader.load(url);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
+    return t;
+  }
+
+  return (currentMode) => {
+    const wantReal = currentMode === "real";
+
+    if (descriptor.realTextureUrl) {
+      if (wantReal) {
+        if (!realMap) realMap = loadReal(descriptor.realTextureUrl);
+        if (mesh.material.map !== realMap) {
+          mesh.material.map = realMap;
+          mesh.material.needsUpdate = true;
+        }
+      } else if (mesh.material.map !== proceduralMap) {
+        mesh.material.map = proceduralMap;
+        mesh.material.needsUpdate = true;
+      }
+    }
+
+    if (ringMesh && descriptor.ring && descriptor.ring.realTextureUrl) {
+      if (wantReal) {
+        if (!realRingMap) {
+          realRingMap = loadReal(descriptor.ring.realTextureUrl);
+          realRingMap.wrapS = THREE.ClampToEdgeWrapping;
+        }
+        if (ringMesh.material.map !== realRingMap) {
+          ringMesh.material.map = realRingMap;
+          ringMesh.material.needsUpdate = true;
+        }
+      } else if (ringMesh.material.map !== proceduralRingMap) {
+        ringMesh.material.map = proceduralRingMap;
+        ringMesh.material.needsUpdate = true;
+      }
+    }
+  };
+}
+
+// aproxima current de target de forma suave e independente de framerate
+function approach(current, target, dt) {
+  const d = target - current;
+  if (Math.abs(d) < 1e-5) return target;
+  return current + d * Math.min(1, dt * 2.5);
+}
+
+const _lodPos = new THREE.Vector3();
+
+export function createBody(descriptor, mode) {
+  const mesh = makeMesh(descriptor, descriptor.isSun);
+  const ringMesh = descriptor.ring ? addRing(mesh, descriptor.ring) : null;
+  const switchTexture = makeTextureSwitcher(mesh, ringMesh, descriptor);
+
+  const pivot = new THREE.Object3D();
+  pivot.add(mesh);
+  const orbitGroup = new THREE.Object3D();
+  orbitGroup.add(pivot);
+
+  // LOD por distância: textura detalhada (NASA/2k) só quando a câmera chega
+  // perto; de longe volta pra procedural e DESCARTA a hi-res (libera VRAM no
+  // tablet). Só no modo real — no aproximado o visual procedural é proposital.
+  const lodProceduralMap = mesh.material.map;
+  let lodHiresMap = null;
+  let lodHiresOn = false;
+
+  const body = {
+    descriptor,
+    id: descriptor.id,
+    name: descriptor.name,
+    mesh,
+    pivot,
+    orbitGroup,
+    moons: [],
+
+    _targetX: 0,
+    _targetScale: 1,
+
+    get radius() {
+      return mesh.scale.x;
+    },
+
+    applyMode(currentMode, instant = true) {
+      this._targetX = descriptor.isSun ? 0 : orbitRadius(descriptor.aAU, currentMode);
+      this._targetScale = bodyRadius(descriptor.realRadiusKm ?? 6371, currentMode, descriptor.isSun);
+      switchTexture(currentMode);
+      if (instant) {
+        pivot.position.x = this._targetX;
+        mesh.scale.setScalar(this._targetScale);
+      }
+      for (const m of this.moons) m.applyMode(currentMode, instant);
+    },
+
+    update(simDays, dSimDays, dt) {
+      pivot.position.x = approach(pivot.position.x, this._targetX, dt);
+      mesh.scale.setScalar(approach(mesh.scale.x, this._targetScale, dt));
+      orbitGroup.rotation.y = longitudeRad(descriptor, simDays);
+      // giro no próprio eixo amarrado ao TEMPO SIMULADO (1 volta por rotDays);
+      // negativo = retrógrado. Desacelera junto com a velocidade do tempo.
+      mesh.rotation.y += ((2 * Math.PI) / (descriptor.rotDays ?? 1)) * dSimDays;
+      for (const m of this.moons) m.update(simDays, dSimDays, dt);
+    },
+
+    worldPosition(target) {
+      return mesh.getWorldPosition(target);
+    },
+
+    // chamado a cada frame com a posição da câmera e o modo atual
+    updateDetail(cameraPos, currentMode) {
+      if (!descriptor.hiresTextureUrl) return;
+      if (currentMode !== "real") {
+        if (lodHiresOn) {
+          mesh.material.map = lodProceduralMap;
+          mesh.material.needsUpdate = true;
+          lodHiresOn = false;
+        }
+        return;
+      }
+      mesh.getWorldPosition(_lodPos);
+      const dist = cameraPos.distanceTo(_lodPos);
+      const r = mesh.scale.x;
+      if (!lodHiresOn && dist < r * 8) {
+        if (!lodHiresMap) {
+          lodHiresMap = textureLoader.load(descriptor.hiresTextureUrl);
+          lodHiresMap.colorSpace = THREE.SRGBColorSpace;
+          lodHiresMap.anisotropy = 8;
+        }
+        mesh.material.map = lodHiresMap;
+        mesh.material.needsUpdate = true;
+        lodHiresOn = true;
+      } else if (lodHiresOn && dist > r * 14) {
+        // histerese (8↔14) evita piscar; descarta a textura ao afastar
+        mesh.material.map = lodProceduralMap;
+        mesh.material.needsUpdate = true;
+        lodHiresOn = false;
+        if (lodHiresMap) {
+          lodHiresMap.dispose();
+          lodHiresMap = null;
+        }
+      }
+    },
+  };
+
+  body.applyMode(mode);
+  return body;
+}
+
+// Cria uma lua presa ao PIVOT do planeta (segue a posição, não a escala/spin).
+export function attachMoon(planet, descriptor, mode) {
+  const mesh = makeMesh(descriptor, false);
+  const pivot = new THREE.Object3D();
+  pivot.add(mesh);
+  const orbitGroup = new THREE.Object3D();
+  orbitGroup.add(pivot);
+  planet.pivot.add(orbitGroup);
+
+  // raio "fantasia" do planeta é constante; usado para posicionar a lua perto
+  // dele no modo fantasia
+  const planetFantasyRadius = bodyRadius(planet.descriptor.realRadiusKm, "fantasy");
+
+  const moon = {
+    descriptor,
+    id: descriptor.id,
+    name: descriptor.name,
+    mesh,
+    parent: planet,
+    _targetX: 0,
+    _targetScale: 1,
+
+    get radius() {
+      return mesh.scale.x;
+    },
+
+    applyMode(currentMode, instant = true) {
+      this._targetX = moonOrbitRadius(planetFantasyRadius, descriptor.moonDistanceKm, currentMode);
+      this._targetScale = bodyRadius(descriptor.realRadiusKm, currentMode);
+      if (instant) {
+        pivot.position.x = this._targetX;
+        mesh.scale.setScalar(this._targetScale);
+      }
+    },
+
+    update(simDays, dSimDays, dt) {
+      pivot.position.x = approach(pivot.position.x, this._targetX, dt);
+      mesh.scale.setScalar(approach(mesh.scale.x, this._targetScale, dt));
+      orbitGroup.rotation.y = moonLongitudeRad(descriptor, simDays);
+      mesh.rotation.y += ((2 * Math.PI) / (descriptor.rotDays ?? 1)) * dSimDays;
+    },
+
+    worldPosition(target) {
+      return mesh.getWorldPosition(target);
+    },
+  };
+
+  moon.applyMode(mode);
+  planet.moons.push(moon);
+  return moon;
+}
