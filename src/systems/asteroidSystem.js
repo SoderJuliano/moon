@@ -64,6 +64,21 @@ export class AsteroidSystem {
     return this;
   }
 
+  // remove um campo e despawna seus asteroides ativos (espelho de addField; útil
+  // para campos dinâmicos/temporários, ex.: o Debug Spawn Mode).
+  removeField(id) {
+    const idx = this.fields.findIndex((f) => f.id === id);
+    if (idx === -1) return;
+    const [field] = this.fields.splice(idx, 1);
+    for (const desc of field.descriptors || []) {
+      const inst = this._active.get(desc.id);
+      if (inst) {
+        this._despawn(inst);
+        this._active.delete(desc.id);
+      }
+    }
+  }
+
   // carrega modelos + textura de rocha. Idempotente; resolve quando pronto.
   async load() {
     if (this.loaded || this._loading) return this._loading;

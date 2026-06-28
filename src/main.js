@@ -15,6 +15,7 @@ import { ShipFlight } from "./ui/shipFlight.js";
 import { SpaceMarkerSystem } from "./ui/spaceMarkers.js";
 import { NavigationHud } from "./ui/navigationHud.js";
 import { createAsteroidSystem } from "./systems/asteroidConfig.js";
+import { DebugAsteroidSpawner } from "./systems/debugAsteroidSpawner.js";
 import { SpaceAudio } from "./ui/spaceAudio.js";
 import { createHud } from "./ui/hud.js";
 import { createMenu } from "./ui/menu.js";
@@ -116,6 +117,11 @@ markerSystem.setTargets(
 // Asteroides (sistema independente): popula o espaço com pedras que têm colisão.
 // Streaming/pooling próprios; colidir = reusa o fluxo de explosão da nave (abaixo).
 const asteroids = createAsteroidSystem(scene, (id) => bodyById.get(id));
+
+// DEBUG SPAWN MODE (temporário): gera asteroides perto da nave p/ validar o
+// sistema. Isolado — remova esta linha (e o update no loop) para desativar.
+const debugAsteroids = new DebugAsteroidSpawner(asteroids, { getBodies: () => bodyById.values() });
+const _dbgFwd = new THREE.Vector3();
 
 function setOrbitLineRadius(line, r) {
   const pos = line.geometry.attributes.position;
@@ -238,6 +244,16 @@ function animate() {
   const asteroidsActive = flying && !supercruising;
   asteroids.update(dt, { active: asteroidsActive, shipPos: ship.ship.position });
   if (asteroidsActive && asteroids.hitTest(ship.ship.position)) ship.explode(); // reusa a explosão
+
+  // DEBUG SPAWN MODE (temporário): semeia asteroides perto da nave p/ teste
+  _dbgFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
+  debugAsteroids.update(dt, {
+    active: flying,
+    supercruising,
+    position: ship.ship.position,
+    forward: _dbgFwd,
+    speed: ship.velocity.length(),
+  });
 
   audio.update(camera, bodyById); // volume por proximidade (modo real)
 

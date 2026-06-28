@@ -19,6 +19,13 @@ import { ringTexture } from "./textures.js";
 
 const SEGMENTS = 64; // silhueta lisa mesmo de perto (custo trivial)
 
+// Ao pilotar e aproximar uma LUA, ela infla pra escala gigante (igual aos
+// planetas). Mas a lua orbita o planeta a uma distância pequena — inflada, ela
+// engoliria o planeta-pai. Então afastamos a lua do planeta o suficiente pra ela
+// (gigante) não cobrir o pai: distância ≥ raio_inflado·FATOR + raio_do_pai.
+// Sem aproximação (escala normal) isso não muda nada (mantém a órbita real).
+const MOON_APPROACH_CLEARANCE = 1.4;
+
 function makeMesh(descriptor, isSun) {
   const texture = descriptor.makeTexture();
   const material = isSun
@@ -298,9 +305,16 @@ export function attachMoon(planet, descriptor, mode) {
     },
 
     update(simDays, dSimDays, dt) {
-      pivot.position.x = approach(pivot.position.x, this._targetX, dt);
       this._approachMul = approach(this._approachMul, this._approachTargetMul, dt);
-      mesh.scale.setScalar(approach(mesh.scale.x, this._targetScale * this._approachMul, dt));
+      const inflated = this._targetScale * this._approachMul;
+      mesh.scale.setScalar(approach(mesh.scale.x, inflated, dt));
+
+      // ESPAÇAMENTO na aproximação: afasta a lua do planeta o bastante pra ela
+      // (gigante) não engolir o pai. Sem inflar (_approachMul≈1) → órbita real.
+      const clearance = inflated * MOON_APPROACH_CLEARANCE + (planet.radius || 0);
+      const distTarget = Math.max(this._targetX, clearance);
+      pivot.position.x = approach(pivot.position.x, distTarget, dt);
+
       orbitGroup.rotation.y = moonLongitudeRad(descriptor, simDays);
       mesh.rotation.y += ((2 * Math.PI) / (descriptor.rotDays ?? 1)) * dSimDays;
     },
