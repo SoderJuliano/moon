@@ -51,15 +51,6 @@ function formatSpeed(unitsPerSec) {
   return `${kmsFmt} km/s`;
 }
 
-// distância legível: km quando perto, minutos/horas-luz quando longe
-function formatDistance(units) {
-  const km = units * KM_PER_UNIT;
-  if (km < 1e6) return `${Math.round(km).toLocaleString("pt-BR")} km`;
-  const lightMin = km / (C_KM_S * 60);
-  if (lightMin < 60) return `${lightMin.toFixed(1)} min-luz`;
-  return `${(lightMin / 60).toFixed(1)} h-luz`;
-}
-
 function buildShipModel() {
   const g = new THREE.Group();
   const hull = new THREE.MeshStandardMaterial({ color: 0xaeb9c6, metalness: 0.6, roughness: 0.35 });
@@ -102,27 +93,25 @@ function buildShipModel() {
 }
 
 export class ShipFlight {
-  constructor(scene, camera, controls, { onEngage, onDisengage, onDestroyed, onEarthApproach, getReferenceBody, getBodies, getSun } = {}) {
+  constructor(scene, camera, controls, { onEngage, onDisengage, onDestroyed, getReferenceBody, getBodies } = {}) {
     this.scene = scene;
     this.camera = camera;
     this.controls = controls;
     this.onEngage = onEngage;
     this.onDisengage = onDisengage;
     this.onDestroyed = onDestroyed;
-    this.onEarthApproach = onEarthApproach;
     this.getReferenceBody = getReferenceBody;
-    this.getBodies = getBodies; // p/ a mira de distância (Sol/planetas)
-    this.getSun = getSun; // p/ colidir com o Sol mesmo sem ser o corpo de referência
+    this.getBodies = getBodies; // todos os corpos (navegação, colisão, escala)
 
     this.enabled = false;
     this.active = false;
     this.intro = null; // fase de entrada cinematográfica (câmera assenta atrás da nave)
     this.exploding = false;
     this.explosion = null;
-    this.earthPromptShown = false;
     this.keys = new Set();
     this.referenceBody = null;
-    this._hiddenMoons = []; // luas escondidas do planeta gigante durante o voo
+    this._approachBody = null; // corpo atualmente ampliado (gigante) ao nos aproximarmos
+    this._hiddenMoons = []; // luas escondidas do corpo gigante durante o voo
 
     // --- empuxo linear: escalar com inércia + DIREÇÃO que segue o nariz -------
     this.maxSpeed = 3.3; // cruzeiro ~7% da luz
@@ -140,6 +129,8 @@ export class ShipFlight {
     this.supercruiseGain = 0.5; // u/s de teto por unidade de distância à superfície
     this.supercruiseMax = 3000; // teto absoluto (~Sol alcançável em ~10–15 s)
     this.scAccel = 1.5; // rampa do empuxo até o teto de supercruise (spool-up)
+    this.brakeAccel = 400; // frenagem de segurança: desaceleração ao detectar impacto
+    this._braking = false; // estado do auto-brake (p/ HUD/readout)
 
     // --- rotação 6DoF (rad/s, eixos locais, com inércia) ---------------------
     this.pitchRate = 1.6; // cabrar/picar (local X)
@@ -219,17 +210,7 @@ export class ShipFlight {
       this.sparks.push({ sprite: s, life: 0 });
     }
 
-    // mira de distância: ao apontar o bico pra um corpo, mostra "Nome — dist"
-    this.targetLabel = document.createElement("div");
-    Object.assign(this.targetLabel.style, {
-      position: "fixed", top: "54px", left: "50%", transform: "translateX(-50%)",
-      zIndex: "21", padding: "4px 12px", borderRadius: "999px",
-      background: "rgba(10,16,28,0.6)", border: "1px solid rgba(255,255,255,0.12)",
-      color: "#dbe7ff", font: "12px system-ui, sans-serif", letterSpacing: "0.3px",
-      pointerEvents: "none", backdropFilter: "blur(6px)", display: "none", whiteSpace: "nowrap",
-    });
-    document.body.appendChild(this.targetLabel);
-
+    // a mira de distância foi substituída pela NavigationHud (marcadores espaciais)
     this.readout = document.createElement("div");
     this.readout.className = "ship-readout";
     this.readout.style.display = "none";
@@ -309,7 +290,6 @@ export class ShipFlight {
   engage() {
     if (this.active) return;
     this.active = true;
-    this.earthPromptShown = false;
     this.ship.visible = true;
     this.readout.style.display = "";
     this.controls.enabled = false;
@@ -328,17 +308,9 @@ export class ShipFlight {
     // o planeta antes de qualquer colisão (escala com o raio do corpo). A nave
     // nasce ENTRE a câmera e o planeta, deslocada pro lado/baixo (entra no quadro).
     if (this.referenceBody) {
-      // planeta cresce pra escala gigante (mínimo grande pros pequenos); esconde
-      // as luas dele (ficariam dentro do planeta agora enorme)
-      const base = this.referenceBody.baseRadius || 1;
-      this.referenceBody.setApproach(Math.max(APPROACH_MUL, MIN_APPROACH_R / base));
-      this._hiddenMoons = [];
-      for (const m of this.referenceBody.moons || []) {
-        if (m.mesh.visible) {
-          m.mesh.visible = false;
-          this._hiddenMoons.push(m);
-        }
-      }
+      // planeta cresce pra escala gigante (mínimo grande pros pequenos) e esconde
+      // suas luas — agora generalizado em _setApproachBody (mesma lógica do voo)
+      this._setApproachBody(this.referenceBody);
       this.referenceBody.worldPosition(this._refPos);
       const approach = this.referenceBody.approachRadius * 2.4 + 2; // nasce bem fora
       this._toPlanet.copy(this.camera.position).sub(this._refPos); // planeta -> câmera
@@ -393,11 +365,53 @@ export class ShipFlight {
     if (this.onEngage) this.onEngage();
   }
 
-  // devolve o planeta ao tamanho normal e mostra as luas de volta
+  // devolve qualquer corpo ampliado ao tamanho normal (mostra as luas de volta)
   _restoreApproach() {
-    if (this.referenceBody) this.referenceBody.setApproach(1);
-    for (const m of this._hiddenMoons) m.mesh.visible = true;
-    this._hiddenMoons = [];
+    this._setApproachBody(null);
+  }
+
+  // raio "gigante" que um corpo terá ao ampliarmos (mín. grande pros pequenos)
+  _giantRadius(body) {
+    const base = body.baseRadius || 1;
+    return base * Math.max(APPROACH_MUL, MIN_APPROACH_R / base);
+  }
+
+  // Amplia UM corpo de cada vez (vira gigante, nave = grão de areia) e esconde as
+  // luas dele (ficariam dentro do planeta enorme). Passar null restaura o atual.
+  // Centraliza o que antes era inline no engage/_restoreApproach — usado tanto na
+  // entrada quanto na aproximação dinâmica durante o voo.
+  _setApproachBody(body) {
+    if (this._approachBody === body) return;
+    if (this._approachBody) {
+      this._approachBody.setApproach(1);
+      for (const m of this._hiddenMoons) m.mesh.visible = true;
+      this._hiddenMoons = [];
+    }
+    this._approachBody = body;
+    if (body) {
+      const base = body.baseRadius || 1;
+      body.setApproach(Math.max(APPROACH_MUL, MIN_APPROACH_R / base));
+      for (const m of body.moons || []) {
+        if (m.mesh.visible) {
+          m.mesh.visible = false;
+          this._hiddenMoons.push(m);
+        }
+      }
+    }
+  }
+
+  // Aproximação dinâmica: ao chegar perto de QUALQUER corpo, ele cresce pra escala
+  // gigante; ao se afastar (ou trocar de corpo mais próximo), volta ao normal.
+  // Histerese (entra a 4× o raio gigante, sai a 7×) evita piscar.
+  _updateApproachScaling(body, dist) {
+    if (this._approachBody && this._approachBody !== body) this._setApproachBody(null);
+    if (!body) return;
+    const gr = this._giantRadius(body);
+    if (this._approachBody === body) {
+      if (dist > gr * 7) this._setApproachBody(null);
+    } else if (dist < gr * 4) {
+      this._setApproachBody(body);
+    }
   }
 
   disengage() {
@@ -504,7 +518,7 @@ export class ShipFlight {
     }
   }
 
-  // esconde todos os efeitos (partículas/faíscas/mira) ao sair/explodir
+  // esconde todos os efeitos (partículas/faíscas) ao sair/explodir
   _hideFx() {
     this.heat.visible = false;
     this.streaks.visible = false;
@@ -512,7 +526,6 @@ export class ShipFlight {
       s.life = 0;
       s.sprite.visible = false;
     }
-    this.targetLabel.style.display = "none";
   }
 
   // espalha as partículas num tubo à frente do nariz (prontas pra entrarem em quadro)
@@ -582,32 +595,6 @@ export class ShipFlight {
         s.sprite.scale.setScalar(0.012 + (1 - l) * 0.02);
         if (s.life <= 0) s.sprite.visible = false;
       }
-    }
-  }
-
-  // mira: se o bico aponta (quase) exato pra um corpo, mostra nome + distância
-  _updateTargetLabel() {
-    if (!this.getBodies) return;
-    let best = null;
-    let bestDot = 0.985; // ~10° de tolerância
-    let bestDist = 0;
-    for (const b of this.getBodies()) {
-      b.worldPosition(this._tmp2);
-      this._tmp2.sub(this.ship.position);
-      const d = this._tmp2.length();
-      if (d < 1e-4) continue;
-      const dot = this._tmp2.dot(this._fwd) / d;
-      if (dot > bestDot) {
-        bestDot = dot;
-        best = b;
-        bestDist = d;
-      }
-    }
-    if (best) {
-      this.targetLabel.textContent = `${best.name} — ${formatDistance(bestDist)}`;
-      this.targetLabel.style.display = "";
-    } else {
-      this.targetLabel.style.display = "none";
     }
   }
 
@@ -719,11 +706,19 @@ export class ShipFlight {
     // teto dinâmico (supercruise): perto de um corpo = boost normal; longe = voa
     // muito mais rápido. distância à SUPERFÍCIE do corpo mais próximo (Sol/planetas).
     let nearSurf = Infinity;
+    let nearestBody = null;
+    let nearestCenter = 0;
     if (this.getBodies) {
       for (const b of this.getBodies()) {
+        if (b.mesh && !b.mesh.visible) continue; // pula luas escondidas (estão "dentro" do gigante)
         b.worldPosition(this._tmp2);
-        const d = this._tmp2.distanceTo(this.ship.position) - b.radius;
-        if (d < nearSurf) nearSurf = d;
+        const c = this._tmp2.distanceTo(this.ship.position);
+        const d = c - b.radius;
+        if (d < nearSurf) {
+          nearSurf = d;
+          nearestBody = b;
+          nearestCenter = c;
+        }
       }
     }
     if (!isFinite(nearSurf)) nearSurf = 0;
@@ -753,41 +748,60 @@ export class ShipFlight {
     this._desiredVel.copy(this._fwd).multiplyScalar(this.speed);
     this.velocity.lerp(this._desiredVel, 1 - Math.exp(-this.velAlign * dt)); // direção segue o nariz
 
-    // gravidade do planeta de referência (puxa a velocidade, leitura órbita/fuga)
+    // gravidade do corpo de REFERÊNCIA (puxa a velocidade; leitura órbita/fuga)
     let escapeSpeed = 0;
     if (this.referenceBody) {
-      const body = this.referenceBody;
-      const r = body.radius;
+      const r = this.referenceBody.radius;
       this._toPlanet.copy(this._refPos).sub(this.ship.position);
       const dist = this._toPlanet.length() || 1e-6;
-      this._tmp3.copy(this._toPlanet).divideScalar(dist); // direção ao planeta
-
+      this._tmp3.copy(this._toPlanet).divideScalar(dist);
       const dd = Math.max(dist, r * 1.05);
-      const gAccel = (this.gravity * r * r) / (dd * dd);
-      this.velocity.addScaledVector(this._tmp3, gAccel * dt);
+      this.velocity.addScaledVector(this._tmp3, ((this.gravity * r * r) / (dd * dd)) * dt);
       escapeSpeed = r * Math.sqrt((2 * this.gravity) / dd);
+    }
 
-      // consequências de proximidade (barreira da Terra / explosão nos demais)
-      if (body.id === "earth") {
-        const barrier = r * 1.4;
-        if (dist < barrier) {
-          // mantém a nave fora e remove a velocidade em direção ao planeta
-          this.ship.position.copy(this._refPos).addScaledVector(this._tmp3, -barrier);
-          const vIn = this.velocity.dot(this._tmp3);
-          if (vIn > 0) this.velocity.addScaledVector(this._tmp3, -vIn);
-          if (!this.earthPromptShown) {
-            this.earthPromptShown = true;
-            if (this.onEarthApproach) this.onEarthApproach();
+    // CORPO MAIS PRÓXIMO (qualquer um — referência ou não): escala de aproximação,
+    // frenagem de segurança, colisão e calor. Sem caso especial (a Terra é igual).
+    this._braking = false;
+    if (nearestBody) {
+      const r = nearestBody.radius;
+      const dist = nearestCenter || 1e-6;
+      nearestBody.worldPosition(this._tmp2);
+      this._toPlanet.copy(this._tmp2).sub(this.ship.position); // (centro - nave)
+      this._tmp3.copy(this._toPlanet).divideScalar(dist); // direção nave → corpo
+
+      // 4) escala visual: o corpo que estamos abordando vira gigante (todos iguais)
+      this._updateApproachScaling(nearestBody, dist);
+
+      // 3) frenagem de segurança (Flight Assist só p/ aproximações perigosas):
+      // em rota de impacto e rápido demais pra frear na mão → limita a velocidade
+      // ao que permite parar antes da superfície. Libera assim que você desvia.
+      const speed = this.velocity.length();
+      const padR = r * 1.4; // para FORA do raio de explosão (1.1·r)
+      if (speed > this.maxSpeed && dist > padR) {
+        this._tmp.copy(this.velocity).multiplyScalar(1 / speed); // direção do voo
+        const tCA = this._toPlanet.dot(this._tmp); // avanço até o ponto mais próximo
+        if (tCA > 0) {
+          const closest2 = Math.max(this._toPlanet.lengthSq() - tCA * tCA, 0);
+          const hitR = r * 1.25; // tolerância de "rota de impacto"
+          if (closest2 < hitR * hitR) {
+            const safe = Math.sqrt(2 * this.brakeAccel * (dist - padR));
+            if (speed > safe) {
+              this.velocity.multiplyScalar(safe / speed);
+              this.speed = Math.min(this.speed, safe);
+              this._braking = true;
+            }
           }
-        } else if (dist > r * 1.9) {
-          this.earthPromptShown = false; // pode perguntar de novo mais tarde
         }
-      } else if (dist < r * 1.1) {
+      }
+
+      // colisão: encostou → explode (Terra e todos os corpos, referência ou não)
+      if (dist < r * 1.1) {
         this.explode();
         return;
       }
 
-      // ar superaquecido no lado voltado pro planeta — cresce ao chegar perto
+      // ar superaquecido no lado voltado pro corpo — cresce ao chegar perto
       const heatStart = r * 3.2;
       const heatEnd = r * 1.25;
       const heatT = THREE.MathUtils.clamp((heatStart - dist) / (heatStart - heatEnd), 0, 1);
@@ -802,17 +816,6 @@ export class ShipFlight {
       }
     } else {
       this.heat.visible = false;
-    }
-
-    // colisão com o Sol mesmo quando ele NÃO é o corpo de referência (senão a
-    // nave atravessava o Sol voando preso a outro planeta)
-    const sunBody = this.getSun ? this.getSun() : null;
-    if (sunBody && sunBody !== this.referenceBody) {
-      sunBody.worldPosition(this._tmp2);
-      if (this._tmp2.distanceTo(this.ship.position) < sunBody.radius * 1.05) {
-        this.explode();
-        return;
-      }
     }
 
     // 5b) integra a posição usando a velocidade (já no espaço-mundo)
@@ -852,7 +855,9 @@ export class ShipFlight {
     }
 
     // velocidade legível (% da luz + km/s) e estado orbital
-    if (supercruising) {
+    if (this._braking) {
+      this.readout.textContent = `⚠ FRENAGEM AUTOMÁTICA · ${formatSpeed(sp)}`;
+    } else if (supercruising) {
       this.readout.textContent = `SUPERCRUISE · ${formatSpeed(sp)}`;
     } else if (this.referenceBody) {
       const status = sp > escapeSpeed ? "FUGA" : "EM ÓRBITA";

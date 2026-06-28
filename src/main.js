@@ -57,10 +57,8 @@ const ship = new ShipFlight(scene, camera, controls, {
     menu.highlight("sun");
     rig.flyToBody(sun, 6);
   },
-  onEarthApproach: () => showEarthDialog(),
   getReferenceBody: () => (selectedId ? bodyById.get(selectedId) : null),
-  getBodies: () => bodyById.values(), // mira de distância (Sol/planetas/luas)
-  getSun: () => sun, // colisão com o Sol mesmo voando preso a outro planeta
+  getBodies: () => bodyById.values(), // navegação, colisão e escala (todos os corpos)
 });
 
 // som ambiente por proximidade (só no modo real)
@@ -194,41 +192,6 @@ function outermostRadius() {
 
 function goPanoramic() {
   rig.flyToPanoramic(outermostRadius() * 1.15);
-}
-
-// Janelinha ao se aproximar da Terra com a nave: oferece "entrar em órbita"
-// (redireciona ao Google Earth). A barreira da nave mantém o jogador fora.
-let earthDialog = null;
-function showEarthDialog() {
-  if (earthDialog) {
-    earthDialog.style.display = "flex";
-    return;
-  }
-  const overlay = document.createElement("div");
-  overlay.className = "modal-overlay";
-  const box = document.createElement("div");
-  box.className = "modal";
-  box.innerHTML =
-    "<h3>Entrar em órbita da Terra?</h3>" +
-    "<p>Você chegou pertinho da Terra. Quer ver de perto no Google Earth?</p>";
-  const row = document.createElement("div");
-  row.className = "modal-row";
-  const yes = document.createElement("button");
-  yes.className = "modal-btn yes";
-  yes.textContent = "Sim, abrir Google Earth";
-  const no = document.createElement("button");
-  no.className = "modal-btn";
-  no.textContent = "Não, continuar voando";
-  yes.addEventListener("click", () => {
-    window.open("https://earth.google.com/web/", "_blank");
-    overlay.style.display = "none";
-  });
-  no.addEventListener("click", () => (overlay.style.display = "none"));
-  row.append(yes, no);
-  box.appendChild(row);
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-  earthDialog = overlay;
 }
 
 // --- Loop ------------------------------------------------------------------
