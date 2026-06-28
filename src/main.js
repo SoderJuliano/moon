@@ -14,6 +14,7 @@ import { CameraRig } from "./ui/cameraRig.js";
 import { ShipFlight } from "./ui/shipFlight.js";
 import { SpaceMarkerSystem } from "./ui/spaceMarkers.js";
 import { NavigationHud } from "./ui/navigationHud.js";
+import { createAsteroidSystem } from "./systems/asteroidConfig.js";
 import { SpaceAudio } from "./ui/spaceAudio.js";
 import { createHud } from "./ui/hud.js";
 import { createMenu } from "./ui/menu.js";
@@ -111,6 +112,10 @@ markerSystem.setTargets(
     getWorldPosition: (v) => b.worldPosition(v),
   }))
 );
+
+// Asteroides (sistema independente): popula o espaço com pedras que têm colisão.
+// Streaming/pooling próprios; colidir = reusa o fluxo de explosão da nave (abaixo).
+const asteroids = createAsteroidSystem(scene, (id) => bodyById.get(id));
 
 function setOrbitLineRadius(line, r) {
   const pos = line.geometry.attributes.position;
@@ -223,8 +228,16 @@ function animate() {
   if (!rig.isTweening && !ship.isActive) controls.update();
 
   // HUD de navegação: marcadores dos corpos enquanto pilota (some na explosão)
-  navHud.setVisible(ship.isActive && !ship.exploding);
+  const flying = ship.isActive && !ship.exploding;
+  navHud.setVisible(flying);
   navHud.update(dt);
+
+  // Asteroides: streaming + colisão só no voo normal. No supercruise (ou fora do
+  // voo) o sistema despawna tudo e ignora colisão, mantendo apenas os dados.
+  const supercruising = ship.velocity.length() > ship.boostSpeed * 1.5;
+  const asteroidsActive = flying && !supercruising;
+  asteroids.update(dt, { active: asteroidsActive, shipPos: ship.ship.position });
+  if (asteroidsActive && asteroids.hitTest(ship.ship.position)) ship.explode(); // reusa a explosão
 
   audio.update(camera, bodyById); // volume por proximidade (modo real)
 
