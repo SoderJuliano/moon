@@ -12,6 +12,8 @@ import { simDate } from "./core/ephemeris.js";
 import { SUN, ORBITERS, MOONS } from "./bodies/index.js";
 import { CameraRig } from "./ui/cameraRig.js";
 import { ShipFlight } from "./ui/shipFlight.js";
+import { SpaceMarkerSystem } from "./ui/spaceMarkers.js";
+import { NavigationHud } from "./ui/navigationHud.js";
 import { SpaceAudio } from "./ui/spaceAudio.js";
 import { createHud } from "./ui/hud.js";
 import { createMenu } from "./ui/menu.js";
@@ -20,6 +22,11 @@ let mode = "fantasy"; // padrão pedido: modo imaginação/fantasia
 
 const { scene, camera, renderer, controls, glow } = createScene();
 const rig = new CameraRig(camera, controls);
+// Navegação espacial (desacoplada do voo): a lógica de projeção/relevância vive
+// no SpaceMarkerSystem; a NavigationHud só desenha. Alvos definidos após montar
+// os corpos. No futuro: estações, naves, waypoints, objetivos de missão.
+const markerSystem = new SpaceMarkerSystem();
+const navHud = new NavigationHud(camera, markerSystem);
 // nave (modo real): voo em 3ª pessoa travado no referencial do planeta focado
 const ship = new ShipFlight(scene, camera, controls, {
   onEngage: () => {
@@ -94,6 +101,18 @@ for (const desc of ORBITERS) {
     }
   }
 }
+
+// Alvos de navegação: todo corpo vira um marcador (Sol, planetas, anões, luas).
+// Adapta o corpo à interface genérica { id, name, color, kind, getWorldPosition }.
+markerSystem.setTargets(
+  [...bodyById.values()].map((b) => ({
+    id: b.id,
+    name: b.name,
+    color: b.descriptor?.menuColor || "#cdd6e6",
+    kind: b.descriptor?.type || "planet",
+    getWorldPosition: (v) => b.worldPosition(v),
+  }))
+);
 
 function setOrbitLineRadius(line, r) {
   const pos = line.geometry.attributes.position;
@@ -239,6 +258,10 @@ function animate() {
   if (!rig.isTweening) ship.update(dt); // nave (modo real)
   rig.update(dt);
   if (!rig.isTweening && !ship.isActive) controls.update();
+
+  // HUD de navegação: marcadores dos corpos enquanto pilota (some na explosão)
+  navHud.setVisible(ship.isActive && !ship.exploding);
+  navHud.update(dt);
 
   audio.update(camera, bodyById); // volume por proximidade (modo real)
 

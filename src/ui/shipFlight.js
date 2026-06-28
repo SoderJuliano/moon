@@ -865,6 +865,7 @@ export class ShipFlight {
     const fx = boosting ? spN : 0;
     this._updateStreaks(fx);
     this._updateSparks(dt, fx);
-    this._updateTargetLabel();
+    // a mira de distância antiga foi substituída pela NavigationHud (marcadores
+    // espaciais), montada em main.js e desacoplada do voo.
   }
 }
