@@ -16,6 +16,7 @@ import { ShipFlight } from "../ui/shipFlight.js";
 import { SpaceMarkerSystem } from "../ui/spaceMarkers.js";
 import { NavigationHud } from "../ui/navigationHud.js";
 import { ENTRY_OVERRIDES } from "../systems/asteroidConfig.js";
+import { Shipwreck, createWreckCloud } from "../systems/shipwreck.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
 
 // Tempo quase parado, como ao pilotar no planetário: a translação orbital é
@@ -36,6 +37,13 @@ export function startGameMode() {
   const markerSystem = new SpaceMarkerSystem();
   markerSystem.setTargets(markerTargets);
   const navHud = new NavigationHud(camera, markerSystem);
+
+  // Cemitério atrás de Júpiter (conteúdo SÓ do jogo): nuvem ~4× o cinturão
+  // principal + cruzador destruído preso à órbita no meio dela. O marcador
+  // "Sinal desconhecido" só entra no GPS quando o jogador chega perto.
+  asteroids.addBelt(createWreckCloud());
+  const wreck = new Shipwreck(scene, (id) => bodyById.get(id));
+  let wreckMarked = false;
 
   const ship = new ShipFlight(scene, camera, controls, {
     canDisengage: false, // Esc abre o menu de pausa em vez de "sair" da nave
@@ -129,6 +137,15 @@ export function startGameMode() {
           asteroids.destroyAsteroid(hit.id); // remove o asteroide atingido junto com a nave
           ship.explode();
         }
+      }
+
+      // Cruzador destruído: segue Júpiter, lazy-load do GLB na aproximação e
+      // colisão com o casco (mesma janela dos asteroides: nunca no supercruise)
+      wreck.update(dt, flying ? ship.ship.position : camera.position);
+      if (asteroidsActive && !ship.exploding && wreck.hitTest(ship.ship.position)) ship.explode();
+      if (wreck.revealed && !wreckMarked) {
+        markerSystem.add(wreck.markerTarget);
+        wreckMarked = true;
       }
 
       // Encontros ocasionais em viagem: só no voo normal (nunca no supercruise)

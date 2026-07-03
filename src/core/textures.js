@@ -259,6 +259,27 @@ export function starTexture({ core = "#fff6d0", mid = "#ffcc55", edge = "#ff8a2b
   return finish(c);
 }
 
+// --- Ponto de estrela p/ o domo (THREE.Points) ------------------------------
+// Disco com falloff suave ASSADO NO RGB (fundo preto): com blending aditivo não
+// precisa de canal alfa nem de transparent:true — transparent jogaria as
+// estrelas pra fila TRANSPARENTE, desenhada depois dos objetos, e com o depth
+// desligado elas voltariam a aparecer "na frente" de tudo.
+export function starDotTexture() {
+  const size = 32;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(0.35, "#909090");
+  g.addColorStop(1, "#000000");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // --- Glow radial (sprite do Sol e brilho de seleção) -----------------------
 export function radialGlowTexture(color = "#ffdd88") {
   const size = 256;
