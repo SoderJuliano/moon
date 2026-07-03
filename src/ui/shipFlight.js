@@ -93,13 +93,14 @@ function buildShipModel() {
 }
 
 export class ShipFlight {
-  constructor(scene, camera, controls, { onEngage, onDisengage, onDestroyed, getReferenceBody, getBodies, getEntryInfo } = {}) {
+  constructor(scene, camera, controls, { onEngage, onDisengage, onDestroyed, getReferenceBody, getBodies, getEntryInfo, canDisengage = true } = {}) {
     this.scene = scene;
     this.camera = camera;
     this.controls = controls;
     this.onEngage = onEngage;
     this.onDisengage = onDisengage;
     this.onDestroyed = onDestroyed;
+    this.canDisengage = canDisengage; // false no Game Mode: não existe câmera de observação pra "sair" da nave
     this.getReferenceBody = getReferenceBody;
     this.getBodies = getBodies; // todos os corpos (navegação, colisão, escala)
     this.getEntryInfo = getEntryInfo; // entrada por corpo: { mul, dir } (cinturões no caminho)
@@ -279,7 +280,7 @@ export class ShipFlight {
   _onKeyDown(e) {
     if (e.target && e.target.tagName === "INPUT") return;
     if (e.code === "Escape") {
-      if (this.active || this.exploding) this.disengage();
+      if (this.canDisengage && (this.active || this.exploding)) this.disengage();
       return;
     }
     if (!NAV_KEYS.has(e.code)) return;

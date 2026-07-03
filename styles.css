@@ -34,6 +34,174 @@ canvas {
   z-index: 50;
 }
 
+/* ---------------- Menu inicial (galáxia) ---------------- */
+.mm-root {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.mm-title {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  letter-spacing: 0.55em;
+  text-transform: uppercase;
+  color: #8fa3c8;
+  text-indent: 0.55em; /* compensa o tracking pra centralizar de verdade */
+  opacity: 0.85;
+}
+
+/* marcador do Sistema Solar: acompanha a rotação da galáxia */
+.mm-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #eaf1ff;
+  will-change: transform;
+}
+.mm-marker-ring {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(214, 228, 255, 0.85);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.mm-marker-ring::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 1px solid rgba(160, 190, 255, 0.35);
+  border-radius: 50%;
+  animation: mm-pulse 2.6s ease-out infinite;
+}
+.mm-marker-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ffe6b0;
+  box-shadow: 0 0 8px #ffd98a;
+}
+.mm-marker-label {
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+.mm-marker:hover .mm-marker-label {
+  color: #fff;
+}
+@keyframes mm-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* painel de escolha da experiência */
+.mm-panel {
+  position: absolute;
+  right: clamp(24px, 6vw, 90px);
+  top: 50%;
+  transform: translateY(-50%) translateX(16px);
+  width: min(330px, calc(100vw - 48px));
+  pointer-events: auto;
+  background: rgba(8, 12, 22, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(16px);
+  padding: 26px 24px 22px;
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.mm-panel.open {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+.mm-panel-title {
+  font-size: 19px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #f2f6ff;
+}
+.mm-panel-sub {
+  margin: 6px 0 20px;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8fa3c8;
+}
+.mm-option {
+  appearance: none;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 2px solid rgba(110, 168, 255, 0.35);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: background 0.18s, border-color 0.18s, transform 0.18s;
+}
+.mm-option + .mm-option {
+  margin-top: 10px;
+}
+.mm-option:hover {
+  background: rgba(110, 168, 255, 0.1);
+  border-color: rgba(110, 168, 255, 0.55);
+  transform: translateX(3px);
+}
+.mm-option-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #dfe9ff;
+}
+.mm-option-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #9fb0cc;
+}
+
+/* fade pra preto ao escolher um modo */
+.mm-fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.65s ease;
+}
+.mm-fade.on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* ---------------- HUD (canto superior direito) ---------------- */
 .hud {
   position: fixed;

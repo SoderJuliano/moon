@@ -11,9 +11,22 @@ Projeto em Three.js + Vite para explorar o Sistema Solar em 3D. O foco original 
 - HUD, menu e apoio de navegação
 - Texturas e modelos 3D para corpos celestes e asteroides
 
+## Modos
+
+O aplicativo abre num menu inicial (a Via Láctea girando; clique no marcador
+"Solar System") com duas experiências construídas sobre a mesma engine:
+
+- **Exploration** — o planetário interativo original (escalas, órbitas, câmera
+  de observação). Conceitualmente congelado.
+- **Game** — jogo de exploração espacial: nasce pilotando a nave perto da
+  Terra e toda a navegação acontece voando. É onde as novas mecânicas entram.
+
+Atalho de desenvolvimento: `?mode=exploration` ou `?mode=game` pula o menu.
+
 ## Estrutura principal
 
-- `src/main.js` — ponto de entrada da aplicação
+- `src/main.js` — bootstrap: menu inicial → modo escolhido
+- `src/app/` — menu inicial, os dois modos e a construção compartilhada do mundo (`world.js`)
 - `src/bodies/` — definição dos corpos celestes
 - `src/core/` — cena, escalas, texturas e utilitários centrais
 - `src/systems/` — sistema de asteroides e debug
