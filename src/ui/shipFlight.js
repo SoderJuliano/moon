@@ -93,7 +93,7 @@ function buildShipModel() {
 }
 
 export class ShipFlight {
-  constructor(scene, camera, controls, { onEngage, onDisengage, onDestroyed, getReferenceBody, getBodies } = {}) {
+  constructor(scene, camera, controls, { onEngage, onDisengage, onDestroyed, getReferenceBody, getBodies, getEntryInfo } = {}) {
     this.scene = scene;
     this.camera = camera;
     this.controls = controls;
@@ -102,6 +102,7 @@ export class ShipFlight {
     this.onDestroyed = onDestroyed;
     this.getReferenceBody = getReferenceBody;
     this.getBodies = getBodies; // todos os corpos (navegação, colisão, escala)
+    this.getEntryInfo = getEntryInfo; // entrada por corpo: { mul, dir } (cinturões no caminho)
 
     this.enabled = false;
     this.active = false;
@@ -312,8 +313,14 @@ export class ShipFlight {
       // suas luas — agora generalizado em _setApproachBody (mesma lógica do voo)
       this._setApproachBody(this.referenceBody);
       this.referenceBody.worldPosition(this._refPos);
-      const approach = this.referenceBody.approachRadius * 2.4 + 2; // nasce bem fora
-      this._toPlanet.copy(this.camera.position).sub(this._refPos); // planeta -> câmera
+      // nasce bem fora; corpos com cinturão no caminho usam { mul, dir } próprios:
+      // mul empurra o spawn e dir FIXA o lado de entrada (alinhado ao cinturão,
+      // que fica sempre à frente). Só muda o PONTO de entrada — a aproximação
+      // (LOD/escala/textura) continua idêntica.
+      const entry = this.getEntryInfo ? this.getEntryInfo(this.referenceBody.id) : null;
+      const approach = this.referenceBody.approachRadius * (entry?.mul ?? 2.4) + 2;
+      if (entry?.dir) this._toPlanet.set(entry.dir[0], entry.dir[1], entry.dir[2]);
+      else this._toPlanet.copy(this.camera.position).sub(this._refPos); // planeta -> câmera
       if (this._toPlanet.lengthSq() < 1e-4) this._toPlanet.copy(this._fwd).negate();
       this._toPlanet.normalize();
       this.ship.position

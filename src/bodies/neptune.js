@@ -13,6 +13,7 @@ export default {
   rotDays: 0.671,
   roughness: 0.7,
   menuColor: "#3b5bd4",
+  hiresTextureUrl: "textures/2k_neptune.jpg", // carregada só de perto (LOD por distância)
   makeTexture() {
     return gasGiantTexture({
       bands: ["#3b5bd4", "#2f49ad", "#4a6ae0", "#27408f", "#3f5fcf"],

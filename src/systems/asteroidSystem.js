@@ -20,6 +20,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 // modelos disponíveis (servidos de /public/models). needsRock = aplica PBR de rocha
 // real (modelo sem textura própria). type fbx|glb.
@@ -46,7 +47,9 @@ export class AsteroidSystem {
     this.modelDefs = models;
 
     this.fields = [];
+    this.belts = []; // cinturões densos instanciados (AsteroidBelt)
     this.loaded = false;
+    this._sources = null; // geometrias fundidas p/ instancing (lazy, pós-load)
     this._protos = new Map(); // key -> Object3D (root scale 1, inner normalizado a raio 1)
     this._pool = new Map(); // key -> [Object3D livres]
     this._active = new Map(); // descId -> { desc, obj, world:Vector3, collisionR }
@@ -64,8 +67,14 @@ export class AsteroidSystem {
     return this;
   }
 
-  // remove um campo e despawna seus asteroides ativos (espelho de addField; útil
-  // para campos dinâmicos/temporários, ex.: o Debug Spawn Mode).
+  // cinturão denso (instanciado). Construído no 1º update após o load dos modelos.
+  addBelt(belt) {
+    this.belts.push(belt);
+    return this;
+  }
+
+  // remove um campo e despawna seus asteroides ativos (espelho de addField; usado
+  // pelos campos dinâmicos/temporários dos encontros — AsteroidEncounter).
   removeField(id) {
     const idx = this.fields.findIndex((f) => f.id === id);
     if (idx === -1) return;
@@ -179,9 +188,20 @@ export class AsteroidSystem {
   }
 
   // ---- streaming -----------------------------------------------------------
-  // active=false (supercruise ou fora do voo) → despawn de tudo, mantém os dados.
-  update(dt, { active, shipPos } = {}) {
+  // active=false (supercruise ou explosão) → despawn dos CAMPOS, mantém os dados.
+  // Os CINTURÕES instanciados ficam visíveis mesmo no supercruise (são cenário
+  // fixo; só a colisão é gateada lá fora) — beltsVisible=false os esconde
+  // (modo fantasia, onde a escala do sistema é outra).
+  update(dt, { active, shipPos, beltsVisible = true } = {}) {
     this._t += dt;
+
+    if (this.loaded) {
+      for (const belt of this.belts) {
+        if (!belt.built) belt.build(this.scene, this._beltSources());
+        belt.update(dt, shipPos, beltsVisible, this.getBody);
+      }
+    }
+
     if (!active || !shipPos) {
       if (this._active.size) this._despawnAll();
       return;
@@ -228,7 +248,33 @@ export class AsteroidSystem {
     for (const inst of this._active.values()) {
       if (shipPos.distanceTo(inst.world) < inst.collisionR) return inst.desc;
     }
+    for (const belt of this.belts) {
+      const hit = belt.hitTest(shipPos);
+      if (hit) return hit;
+    }
     return null;
+  }
+
+  // remove um asteroide específico (campo OU cinturão) — despawna/esconde e apaga
+  // o descritor. Chamado ao colidir: o asteroide some junto com a nave.
+  destroyAsteroid(id) {
+    for (const belt of this.belts) {
+      if (belt.destroyRock(id)) return true;
+    }
+    const inst = this._active.get(id);
+    if (inst) {
+      this._despawn(inst);
+      this._active.delete(id);
+    }
+    for (const field of this.fields) {
+      if (!field.descriptors) continue;
+      const idx = field.descriptors.findIndex((d) => d.id === id);
+      if (idx !== -1) {
+        field.descriptors.splice(idx, 1);
+        return true;
+      }
+    }
+    return false;
   }
 
   // ---- pooling -------------------------------------------------------------
@@ -258,9 +304,69 @@ export class AsteroidSystem {
     this._active.clear();
   }
 
+  // ---- fontes p/ instancing (cinturões) -------------------------------------
+  // Funde as meshes de cada proto numa geometria única (com a normalização a
+  // raio 1 aplicada) e escolhe um material — é o que o InstancedMesh precisa.
+  _beltSources() {
+    if (this._sources) return this._sources;
+    const out = [];
+    for (const [key, proto] of this._protos) {
+      const src = this._mergeProto(key, proto);
+      if (src) out.push(src);
+    }
+    return (this._sources = out);
+  }
+
+  _mergeProto(key, proto) {
+    proto.updateMatrixWorld(true);
+    const geos = [];
+    let material = null;
+    proto.traverse((o) => {
+      if (!o.isMesh) return;
+      let g = o.geometry.clone();
+      g.applyMatrix4(o.matrixWorld);
+      if (g.index) g = g.toNonIndexed(); // merge exige tudo indexado ou nada
+      geos.push(g);
+      if (!material) material = Array.isArray(o.material) ? o.material[0] : o.material;
+    });
+    if (!geos.length) return null;
+
+    // atributos consistentes p/ o merge: position/normal sempre; uv/color só se
+    // TODAS as partes tiverem (senão o merge falha)
+    const hasUv = geos.every((g) => g.attributes.uv);
+    const hasColor = geos.every((g) => g.attributes.color);
+    for (const g of geos) {
+      for (const name of Object.keys(g.attributes)) {
+        const keep =
+          name === "position" || name === "normal" ||
+          (name === "uv" && hasUv) || (name === "color" && hasColor);
+        if (!keep) g.deleteAttribute(name);
+      }
+      if (!g.attributes.normal) g.computeVertexNormals();
+    }
+
+    let geometry = geos.length === 1 ? geos[0] : mergeGeometries(geos, false);
+    if (!geometry) geometry = geos[0];
+    // sem UV não dá pra texturizar: material de rocha liso (evita mapa quebrado)
+    if (!hasUv && material?.map) material = this._plainRockMaterial();
+    this._disposables.push(geometry);
+    return { key, geometry, material, tris: geometry.attributes.position.count / 3 };
+  }
+
+  _plainRockMaterial() {
+    if (!this._plainMat) {
+      this._plainMat = new THREE.MeshStandardMaterial({ color: 0x8d8175, roughness: 1, metalness: 0 });
+      this._disposables.push(this._plainMat);
+    }
+    return this._plainMat;
+  }
+
   dispose() {
     this._despawnAll();
     this._pool.clear();
+    for (const belt of this.belts) belt.dispose(this.scene);
+    this.belts.length = 0;
+    this._sources = null;
     for (const proto of this._protos.values()) {
       proto.traverse((o) => {
         if (o.isMesh) o.geometry?.dispose();

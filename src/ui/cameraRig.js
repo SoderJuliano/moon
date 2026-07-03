@@ -22,9 +22,13 @@ export class CameraRig {
     return this.tween !== null;
   }
 
-  // Solta o corpo seguido (usado quando o usuário assume o controle pelo teclado).
+  // Solta o corpo seguido e ABORTA qualquer tween em voo (usado quando o usuário
+  // assume o controle — ex.: W entra na nave no meio do voo da câmera; sem isso o
+  // tween continua até ~4 raios do tamanho ANTIGO e o planeta, inflando pra escala
+  // gigante, engole a câmera).
   stopFollow() {
     this.followBody = null;
+    this.tween = null;
   }
 
   // Voa até um corpo e passa a segui-lo. A direção de aproximação é fixada no

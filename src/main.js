@@ -14,8 +14,7 @@ import { CameraRig } from "./ui/cameraRig.js";
 import { ShipFlight } from "./ui/shipFlight.js";
 import { SpaceMarkerSystem } from "./ui/spaceMarkers.js";
 import { NavigationHud } from "./ui/navigationHud.js";
-import { createAsteroidSystem } from "./systems/asteroidConfig.js";
-import { DebugAsteroidSpawner } from "./systems/debugAsteroidSpawner.js";
+import { createAsteroidSystem, createRegionBodies, ENTRY_OVERRIDES } from "./systems/asteroidConfig.js";
 import { SpaceAudio } from "./ui/spaceAudio.js";
 import { createHud } from "./ui/hud.js";
 import { createMenu } from "./ui/menu.js";
@@ -59,8 +58,10 @@ const ship = new ShipFlight(scene, camera, controls, {
     menu.highlight("sun");
     rig.flyToBody(sun, 6);
   },
-  getReferenceBody: () => (selectedId ? bodyById.get(selectedId) : null),
+  getReferenceBody: () => (selectedId ? resolveBody(selectedId) : null),
   getBodies: () => bodyById.values(), // navegação, colisão e escala (todos os corpos)
+  // entrada alinhada ao cinturão quando há um no caminho (atravessa antes de chegar)
+  getEntryInfo: (id) => ENTRY_OVERRIDES[id],
 });
 
 // som ambiente por proximidade (só no modo real)
@@ -102,10 +103,19 @@ for (const desc of ORBITERS) {
   }
 }
 
-// Alvos de navegação: todo corpo vira um marcador (Sol, planetas, anões, luas).
-// Adapta o corpo à interface genérica { id, name, color, kind, getWorldPosition }.
+// Regiões de asteroides como "corpos virtuais": clicáveis no menu, marcadores
+// de navegação e referência da nave. FORA de bodyById de propósito (sem colisão
+// de corpo, sem áudio, sem LOD — asteroides têm colisão própria via hitTest).
+const regionById = new Map(createRegionBodies((id) => bodyById.get(id)).map((r) => [r.id, r]));
+
+function resolveBody(id) {
+  return bodyById.get(id) || regionById.get(id);
+}
+
+// Alvos de navegação: todo corpo vira um marcador (Sol, planetas, anões, luas,
+// regiões de asteroides). Interface { id, name, color, kind, getWorldPosition }.
 markerSystem.setTargets(
-  [...bodyById.values()].map((b) => ({
+  [...bodyById.values(), ...regionById.values()].map((b) => ({
     id: b.id,
     name: b.name,
     color: b.descriptor?.menuColor || "#cdd6e6",
@@ -114,14 +124,15 @@ markerSystem.setTargets(
   }))
 );
 
-// Asteroides (sistema independente): popula o espaço com pedras que têm colisão.
+// Asteroides (sistema independente): regiões reais do Sistema Solar (cinturão
+// principal, troianos, NEOs, Kuiper...) + encontros ocasionais em viagem.
 // Streaming/pooling próprios; colidir = reusa o fluxo de explosão da nave (abaixo).
-const asteroids = createAsteroidSystem(scene, (id) => bodyById.get(id));
-
-// DEBUG SPAWN MODE (temporário): gera asteroides perto da nave p/ validar o
-// sistema. Isolado — remova esta linha (e o update no loop) para desativar.
-const debugAsteroids = new DebugAsteroidSpawner(asteroids, { getBodies: () => bodyById.values() });
-const _dbgFwd = new THREE.Vector3();
+const { asteroids, encounter } = createAsteroidSystem(
+  scene,
+  (id) => bodyById.get(id),
+  () => bodyById.values()
+);
+const _shipFwd = new THREE.Vector3(); // forward da nave (p/ os encontros)
 
 function setOrbitLineRadius(line, r) {
   const pos = line.geometry.attributes.position;
@@ -164,8 +175,7 @@ const hud = createHud({
     if (mode === "real" && panoramic) {
       // panorâmica não existe no modo real: volta para o foco atual
       panoramic = false;
-      if (selectedId) rig.flyToBody(bodyById.get(selectedId), selectedId === "sun" ? 6 : 4);
-      else rig.flyToBody(sun, 6);
+      rig.flyToBody(selectedId ? bodyById.get(selectedId) : sun, selectedId === "sun" ? 6 : 4);
     } else if (panoramic) {
       goPanoramic(); // recalcula altura para a nova escala (fantasia)
     }
@@ -173,8 +183,7 @@ const hud = createHud({
   onPanoramic: (active) => {
     panoramic = active;
     if (active) goPanoramic();
-    else if (selectedId) rig.flyToBody(bodyById.get(selectedId));
-    else rig.flyToBody(sun, 6);
+    else rig.flyToBody(selectedId ? bodyById.get(selectedId) : sun, selectedId === "sun" ? 6 : 4);
   },
   onSpeedChange: (v) => {
     // pilotando: o tempo fica travado lento; guarda o valor pra restaurar ao sair
@@ -183,14 +192,14 @@ const hud = createHud({
   },
 });
 
-let selectedId = null;
+let selectedId = "sun";
 const menu = createMenu({
   onSelect: (id) => {
     selectedId = id;
     panoramic = false;
     hud.setPanoramic(false);
     ship.disengage(); // sair da nave ao focar um planeta
-    const body = bodyById.get(id);
+    const body = resolveBody(id);
     if (body) rig.flyToBody(body, id === "sun" ? 6 : 4);
   },
 });
@@ -238,20 +247,30 @@ function animate() {
   navHud.setVisible(flying);
   navHud.update(dt);
 
-  // Asteroides: streaming + colisão só no voo normal. No supercruise (ou fora do
-  // voo) o sistema despawna tudo e ignora colisão, mantendo apenas os dados.
+  // Asteroides: campos esparsos fazem streaming ao redor da NAVE em voo e da
+  // CÂMERA fora dele; o cinturão instanciado fica sempre de pé no modo real
+  // (visível até no supercruise — colisão é que só vale no voo normal).
   const supercruising = ship.velocity.length() > ship.boostSpeed * 1.5;
   const asteroidsActive = flying && !supercruising;
-  asteroids.update(dt, { active: asteroidsActive, shipPos: ship.ship.position });
-  if (asteroidsActive && asteroids.hitTest(ship.ship.position)) ship.explode(); // reusa a explosão
+  asteroids.update(dt, {
+    active: asteroidsActive || !ship.isActive,
+    shipPos: flying ? ship.ship.position : camera.position,
+    beltsVisible: mode === "real",
+  });
+  if (asteroidsActive) {
+    const hit = asteroids.hitTest(ship.ship.position);
+    if (hit) {
+      asteroids.destroyAsteroid(hit.id); // remove o asteroide atingido junto com a nave
+      ship.explode();
+    }
+  }
 
-  // DEBUG SPAWN MODE (temporário): semeia asteroides perto da nave p/ teste
-  _dbgFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
-  debugAsteroids.update(dt, {
-    active: flying,
-    supercruising,
+  // Encontros ocasionais em viagem: só no voo normal (nunca no supercruise)
+  _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
+  encounter.update(dt, {
+    active: asteroidsActive,
     position: ship.ship.position,
-    forward: _dbgFwd,
+    forward: _shipFwd,
     speed: ship.velocity.length(),
   });
 
@@ -280,3 +299,18 @@ function animate() {
 }
 let loadingHidden = false;
 animate();
+
+// hook de debug TEMPORÁRIO (investigação do spawn em Urano) — remover depois
+window.__dbg = (id) => {
+  const b = resolveBody(id);
+  const p = new THREE.Vector3();
+  if (b) b.worldPosition(p);
+  return {
+    body: b ? { pos: p.toArray().map((v) => +v.toFixed(1)), radius: +b.radius.toFixed(2), approachRadius: +b.approachRadius.toFixed(2) } : null,
+    ship: { pos: ship.ship.position.toArray().map((v) => +v.toFixed(1)), active: ship.active, exploding: ship.exploding, intro: !!ship.intro },
+    cam: camera.position.toArray().map((v) => +v.toFixed(1)),
+    tweening: rig.isTweening,
+    distShip: b ? +ship.ship.position.distanceTo(p).toFixed(1) : null,
+    distCam: b ? +camera.position.distanceTo(p).toFixed(1) : null,
+  };
+};

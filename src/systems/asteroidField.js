@@ -100,7 +100,9 @@ export class AsteroidField {
   }
 
   // centro do campo em coordenadas de MUNDO. Ancorado: posição do corpo + um
-  // deslocamento fixo (seeded), para FORA da bolha gigante; senão, centro absoluto.
+  // deslocamento fixo. Se offsetDir/offsetDist forem fornecidos no def, usam-se
+  // valores explícitos (cinturões posicionados com precisão); caso contrário o
+  // deslocamento é gerado a partir da seed para FORA da bolha gigante.
   getCenter(getBody, out) {
     const d = this.def;
     if (d.anchorId && getBody) {
@@ -108,11 +110,16 @@ export class AsteroidField {
       if (body) {
         body.worldPosition(out);
         if (!this._offset) {
-          const r = this._rng;
-          const dir = new THREE.Vector3(r() * 2 - 1, r() * 2 - 1, r() * 2 - 1);
-          if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0);
-          dir.normalize();
-          const dist = this._giantRadius(body) * 2.5 + this.boundingRadius;
+          let dir;
+          if (d.offsetDir) {
+            dir = new THREE.Vector3(...d.offsetDir).normalize();
+          } else {
+            const r = this._rng;
+            dir = new THREE.Vector3(r() * 2 - 1, r() * 2 - 1, r() * 2 - 1);
+            if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0);
+            dir.normalize();
+          }
+          const dist = d.offsetDist ?? (this._giantRadius(body) * 2.5 + this.boundingRadius);
           this._offset = dir.multiplyScalar(dist);
         }
         return out.add(this._offset);
