@@ -184,7 +184,8 @@ export class AsteroidBelt {
     }
   }
 
-  // colisão: grade local (célula da nave + 26 vizinhas)
+  // colisão: grade local (célula da nave + 26 vizinhas). Devolve id + raio +
+  // centro em mundo (r/center alimentam dano e efeitos dos tiros; a nave só usa id).
   hitTest(shipPos) {
     if (!this.built || !this.group.visible) return null;
     this._local.copy(shipPos).sub(this.group.position);
@@ -199,7 +200,13 @@ export class AsteroidBelt {
           for (const ri of cell) {
             const rock = this._rocks[ri];
             if (this._destroyed.has(rock.id)) continue;
-            if (this._local.distanceTo(rock.pos) < rock.collisionR) return { id: rock.id };
+            if (this._local.distanceTo(rock.pos) < rock.collisionR) {
+              return {
+                id: rock.id,
+                r: rock.collisionR,
+                center: rock.pos.clone().add(this.group.position),
+              };
+            }
           }
         }
     return null;

@@ -21,7 +21,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { radialGlowTexture } from "../core/textures.js";
+import { radialGlowTexture, warpRingTexture } from "../core/textures.js";
 
 const NAV_KEYS = new Set([
   "KeyW", "KeyS", "KeyA", "KeyD", "KeyX", "KeyZ", "KeyQ", "KeyE",
@@ -212,6 +212,52 @@ export class ShipFlight {
       this.sparks.push({ sprite: s, life: 0 });
     }
 
+    // --- rastro de dobra (supercruise) ---------------------------------------
+    // Em supercruise a nave voa tão rápido que não sobra referência visual de
+    // movimento. O rastro devolve a sensação: ANÉIS de distorção (o espaço
+    // "vincado" pela bolha de dobra) se materializam à frente no rumo do voo,
+    // a nave os atravessa e eles ficam pra trás formando um trilho, ligados por
+    // um traço de luz contínuo — tipo +----+----+ [nave]>.
+    this.warpRings = [];
+    const warpTex = warpRingTexture();
+    for (let i = 0; i < 16; i++) {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({
+          map: warpTex, color: 0xbfd8ff, transparent: true, opacity: 0,
+          blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+        })
+      );
+      mesh.visible = false;
+      scene.add(mesh);
+      this.warpRings.push({ mesh, age: 0, ttl: 0, spin: 0, base: 1 });
+    }
+    this.warpLead = 0.9; // anel nasce ~0.9 s de voo à frente (tamanho angular constante)
+    this.warpEvery = 0.33; // cadência de anéis novos
+    this._warpT = this.warpEvery;
+
+    // traço contínuo do rastro: linha aditiva que esmaece com a idade dos pontos
+    this.trailMax = 90;
+    this.trailTtl = 4; // segundos até um ponto do traço apagar
+    this.trailEvery = 0.08; // intervalo entre pontos fixados (o último gruda na nave)
+    this._trailT = 0;
+    this.trailPts = []; // { pos, age, gap } — gap = ponto apagado que quebra a linha
+    const trailGeo = new THREE.BufferGeometry();
+    this._trailPos = new Float32Array(this.trailMax * 3);
+    this._trailCol = new Float32Array(this.trailMax * 3);
+    trailGeo.setAttribute("position", new THREE.BufferAttribute(this._trailPos, 3));
+    trailGeo.setAttribute("color", new THREE.BufferAttribute(this._trailCol, 3));
+    this.warpTrail = new THREE.Line(
+      trailGeo,
+      new THREE.LineBasicMaterial({
+        vertexColors: true, transparent: true,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      })
+    );
+    this.warpTrail.frustumCulled = false;
+    this.warpTrail.visible = false;
+    scene.add(this.warpTrail);
+
     // a mira de distância foi substituída pela NavigationHud (marcadores espaciais)
     this.readout = document.createElement("div");
     this.readout.className = "ship-readout";
@@ -229,6 +275,8 @@ export class ShipFlight {
     this._desiredVel = new THREE.Vector3();
     this._m = new THREE.Matrix4(); // orientação da nave (lookAt sem depender do matrixWorld)
     this._worldUp = new THREE.Vector3(0, 1, 0);
+    this._zAxis = new THREE.Vector3(0, 0, 1);
+    this._refDelta = new THREE.Vector3(); // deslocamento do referencial neste frame (p/ o rastro)
 
     window.addEventListener("keydown", (e) => this._onKeyDown(e));
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
@@ -310,9 +358,11 @@ export class ShipFlight {
     // o planeta antes de qualquer colisão (escala com o raio do corpo). A nave
     // nasce ENTRE a câmera e o planeta, deslocada pro lado/baixo (entra no quadro).
     if (this.referenceBody) {
-      // planeta cresce pra escala gigante (mínimo grande pros pequenos) e esconde
-      // suas luas — agora generalizado em _setApproachBody (mesma lógica do voo)
-      this._setApproachBody(this.referenceBody);
+      // ENTRADA (teleporte do modo observação): aqui o planeta já nasce gigante
+      // de uma vez — o spawn é calculado em cima do approachRadius final. A
+      // aproximação GRADUAL (voar até um corpo e vê-lo crescer) fica no voo,
+      // em _updateApproachScaling.
+      this._setApproachBody(this.referenceBody, this._giantMul(this.referenceBody));
       this.referenceBody.worldPosition(this._refPos);
       // nasce bem fora; corpos com cinturão no caminho usam { mul, dir } próprios:
       // mul empurra o spawn e dir FIXA o lado de entrada (alinhado ao cinturão,
@@ -378,48 +428,60 @@ export class ShipFlight {
     this._setApproachBody(null);
   }
 
-  // raio "gigante" que um corpo terá ao ampliarmos (mín. grande pros pequenos)
-  _giantRadius(body) {
+  // multiplicador "gigante" de um corpo (mín. grande pros pequenos)
+  _giantMul(body) {
     const base = body.baseRadius || 1;
-    return base * Math.max(APPROACH_MUL, MIN_APPROACH_R / base);
+    return Math.max(APPROACH_MUL, MIN_APPROACH_R / base);
   }
 
-  // Amplia UM corpo de cada vez (vira gigante, nave = grão de areia) e esconde as
-  // luas dele (ficariam dentro do planeta enorme). Passar null restaura o atual.
-  // Centraliza o que antes era inline no engage/_restoreApproach — usado tanto na
-  // entrada quanto na aproximação dinâmica durante o voo.
-  _setApproachBody(body) {
-    if (this._approachBody === body) return;
-    if (this._approachBody) {
-      this._approachBody.setApproach(1);
-      for (const m of this._hiddenMoons) m.mesh.visible = true;
-      this._hiddenMoons = [];
-    }
-    this._approachBody = body;
-    if (body) {
-      const base = body.baseRadius || 1;
-      body.setApproach(Math.max(APPROACH_MUL, MIN_APPROACH_R / base));
-      for (const m of body.moons || []) {
+  // raio "gigante" que um corpo terá ao ampliarmos por completo
+  _giantRadius(body) {
+    return (body.baseRadius || 1) * this._giantMul(body);
+  }
+
+  // Marca UM corpo como "em aproximação" (esconde as luas dele — seriam
+  // engolidas pelo planeta crescendo) e restaura o anterior. O multiplicador de
+  // escala é passado por quem chama: o engage manda o gigante COMPLETO (spawn é
+  // calculado no tamanho final); o voo manda o valor GRADUAL da distância.
+  // Passar null restaura o atual.
+  _setApproachBody(body, mul = null) {
+    if (this._approachBody !== body) {
+      if (this._approachBody) {
+        this._approachBody.setApproach(1);
+        for (const m of this._hiddenMoons) m.mesh.visible = true;
+        this._hiddenMoons = [];
+      }
+      this._approachBody = body;
+      for (const m of body?.moons || []) {
         if (m.mesh.visible) {
           m.mesh.visible = false;
           this._hiddenMoons.push(m);
         }
       }
     }
+    if (body && mul != null) body.setApproach(mul);
   }
 
-  // Aproximação dinâmica: ao chegar perto de QUALQUER corpo, ele cresce pra escala
-  // gigante; ao se afastar (ou trocar de corpo mais próximo), volta ao normal.
-  // Histerese (entra a 4× o raio gigante, sai a 7×) evita piscar.
+  // Aproximação dinâmica GRADUAL: o corpo mais próximo cresce CONTINUAMENTE
+  // conforme a distância ao centro cai — nada de pular pra gigante num limiar.
+  // O crescimento começa longe (start, ~da distância dos cinturões o planeta já
+  // vem inchando na tela) e completa pouco antes do sobrevoo (full), com
+  // smoothstep nas duas pontas. Função contínua da distância = sem histerese e
+  // sem piscar; o easing temporal já existe em body.update (_approachMul) —
+  // aqui só movemos o ALVO. Afastar-se desfaz o crescimento na mesma curva.
   _updateApproachScaling(body, dist) {
     if (this._approachBody && this._approachBody !== body) this._setApproachBody(null);
     if (!body) return;
     const gr = this._giantRadius(body);
-    if (this._approachBody === body) {
-      if (dist > gr * 7) this._setApproachBody(null);
-    } else if (dist < gr * 4) {
-      this._setApproachBody(body);
+    const start = gr * 9;
+    const full = gr * 2.8;
+    const t = THREE.MathUtils.clamp((start - dist) / (start - full), 0, 1);
+    if (t <= 0.001) {
+      if (this._approachBody === body) this._setApproachBody(null); // longe: normal
+      return;
     }
+    const e = t * t * (3 - 2 * t); // smoothstep
+    this._setApproachBody(body, 1 + (this._giantMul(body) - 1) * e);
   }
 
   disengage() {
@@ -526,13 +588,137 @@ export class ShipFlight {
     }
   }
 
-  // esconde todos os efeitos (partículas/faíscas) ao sair/explodir
+  // esconde todos os efeitos (partículas/faíscas/rastro de dobra) ao sair/explodir
   _hideFx() {
     this.heat.visible = false;
     this.streaks.visible = false;
     for (const s of this.sparks) {
       s.life = 0;
       s.sprite.visible = false;
+    }
+    this._resetWarpWake();
+  }
+
+  // apaga anéis e traço do rastro de dobra (saída, explosão, novo engage)
+  _resetWarpWake() {
+    this._warpT = this.warpEvery;
+    this._trailT = 0;
+    for (const r of this.warpRings) {
+      r.ttl = 0;
+      r.mesh.visible = false;
+    }
+    this.trailPts.length = 0;
+    this.warpTrail.visible = false;
+  }
+
+  // um anel de distorção se materializa à frente, no rumo do voo — longe o
+  // bastante pra nave levar ~warpLead s até atravessá-lo. O diâmetro escala com
+  // essa distância, então todo anel nasce com o mesmo tamanho aparente na tela
+  // e "cresce" conforme a nave chega — túnel de dobra em qualquer velocidade.
+  _spawnWarpRing(sp) {
+    const r = this.warpRings.find((x) => x.ttl <= 0);
+    if (!r) return;
+    const dir = this._tmp.copy(this.velocity).multiplyScalar(1 / (sp || 1));
+    const lead = sp * this.warpLead;
+    // leve desvio perpendicular: o trilho fica orgânico, não um túnel perfeito
+    this._tmp2.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+    this._tmp2.addScaledVector(dir, -this._tmp2.dot(dir));
+    r.mesh.position
+      .copy(this.ship.position)
+      .addScaledVector(dir, lead)
+      .addScaledVector(this._tmp2, lead * 0.06);
+    r.mesh.quaternion.setFromUnitVectors(this._zAxis, dir); // plano perpendicular ao voo
+    r.base = Math.max(1.2, lead * 0.35);
+    r.mesh.scale.setScalar(r.base);
+    r.age = 0;
+    r.ttl = this.warpLead + 2.4; // atravessa a nave e fica ~2.4 s no "retrovisor"
+    r.spin = (Math.random() - 0.5) * 1.2; // giro lento dos nós de energia
+    r.mesh.material.opacity = 0;
+    r.mesh.visible = true;
+  }
+
+  // rastro de dobra: anéis que a nave atravessa + traço de luz que fica pra trás
+  _updateWarpWake(dt, sp, supercruising) {
+    const shift = this._refDelta; // o que ficou pra trás segue o referencial
+
+    if (supercruising) {
+      this._warpT += dt;
+      if (this._warpT >= this.warpEvery) {
+        this._warpT = 0;
+        this._spawnWarpRing(sp);
+      }
+    } else {
+      this._warpT = this.warpEvery; // ao reentrar, o primeiro anel sai na hora
+    }
+
+    for (const r of this.warpRings) {
+      if (r.ttl <= 0) continue;
+      r.mesh.position.add(shift);
+      r.age += dt;
+      if (r.age >= r.ttl) {
+        r.ttl = 0;
+        r.mesh.visible = false;
+        continue;
+      }
+      const t = r.age / r.ttl;
+      const fadeIn = Math.min(r.age / 0.35, 1); // materializa suave
+      const fadeOut = Math.min((1 - t) / 0.3, 1);
+      r.mesh.material.opacity = 0.9 * fadeIn * fadeOut;
+      r.mesh.scale.setScalar(r.base * (1 + t * 0.5)); // o espaço "relaxa": anel abre devagar
+      r.mesh.rotateZ(r.spin * dt);
+    }
+
+    // --- traço contínuo: pontos fixados no caminho, o último gruda na nave ----
+    const pts = this.trailPts;
+    for (const p of pts) {
+      p.pos.add(shift);
+      p.age += dt;
+    }
+    while (pts.length && pts[0].age >= this.trailTtl) pts.shift();
+
+    if (supercruising) {
+      const last = pts[pts.length - 1];
+      if (!last || last.age > 0.5) {
+        // (re)começando: se sobrou rastro velho, insere uma ponte APAGADA entre
+        // ele e a posição atual — com blending aditivo, segmento preto é invisível
+        if (last) {
+          pts.push({ pos: last.pos.clone(), age: last.age, gap: true });
+          pts.push({ pos: this.ship.position.clone(), age: 0, gap: true });
+        }
+        pts.push({ pos: this.ship.position.clone(), age: 0, gap: false });
+        pts.push({ pos: this.ship.position.clone(), age: 0, gap: false });
+        this._trailT = 0;
+      } else {
+        last.pos.copy(this.ship.position); // cabeça do traço colada na nave
+        last.age = 0;
+        this._trailT += dt;
+        if (this._trailT >= this.trailEvery) {
+          this._trailT = 0;
+          pts.push({ pos: this.ship.position.clone(), age: 0, gap: false });
+        }
+      }
+      while (pts.length > this.trailMax) pts.shift();
+    }
+
+    const n = pts.length;
+    if (n >= 2) {
+      for (let i = 0; i < n; i++) {
+        const p = pts[i];
+        this._trailPos[i * 3] = p.pos.x;
+        this._trailPos[i * 3 + 1] = p.pos.y;
+        this._trailPos[i * 3 + 2] = p.pos.z;
+        const a = p.gap ? 0 : Math.max(0, 1 - p.age / this.trailTtl) * 0.55;
+        this._trailCol[i * 3] = 0.45 * a;
+        this._trailCol[i * 3 + 1] = 0.75 * a;
+        this._trailCol[i * 3 + 2] = a;
+      }
+      const geo = this.warpTrail.geometry;
+      geo.attributes.position.needsUpdate = true;
+      geo.attributes.color.needsUpdate = true;
+      geo.setDrawRange(0, n);
+      this.warpTrail.visible = true;
+    } else {
+      this.warpTrail.visible = false;
     }
   }
 
@@ -672,9 +858,11 @@ export class ShipFlight {
     const k = this.keys;
 
     // 1) trava no referencial do planeta
+    this._refDelta.set(0, 0, 0);
     if (this.referenceBody) {
       this.referenceBody.worldPosition(this._refPos);
       this._tmp.copy(this._refPos).sub(this._prevRef);
+      this._refDelta.copy(this._tmp); // o rastro de dobra acompanha o mesmo referencial
       this.ship.position.add(this._tmp);
       this._prevRef.copy(this._refPos);
     }
@@ -878,6 +1066,9 @@ export class ShipFlight {
     const fx = boosting ? spN : 0;
     this._updateStreaks(fx);
     this._updateSparks(dt, fx);
+    // rastro de dobra: anéis de distorção + traço de luz enquanto em supercruise
+    // (persiste esmaecendo depois — dá referência de movimento no vazio)
+    this._updateWarpWake(dt, sp, supercruising);
     // a mira de distância antiga foi substituída pela NavigationHud (marcadores
     // espaciais), montada em main.js e desacoplada do voo.
   }

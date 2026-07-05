@@ -35,7 +35,14 @@ function makeMesh(descriptor, isSun) {
         roughness: descriptor.roughness ?? 0.9,
         metalness: 0,
       });
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, SEGMENTS, SEGMENTS), material);
+  const geometry = new THREE.SphereGeometry(1, SEGMENTS, SEGMENTS);
+  // Corpos não-esféricos (ex.: Haumea): proporção assada na GEOMETRIA, pra
+  // mesh.scale continuar uniforme (as animações de escala dependem disso).
+  // Componentes devem ser ≤1 (colisão/aproximação tratam o corpo como esfera
+  // de raio mesh.scale.x — o eixo maior não pode ultrapassar esse raio).
+  // Eixo Y = eixo de rotação (polar); X/Z = plano equatorial.
+  if (descriptor.shapeScale) geometry.scale(...descriptor.shapeScale);
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.userData.bodyId = descriptor.id;
   if (descriptor.axialTilt) mesh.rotation.z = THREE.MathUtils.degToRad(descriptor.axialTilt);
   return mesh;
@@ -126,21 +133,27 @@ function approach(current, target, dt) {
 
 const _lodPos = new THREE.Vector3();
 
-// LOD por distância (reutilizado por planetas e luas): textura real (NASA/2k) só
-// quando a câmera chega perto; de longe volta pra procedural e DESCARTA a hi-res
-// (libera VRAM no tablet). Só no modo real. Limiar generoso com piso absoluto
-// pra valer também pra corpos pequenos (Marte/Lua), cujo raio é minúsculo.
+// LOD por distância (reutilizado por planetas e luas): textura pesada (NASA/2k)
+// só quando a câmera chega perto; de longe volta pra procedural e DESCARTA a
+// hi-res (libera VRAM no tablet). Vale em QUALQUER modo. Limiar generoso com
+// piso absoluto pra valer também pra corpos pequenos (Marte/Lua), cujo raio é
+// minúsculo.
 function makeDetailLOD(mesh, descriptor) {
   const proceduralMap = mesh.material.map;
   let hiresMap = null;
   let on = false;
   return function (cameraPos, currentMode) {
     if (!descriptor.hiresTextureUrl) return;
-    if (currentMode !== "real") {
+    // Corpos que TAMBÉM têm realTextureUrl (Júpiter/Saturno): no modo real quem
+    // manda no mapa é o switcher (textura pesada SEMPRE, mesmo de longe). O LOD
+    // se retira — senão, ao afastar, ele devolveria a procedural por cima.
+    if (descriptor.realTextureUrl && currentMode === "real") {
       if (on) {
-        mesh.material.map = proceduralMap;
-        mesh.material.needsUpdate = true;
-        on = false;
+        on = false; // o mapa já foi trocado pelo switcher; só solta a cópia do LOD
+        if (hiresMap) {
+          hiresMap.dispose();
+          hiresMap = null;
+        }
       }
       return;
     }

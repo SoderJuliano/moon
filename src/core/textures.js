@@ -329,6 +329,41 @@ export function flameTexture() {
   return tex;
 }
 
+// --- Anel de dobra (supercruise): filete de luz circular com halo violeta —
+// o "vinco" que a bolha de dobra deixa no espaço. Centro transparente (a nave
+// passa por dentro) + nós de energia assimétricos pra rotação ficar visível. --
+export function warpRingTexture() {
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0.0, "rgba(0,0,0,0)");
+  g.addColorStop(0.52, "rgba(0,0,0,0)");
+  g.addColorStop(0.62, "rgba(110,70,230,0.22)"); // halo violeta interno
+  g.addColorStop(0.7, "rgba(190,235,255,0.95)"); // filete claro (o vinco em si)
+  g.addColorStop(0.78, "rgba(110,70,230,0.22)"); // halo violeta externo
+  g.addColorStop(1.0, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  // nós de energia: arcos mais brilhantes espalhados no filete
+  const rng = mulberry32(41);
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const a0 = rng() * Math.PI * 2;
+    ctx.strokeStyle = "rgba(225,245,255,0.85)";
+    ctx.globalAlpha = 0.35 + rng() * 0.4;
+    ctx.lineWidth = 4 + rng() * 5;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.35, a0, a0 + 0.4 + rng() * 0.9);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // --- Anel (Saturno/Urano): faixas radiais com transparência ----------------
 export function ringTexture({ inner = "#caa97a", outer = "#9c8559", seed = 3 }) {
   const size = 256;

@@ -241,12 +241,14 @@ export class AsteroidSystem {
     }
   }
 
-  // colisão: nave dentro do raio de algum asteroide ATIVO (só durante voo normal).
-  // Retorna o descritor atingido (p/ futuro: dano/recurso) ou null.
+  // colisão: ponto dentro do raio de algum asteroide ATIVO (nave OU projétil).
+  // Retorna { id, r, center } do atingido (r/center p/ dano e efeitos) ou null.
   hitTest(shipPos) {
     if (!shipPos) return null;
     for (const inst of this._active.values()) {
-      if (shipPos.distanceTo(inst.world) < inst.collisionR) return inst.desc;
+      if (shipPos.distanceTo(inst.world) < inst.collisionR) {
+        return { id: inst.desc.id, r: inst.collisionR, center: inst.world.clone() };
+      }
     }
     for (const belt of this.belts) {
       const hit = belt.hitTest(shipPos);

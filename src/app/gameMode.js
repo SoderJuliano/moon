@@ -17,6 +17,10 @@ import { SpaceMarkerSystem } from "../ui/spaceMarkers.js";
 import { NavigationHud } from "../ui/navigationHud.js";
 import { ENTRY_OVERRIDES } from "../systems/asteroidConfig.js";
 import { Shipwreck, createWreckCloud } from "../systems/shipwreck.js";
+import { WreckMission } from "../systems/wreckMission.js";
+import { PlasmaCannon } from "../systems/plasmaCannon.js";
+import { SatelliteSystem } from "../systems/satellites.js";
+import { DeepSpaceMusic } from "../ui/spaceMusic.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
 
 // Tempo quase parado, como ao pilotar no planetário: a translação orbital é
@@ -54,18 +58,48 @@ export function startGameMode() {
   });
   ship.setEnabled(true);
 
+  // Canhão de plasma: nasce DESABILITADO — a missão do sinal de socorro é quem
+  // desbloqueia (a tecnologia é recuperada do cruzador destruído).
+  const cannon = new PlasmaCannon(scene, ship, asteroids, camera, {
+    getBodies: () => bodyById.values(),
+  });
+
+  // Satélites na órbita baixa da Terra: invisíveis de longe, aparecem quando a
+  // Terra está gigante na tela (lazy-load do modelo na primeira aproximação —
+  // como o jogo começa na Terra, na prática carregam já no spawn). Caem com
+  // 2 tiros do canhão.
+  const satellites = new SatelliteSystem(scene, () => bodyById.get(START_BODY_ID));
+  cannon.addTargetSystem(satellites);
+
+  // Primeira missão: investigar o sinal de socorro perto de Júpiter
+  const mission = new WreckMission({
+    wreck,
+    camera,
+    onUnlock: () => {
+      cannon.setEnabled(true);
+      // o atalho novo entra na seção Teclado do menu de pausa
+      keyList.insertAdjacentHTML(
+        "beforeend",
+        '<div><span class="key">Espaço</span> dispara o canhão</div>'
+      );
+    },
+  });
+  // trava a nave no referencial do DESTROÇO durante a investigação (o casco
+  // acompanha Júpiter; sem isso ele derivaria devagar pra longe da cena parada)
+  const _holdPrev = new THREE.Vector3();
+  let _holding = false;
+
   const audio = createAmbientAudio();
   audio.setEnabled(true);
+  // Trilha deep-space lofi (SÓ do jogo): entra junto com a cena, no mesmo
+  // AudioContext do ambiente, e SILENCIA quando alguma vibração de corpo
+  // (Júpiter/Saturno/Sol) sobe — o fenômeno tem prioridade sobre a música.
+  const music = new DeepSpaceMusic(() => audio.ctx);
   const _shipFwd = new THREE.Vector3(); // forward da nave (p/ os encontros)
 
-  // dica de controles (mesma linguagem visual do planetário)
-  const navHint = document.createElement("div");
-  navHint.className = "nav-hint";
-  navHint.innerHTML =
-    "<b>W</b>/↑ acelera &nbsp;·&nbsp; <b>S</b>/↓ ré &nbsp;·&nbsp; <b>A/D</b> (←→) vira &nbsp;·&nbsp; <b>X</b> sobe &nbsp;·&nbsp; <b>Z</b> desce &nbsp;·&nbsp; <b>Q/E</b> rola &nbsp;·&nbsp; <b>Shift+W</b> turbo &nbsp;·&nbsp; <b>Esc</b> pausa";
-  document.body.appendChild(navHint);
-
-  // --- Pausa (Esc): Continuar / Menu principal --------------------------------
+  // --- Pausa (Esc): Continuar / Menu principal + teclado -----------------------
+  // Os comandos da nave vivem AQUI (seção "Teclado"), não num quadro flutuante:
+  // a tela de voo fica limpa pra HUD/missão e o jogador consulta no Esc.
   let paused = false;
   const pauseOverlay = document.createElement("div");
   pauseOverlay.className = "modal-overlay";
@@ -74,12 +108,23 @@ export function startGameMode() {
     <div class="modal">
       <h3>Pausado</h3>
       <p>A nave fica parada no espaço enquanto você decide.</p>
+      <div class="key-list">
+        <div><span class="key">W</span>/<span class="key">↑</span> acelera</div>
+        <div><span class="key">S</span>/<span class="key">↓</span> ré</div>
+        <div><span class="key">A</span><span class="key">D</span> (←→) vira</div>
+        <div><span class="key">X</span> sobe o nariz</div>
+        <div><span class="key">Z</span> desce o nariz</div>
+        <div><span class="key">Q</span><span class="key">E</span> rolagem</div>
+        <div><span class="key">Shift</span>+<span class="key">W</span> supercruise</div>
+        <div><span class="key">Esc</span> pausa</div>
+      </div>
       <div class="modal-row">
         <button class="modal-btn yes" data-act="resume">Continuar voando</button>
         <button class="modal-btn" data-act="menu">Menu principal</button>
       </div>
     </div>`;
   document.body.appendChild(pauseOverlay);
+  const keyList = pauseOverlay.querySelector(".key-list");
 
   function setPaused(on) {
     paused = on;
@@ -115,7 +160,25 @@ export function startGameMode() {
 
       for (const b of bodies) b.update(simDays, dSim, dt);
 
-      ship.update(dt);
+      // Investigação em curso: a nave fica PARADA (física congelada) e colada
+      // ao referencial do destroço — a cena não deriva durante os textos.
+      if (mission.holdShip) {
+        if (!_holding) {
+          _holding = true;
+          ship.velocity.set(0, 0, 0);
+          ship.speed = 0;
+          ship.keys.clear();
+          _holdPrev.copy(wreck.group.position);
+        } else {
+          const shiftD = wreck.group.position.clone().sub(_holdPrev);
+          ship.ship.position.add(shiftD);
+          camera.position.add(shiftD);
+          _holdPrev.copy(wreck.group.position);
+        }
+      } else {
+        _holding = false;
+        ship.update(dt);
+      }
 
       // GPS: some só durante a explosão (renasce junto com a nave)
       const flying = ship.isActive && !ship.exploding;
@@ -148,6 +211,17 @@ export function startGameMode() {
         wreckMarked = true;
       }
 
+      // Satélites da Terra: só existem de perto (o próprio sistema decide
+      // mostrar/esconder pela distância ao raio atual da Terra)
+      satellites.update(dt, flying ? ship.ship.position : camera.position);
+
+      // Missão do sinal de socorro (banner/chip/botão Investigar/história)
+      mission.update(dt, { shipPos: ship.ship.position, flying });
+
+      // Canhão de plasma: atira só no voo normal (nunca no supercruise, nunca
+      // com a nave parada na investigação); os bolts/fumaça animam sempre
+      cannon.update(dt, { canFire: asteroidsActive && !mission.holdShip });
+
       // Encontros ocasionais em viagem: só no voo normal (nunca no supercruise)
       _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
       encounter.update(dt, {
@@ -158,6 +232,7 @@ export function startGameMode() {
       });
 
       audio.update(camera, bodyById); // volume por proximidade
+      music.update(audio.proximityLevel); // trilha cede espaço às vibrações
 
       // LOD por distância: textura detalhada só quando a câmera chega perto
       for (const b of bodies) b.updateDetail(camera.position, "real");

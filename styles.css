@@ -476,3 +476,249 @@ canvas {
     font-size: 10px;
   }
 }
+
+/* ---------------- Missão do sinal de socorro + canhão de plasma ------------- */
+/* banner grande do briefing (some sozinho e vira o chip) */
+.mission-banner {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #eaf2ff;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 12px 22px;
+  backdrop-filter: blur(8px);
+  animation: mission-in 0.8s ease-out, mission-out 1s ease-in 8s forwards;
+  pointer-events: none;
+}
+.mission-banner small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+@keyframes mission-in {
+  from { opacity: 0; transform: translate(-50%, -14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes mission-out {
+  to { opacity: 0; }
+}
+
+/* chip persistente do objetivo (canto superior esquerdo) */
+.mission-chip {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 25;
+  font-size: 12px;
+  color: #cfe0ff;
+  background: rgba(10, 16, 28, 0.7);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  max-width: min(70vw, 420px);
+}
+.mission-chip.done {
+  color: #a9f0c0;
+  border-color: rgba(120, 230, 160, 0.4);
+}
+
+/* botão "Investigar" projetado sobre o destroço */
+.invest-btn {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  z-index: 26;
+  appearance: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffd9c9;
+  background: rgba(30, 18, 14, 0.78);
+  border: 1px solid rgba(255, 122, 80, 0.55);
+  border-radius: 999px;
+  padding: 9px 16px;
+  backdrop-filter: blur(6px);
+  animation: invest-pulse 1.6s ease-in-out infinite;
+}
+.invest-btn:hover {
+  background: rgba(64, 32, 22, 0.9);
+}
+@keyframes invest-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 110, 70, 0.45); }
+  50% { box-shadow: 0 0 0 9px rgba(255, 110, 70, 0); }
+}
+
+/* painel da história (diálogo embaixo, nave parada) */
+.story-panel {
+  position: fixed;
+  left: 50%;
+  bottom: 150px;
+  transform: translateX(-50%);
+  z-index: 32;
+  width: min(92vw, 560px);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.story-text {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #dbe6f8;
+}
+.story-actions {
+  display: flex;
+  justify-content: center;
+}
+.story-btn {
+  appearance: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(40, 64, 110, 0.9);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 9px 18px;
+}
+.story-btn:hover {
+  background: rgba(56, 88, 148, 0.95);
+}
+
+/* miniatura da tecnologia (recorte da ficha, clicável) */
+.tech-thumb {
+  appearance: none;
+  cursor: pointer;
+  width: 96px;
+  height: 96px;
+  border-radius: 12px;
+  border: 1px solid rgba(110, 180, 255, 0.7);
+  background-color: #060a12;
+  background-repeat: no-repeat;
+  animation: tech-glow 1.4s ease-in-out infinite;
+}
+@keyframes tech-glow {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(110, 180, 255, 0.35); }
+  50% { box-shadow: 0 0 16px 4px rgba(110, 180, 255, 0.75); }
+}
+
+/* ficha completa da tecnologia */
+.tech-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+.tech-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 92vw;
+}
+.tech-img {
+  max-width: min(92vw, 960px);
+  max-height: 72vh;
+  border-radius: 12px;
+  border: 1px solid rgba(110, 180, 255, 0.5);
+  box-shadow: 0 0 60px rgba(60, 130, 255, 0.25);
+}
+.tech-caption {
+  margin: 0;
+  font-size: 12.5px;
+  color: #b9c4d6;
+  text-align: center;
+  max-width: 560px;
+  line-height: 1.5;
+}
+
+/* toast "armas online" */
+.weapon-toast {
+  position: fixed;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 44;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #bfe8ff;
+  background: rgba(10, 20, 34, 0.82);
+  border: 1px solid rgba(110, 180, 255, 0.5);
+  border-radius: 12px;
+  padding: 12px 24px;
+  backdrop-filter: blur(8px);
+  animation: mission-in 0.5s ease-out, mission-out 1s ease-in 5.4s forwards;
+  pointer-events: none;
+}
+.weapon-toast small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.4px;
+  color: #9fb6d6;
+}
+
+/* barra de vida fininha do asteroide atingido */
+.ast-hp {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  z-index: 24;
+  width: 46px;
+  height: 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.ast-hp-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ff8a5a, #ffc46a);
+  transition: width 0.12s ease-out;
+}
+
+/* seção "Teclado" dentro do menu de pausa */
+.key-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  margin: 0 0 16px;
+  text-align: left;
+  font-size: 12px;
+  color: #b9c4d6;
+}
+.key {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid var(--panel-border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #e8ecf5;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}

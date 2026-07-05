@@ -1,4 +1,6 @@
-// Terra — único corpo que reaproveita uma imagem real (earth.jpg, ~350KB, leve).
+// Terra — de longe usa a earth.jpg leve (~350KB, 1280×640); de perto o LOD
+// troca pro Blue Marble da NASA em 4k (o dobro dos outros corpos: é o planeta
+// inicial do jogo, visto de pertíssimo, e a hi-res é descartada ao afastar).
 import * as THREE from "three";
 
 const loader = new THREE.TextureLoader();
@@ -15,6 +17,7 @@ export default {
   rotDays: 0.997,
   roughness: 0.8,
   menuColor: "#3b7fd4",
+  hiresTextureUrl: "textures/4k_earth.jpg", // NASA Blue Marble (LOD na aproximação)
   makeTexture() {
     const tex = loader.load("earth.jpg");
     tex.colorSpace = THREE.SRGBColorSpace;

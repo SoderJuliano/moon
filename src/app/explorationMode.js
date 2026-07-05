@@ -144,6 +144,40 @@ export function startExplorationMode() {
     },
   });
 
+  // --- Esc: voltar ao menu principal -------------------------------------------
+  // Sem isto o Esc não tinha função fora do voo — não havia caminho de volta ao
+  // menu. Listener em CAPTURA pra decidir ANTES do listener da nave (registrado
+  // no construtor dela): pilotando, o Esc continua só desengajando a nave; fora
+  // do voo (ou com o quadro aberto), alterna este quadro.
+  const escOverlay = document.createElement("div");
+  escOverlay.className = "modal-overlay";
+  escOverlay.style.display = "none";
+  escOverlay.innerHTML = `
+    <div class="modal">
+      <h3>Exploração</h3>
+      <p>Voltar ao menu principal?</p>
+      <div class="modal-row">
+        <button class="modal-btn yes" data-act="stay">Continuar explorando</button>
+        <button class="modal-btn" data-act="menu">Menu principal</button>
+      </div>
+    </div>`;
+  document.body.appendChild(escOverlay);
+  escOverlay.addEventListener("click", (e) => {
+    const act = e.target?.dataset?.act;
+    if (act === "stay") escOverlay.style.display = "none";
+    if (act === "menu") location.href = location.pathname; // recarrega SEM ?mode= (senão pularia o menu)
+  });
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.code !== "Escape") return;
+      const open = escOverlay.style.display !== "none";
+      if (!open && ship.isActive) return; // Esc do voo: deixa a nave desengajar
+      escOverlay.style.display = open ? "none" : "";
+    },
+    true
+  );
+
   function outermostRadius() {
     let max = 0;
     for (const { aAU } of orbitLines) max = Math.max(max, orbitRadius(aAU, mode));

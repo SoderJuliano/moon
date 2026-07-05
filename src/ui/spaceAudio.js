@@ -4,6 +4,13 @@
 // O volume sobe de 0 a 100% conforme a câmera se aproxima do corpo, como nos
 // vídeos de "sons" de Júpiter/Saturno da NASA.
 //
+// Exceção: uma faixa pode usar um SAMPLE em loop (opts.sampleUrl) em vez do
+// drone sintetizado — usado pro Sol, que toca a sonificação REAL da NASA
+// (oscilações do SOHO tornadas audíveis pela Stanford). E opts.relativeToRadius
+// interpreta near/far como MÚLTIPLOS do raio atual do corpo — necessário pro
+// Sol, cujo raio infla ~40× na aproximação da nave (distâncias fixas não
+// serviriam pra nave e pra câmera focada ao mesmo tempo).
+//
 // Autoplay: navegadores só deixam tocar áudio após um gesto do usuário. O
 // AudioContext é criado/retomado em setEnabled(true), que é disparado pelo
 // clique no toggle "Real" da HUD — gesto válido.
@@ -33,6 +40,7 @@ export class SpaceAudio {
   constructor() {
     this.tracks = [];
     this.enabled = false;
+    this.proximityLevel = 0; // 0..1: maior volume atual entre as vibrações
     this.ctx = null;
     this.noise = null;
     this.master = null;
@@ -62,6 +70,29 @@ export class SpaceAudio {
   _buildTrack(t) {
     const ctx = this.ctx;
     const o = t.opts || {};
+
+    // faixa com sample em loop (ex.: sonificação real do Sol): o gain de
+    // proximidade nasce mudo e o áudio entra quando o download/decodificação
+    // termina — sem bloquear nada se a rede falhar (fica silencioso)
+    if (o.sampleUrl) {
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(this.master);
+      t.nodes = { src: null, filter: null, gain, osc: null };
+      fetch(o.sampleUrl)
+        .then((r) => r.arrayBuffer())
+        .then((ab) => ctx.decodeAudioData(ab))
+        .then((buf) => {
+          const src = ctx.createBufferSource();
+          src.buffer = buf;
+          src.loop = true;
+          src.connect(gain);
+          src.start();
+          t.nodes.src = src;
+        })
+        .catch(() => {});
+      return;
+    }
 
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
@@ -109,17 +140,26 @@ export class SpaceAudio {
   }
 
   update(camera, bodyById) {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled || !this.ctx) {
+      this.proximityLevel = 0;
+      return;
+    }
     const now = this.ctx.currentTime;
+    let maxVol = 0;
     for (const t of this.tracks) {
       if (!t.nodes) continue;
       const body = bodyById.get(t.bodyId);
       if (!body) continue;
       body.worldPosition(this._tmp);
       const d = camera.position.distanceTo(this._tmp);
-      const vol = 1 - smoothstep(t.near, t.far, d); // 1 perto, 0 longe
+      // near/far absolutos, ou em múltiplos do raio ATUAL (acompanha a inflação)
+      const r = t.opts && t.opts.relativeToRadius ? body.radius || 1 : 1;
+      const vol = 1 - smoothstep(t.near * r, t.far * r, d); // 1 perto, 0 longe
       // rampa suave para evitar cliques
       t.nodes.gain.gain.setTargetAtTime(THREE.MathUtils.clamp(vol, 0, 1), now, 0.15);
+      maxVol = Math.max(maxVol, vol);
     }
+    // maior presença entre as vibrações — consumido pelo ducking da trilha
+    this.proximityLevel = maxVol;
   }
 }

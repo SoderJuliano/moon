@@ -84,7 +84,14 @@ export function buildSolarSystem(scene, glow, { mode, withOrbitLines = true }) {
 // dois modos: ruído grave filtrado + sub-grave por corpo (sem mp3).
 export function createAmbientAudio() {
   const audio = new SpaceAudio();
-  audio.add("jupiter", { type: "lowpass", freq: 170, q: 0.9, sub: 52, subGain: 0.5 }, 90, 22000);
-  audio.add("saturn", { type: "bandpass", freq: 420, q: 1.4, sub: 70, subGain: 0.3 }, 80, 20000);
+  // near/far alinhados à janela de APROXIMAÇÃO GRADUAL do voo (o planeta começa
+  // a crescer a ~9× o raio gigante): o drone entra junto com o corpo ganhando
+  // presença na tela — não quando ele ainda é um pontinho a 20 mil unidades.
+  audio.add("jupiter", { type: "lowpass", freq: 170, q: 0.9, sub: 52, subGain: 0.5 }, 800, 4500);
+  audio.add("saturn", { type: "bandpass", freq: 420, q: 1.4, sub: 70, subGain: 0.3 }, 700, 3600);
+  // Sol: sonificação REAL da NASA (SOHO/Stanford) em loop sem emenda. near/far
+  // em MÚLTIPLOS do raio atual (relativeToRadius): funciona tanto pra câmera
+  // focada no Sol (raio ~109) quanto pra nave chegando perto (Sol inflado ~40×).
+  audio.add("sun", { sampleUrl: "audio/sun_sonification.wav", relativeToRadius: true }, 3, 25);
   return audio;
 }
