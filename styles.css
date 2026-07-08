@@ -722,3 +722,525 @@ canvas {
   font-weight: 600;
   text-align: center;
 }
+
+/* ==== Progressão: popup de descoberta ==== */
+.disc-pop {
+  position: fixed;
+  top: 14%;
+  left: 50%;
+  transform: translate(-50%, -14px);
+  z-index: 60;
+  min-width: 210px;
+  padding: 16px 26px 14px;
+  text-align: center;
+  border: 1px solid var(--panel-border, #2c3a52);
+  border-radius: 14px;
+  background: rgba(10, 16, 28, 0.86);
+  backdrop-filter: blur(6px);
+  color: #e8ecf5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.disc-pop.on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.disc-pop small {
+  display: block;
+  margin-top: 8px;
+  letter-spacing: 0.35em;
+  font-size: 10px;
+  color: #8fa2c0;
+}
+.disc-ball {
+  display: inline-block;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+}
+.disc-icon {
+  display: inline-block;
+  font-size: 36px;
+  line-height: 44px;
+}
+.disc-name {
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.disc-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #b9c4d6;
+}
+.disc-date {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #8fa2c0;
+}
+
+/* ==== Progressão: tela de conquistas ==== */
+.ach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 16, 0.72);
+}
+.ach-box {
+  width: min(680px, 92vw);
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--panel-border, #2c3a52);
+  border-radius: 14px;
+  background: rgba(10, 16, 28, 0.95);
+  color: #e8ecf5;
+}
+.ach-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ach-head h3 {
+  margin: 0;
+  flex: 1;
+  font-size: 17px;
+}
+.ach-count {
+  font-size: 13px;
+  color: #8fa2c0;
+}
+.ach-close {
+  margin: 0;
+}
+.ach-body {
+  overflow-y: auto;
+  padding: 12px 18px 18px;
+}
+.ach-cat {
+  margin: 14px 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #8fa2c0;
+}
+.ach-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+}
+.ach-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.ach-ball {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+.ach-icon {
+  flex: none;
+  width: 30px;
+  font-size: 24px;
+  text-align: center;
+}
+.ach-locked-ball {
+  background: radial-gradient(circle at 35% 30%, #ffffff14, #2a3242 45%, #000c 130%);
+}
+.ach-locked {
+  opacity: 0.55;
+}
+.ach-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.ach-meta {
+  font-size: 11px;
+  color: #8fa2c0;
+}
+
+/* ==== Menu inicial: submenus do Game (save/nome/jogadores/conquistas) ==== */
+/* cada "tela" fica escondida; showScreen() liga a .on da tela ativa */
+.mm-view-game,
+.mm-view-name,
+.mm-view-players {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+.mm-view-game.on,
+.mm-view-name.on,
+.mm-view-players.on {
+  display: flex;
+}
+.mm-name-input {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #eaf1ff;
+  font-size: 14px;
+}
+.mm-name-input:focus {
+  outline: none;
+  border-color: rgba(110, 168, 255, 0.6);
+}
+.mm-players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.mm-save-row {
+  display: flex;
+  gap: 8px;
+}
+.mm-save-btn {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #b9c4d6;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mm-save-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.mm-option[disabled],
+.mm-save-btn[disabled] {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+}
+.mm-save-note {
+  font-size: 11px;
+  color: #8fa2c0;
+  text-align: center;
+  min-height: 14px;
+}
+
+/* ==== Combate PvE ==== */
+.dmg-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: inset 0 0 120px 40px rgba(255, 40, 40, 0.55);
+}
+.player-hp {
+  position: fixed;
+  left: 50%;
+  bottom: 74px;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #ffb0b0;
+}
+.player-hp-track {
+  width: 180px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.player-hp-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ff4d4d, #ff9d5a);
+  transition: width 0.15s ease-out;
+}
+.enemy-hp {
+  position: fixed;
+  z-index: 30;
+  width: 64px;
+  height: 5px;
+  transform: translate(-50%, -100%);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  pointer-events: none;
+}
+.enemy-hp-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ff3d5e, #d05aff);
+  transition: width 0.12s ease-out;
+}
+.enemy-mark {
+  position: fixed;
+  z-index: 29;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  color: #ff5a6e;
+  text-shadow: 0 0 8px rgba(255, 60, 90, 0.8);
+}
+.enemy-mark-dot {
+  font-size: 16px;
+  animation: enemyPulse 1s ease-in-out infinite;
+}
+.enemy-mark-dist {
+  font-size: 10px;
+  color: #ff9d9d;
+}
+@keyframes enemyPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.35); opacity: 1; }
+}
+
+/* trava do assistente de mira: o marcador "morde" o alvo */
+.enemy-mark.locked .enemy-mark-dot {
+  color: #ffd34d;
+  text-shadow: 0 0 12px rgba(255, 200, 60, 0.95);
+  animation: none;
+  transform: scale(1.5);
+}
+.enemy-mark.locked::after {
+  content: "TRAVADO";
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: #ffd34d;
+}
+
+/* ==== Engine de missões: banner disponível + chip ==== */
+.mission-avail {
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  min-width: 280px;
+  padding: 16px 22px;
+  text-align: center;
+  border: 1px solid var(--panel-border, #2c3a52);
+  border-radius: 14px;
+  background: rgba(10, 16, 28, 0.9);
+  backdrop-filter: blur(6px);
+  color: #e8ecf5;
+}
+.mission-avail small {
+  display: block;
+  letter-spacing: 0.3em;
+  font-size: 10px;
+  color: #8fa2c0;
+}
+.mission-avail b {
+  display: block;
+  margin: 6px 0 12px;
+  font-size: 16px;
+}
+.mission-avail-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.mission-chip-2 {
+  top: 46px;
+}
+
+/* ==== Pausa: estatísticas do jogador + prestígio ==== */
+.pause-stats {
+  margin: 4px 0 14px;
+  text-align: left;
+}
+.pause-stats-title {
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #8fa2c0;
+  margin-bottom: 8px;
+}
+.pstat {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  color: #c6d0e0;
+  padding: 3px 0;
+}
+.pstat b {
+  color: #eaf1ff;
+  font-variant-numeric: tabular-nums;
+}
+.prestige-track {
+  margin-top: 6px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.prestige-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #6ea8ff, #9dff7a);
+  transition: width 0.3s ease;
+}
+
+/* ==== Scanner de objetos espaciais ==== */
+.scan-label {
+  position: fixed;
+  z-index: 30;
+  transform: translate(-50%, -140%);
+  padding: 4px 9px;
+  border: 1px solid rgba(110, 200, 255, 0.6);
+  border-radius: 8px;
+  background: rgba(6, 14, 26, 0.82);
+  color: #cfefff;
+  pointer-events: none;
+  text-align: center;
+  box-shadow: 0 0 12px rgba(80, 180, 255, 0.35);
+}
+.scan-mat {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.scan-pur {
+  display: block;
+  font-size: 10px;
+  color: #8fc4e8;
+}
+.scan-reward {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 16, 0.72);
+}
+.scan-reward-box {
+  width: min(340px, 92vw);
+  padding: 22px;
+  text-align: center;
+  border: 1px solid var(--panel-border, #2c3a52);
+  border-radius: 14px;
+  background: rgba(10, 16, 28, 0.96);
+  color: #e8ecf5;
+}
+.scan-reward-box small {
+  letter-spacing: 0.3em;
+  font-size: 10px;
+  color: #8fa2c0;
+}
+.scan-reward-box b {
+  display: block;
+  margin: 6px 0 14px;
+  font-size: 17px;
+}
+.scan-thumb {
+  border: 1px solid rgba(110, 200, 255, 0.5);
+  border-radius: 12px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.scan-thumb:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 18px rgba(80, 180, 255, 0.55);
+}
+.scan-reward-box p {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: #b9c4d6;
+}
+
+/* ==== Missão secundária: chip discreto + toast do NPC da estação ==== */
+/* o chip primário já existe (.mission-chip). O secundário fica ABAIXO, menor
+   e mais apagado — menos ênfase que a missão principal. */
+.mission-chip-sec {
+  top: 44px;
+  font-size: 11px;
+  padding: 4px 10px;
+  color: #8f9bb0;
+  background: rgba(10, 16, 28, 0.55);
+  border-color: rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.01em;
+}
+.station-toast {
+  position: fixed;
+  left: 14px;
+  bottom: 108px;
+  z-index: 24;
+  max-width: 320px;
+  padding: 9px 13px;
+  border: 1px solid rgba(120, 200, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(8, 16, 28, 0.85);
+  color: #cfe6ff;
+  font-size: 12.5px;
+  line-height: 1.4;
+  box-shadow: 0 0 14px rgba(60, 150, 255, 0.2);
+}
+
+/* progresso de missões no menu de pausa */
+.pause-missions {
+  margin: 6px 0 14px;
+  text-align: left;
+}
+.pmiss {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  padding: 3px 0;
+  color: #c6d0e0;
+}
+.pmiss .tag {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7f8ba0;
+  align-self: center;
+}
+.pmiss.sec {
+  color: #97a2b5;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 14px;
+  font-size: 12.5px;
+  color: #c6d0e0;
+  cursor: pointer;
+}
+.setting-row input {
+  accent-color: var(--accent);
+}
+
+/* botão "Aceitar" compacto no painel de missões da pausa */
+.pmiss-accept {
+  margin: 0;
+  padding: 2px 10px;
+  font-size: 11px;
+}
+.pmiss em {
+  color: #8fb0d8;
+  font-style: normal;
+}

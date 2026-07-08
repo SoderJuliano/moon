@@ -20,27 +20,69 @@ import { Shipwreck, createWreckCloud } from "../systems/shipwreck.js";
 import { WreckMission } from "../systems/wreckMission.js";
 import { PlasmaCannon } from "../systems/plasmaCannon.js";
 import { SatelliteSystem } from "../systems/satellites.js";
+import { SpaceStation } from "../systems/spaceStation.js";
 import { DeepSpaceMusic } from "../ui/spaceMusic.js";
+import { SaveManager, createPlayerSave } from "../game/saveManager.js";
+import { addPlayer } from "../game/players.js";
+import { AchievementSystem } from "../game/achievementSystem.js";
+import { emit, on } from "../game/events.js";
+import { DiscoveryPopup } from "../ui/discoveryPopup.js";
+import { setSfxPaused } from "../ui/sfx.js";
+import { CombatEncounter } from "../combat/combatMode.js";
+import { CombatMusic } from "../combat/combatMusic.js";
+import { MissionManager, MISSION } from "../missions/missionManager.js";
+import { createStrangeObjectsMission } from "../missions/strangeObjects.js";
+import { createSpaceRocksMission, createRockChores } from "../missions/spaceRocks.js";
+import { createNeptuneIncident } from "../missions/neptuneIncident.js";
+import { ScannerSystem } from "../systems/scanner.js";
+import { AchievementsScreen } from "../ui/achievementsScreen.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
 
 // Tempo quase parado, como ao pilotar no planetário: a translação orbital é
 // anulada pela trava de referencial e a rotação fica lenta e apreciável.
 const GAME_TIME_DAYS_PER_SEC = 1 / 600;
 const START_BODY_ID = "earth"; // o jogador começa (e renasce) perto da Terra
+const EARTH_RADIUS_KM = 6371; // 1 unidade de mundo = 1 raio terrestre
 
-export function startGameMode() {
+// resume: true = Continuar (carrega o save); false = Novo Jogo (save limpo);
+// "auto" (padrão/?mode=game) = carrega se existir, senão cria — nunca apaga.
+// playerName: jogador nomeado (save local próprio + sync na nuvem). Sem nome
+// cai no save legado sem nome (compatibilidade com atalho ?mode=game).
+export function startGameMode({ resume = "auto", playerName = null } = {}) {
   const { scene, camera, renderer, controls, glow } = createScene();
   controls.enabled = false; // não existe câmera de observação no jogo
 
   // Mundo compartilhado em escala real, sem linhas de órbita (são recurso de
   // "imaginação" do planetário — no jogo o espaço é o de verdade).
   const world = buildSolarSystem(scene, glow, { mode: "real", withOrbitLines: false });
-  const { sun, bodies, bodyById, resolveBody, markerTargets, asteroids, encounter } = world;
+  const { sun, bodies, bodyById, regionById, resolveBody, markerTargets, asteroids, encounter } = world;
 
-  // GPS da nave: marcadores dos corpos (nomes, distâncias, setas de borda)
+  // GPS da nave: marcadores dos corpos (nomes, distâncias, setas de borda).
+  // SEM os clusters de asteroides (kind "region"): eles são descobertos
+  // naturalmente explorando — só Sol/planetas/luas/destinos importantes no HUD.
   const markerSystem = new SpaceMarkerSystem();
-  markerSystem.setTargets(markerTargets);
+  markerSystem.setTargets(markerTargets.filter((t) => t.kind !== "region"));
   const navHud = new NavigationHud(camera, markerSystem);
+
+  // --- Progressão: save + conquistas + descobertas -----------------------------
+  // jogador nomeado → save próprio + nuvem; sem nome → legado local
+  const saveManager = playerName ? createPlayerSave(playerName) : new SaveManager();
+  if (resume === false) saveManager.newGame();
+  else if (!saveManager.load()) saveManager.newGame();
+  const save = saveManager.data;
+  if (playerName) {
+    save.player.name = playerName;
+    addPlayer(playerName); // garante que aparece na lista "Continuar"
+    // (a nuvem já nasce gated em createPlayerSave; liberada após o setup)
+  }
+  const stats = save.statistics;
+  const isResume = resume !== false && !!save.ship.position; // já voou antes?
+  let refBodyId = save.ship.referenceBodyId || START_BODY_ID;
+  let simDays = save.world.simDays || 0;
+
+  const popup = new DiscoveryPopup();
+  const achievements = new AchievementSystem({ save: saveManager, popup });
+  const achScreen = new AchievementsScreen({ save: saveManager, catalog: achievements.catalog });
 
   // Cemitério atrás de Júpiter (conteúdo SÓ do jogo): nuvem ~4× o cinturão
   // principal + cruzador destruído preso à órbita no meio dela. O marcador
@@ -51,8 +93,12 @@ export function startGameMode() {
 
   const ship = new ShipFlight(scene, camera, controls, {
     canDisengage: false, // Esc abre o menu de pausa em vez de "sair" da nave
-    onDestroyed: () => ship.engage(), // explodiu: renasce na aproximação da Terra
-    getReferenceBody: () => resolveBody(START_BODY_ID),
+    onDestroyed: () => {
+      emit("milestone", { id: "first-collision" });
+      emit("stat", { key: "collisions" });
+      ship.engage(); // explodiu: renasce na aproximação do planeta atual
+    },
+    getReferenceBody: () => resolveBody(refBodyId),
     getBodies: () => bodyById.values(), // navegação, colisão e escala (todos os corpos)
     getEntryInfo: (id) => ENTRY_OVERRIDES[id],
   });
@@ -71,12 +117,96 @@ export function startGameMode() {
   const satellites = new SatelliteSystem(scene, () => bodyById.get(START_BODY_ID));
   cannon.addTargetSystem(satellites);
 
+  // ISS orbitando a Terra (numa casca abaixo da rede — nunca colide com ela):
+  // só renderiza de perto, destrutível com 3 tiros.
+  const station = new SpaceStation(scene, () => bodyById.get(START_BODY_ID));
+  cannon.addTargetSystem(station);
+
+  // --- Combate PvE (pacote apartado em src/combat/) ----------------------------
+  // 30s depois de instalar o canhão, um portal negro rasga o espaço e a nave
+  // alien ataca. Enquanto o combate está ativo o GPS some e o ambiente é
+  // abafado (o gameMode só consulta combat.active — o resto vive no pacote).
+  let combatCountdown = -1;
+  let strangeAvailTimer = -1; // 1 min após a 1ª vitória → libera a secundária
+  const combat = new CombatEncounter(scene, camera, ship, {
+    onEnd: (result) => {
+      if (result === "victory") {
+        emit("stat", { key: "enemyShipsDestroyed" }); // contador de naves abatidas
+        if (!save.flags.alienDefeated) {
+          save.flags.alienDefeated = true; // 1ª vez: conquista + destrava secundária
+          emit("milestone", { id: "alien-defeated" });
+          strangeAvailTimer = 60;
+        }
+      }
+      saveManager.saveNow(); // vitória/fuga/derrota: persiste (local + nuvem)
+    },
+  });
+  cannon.addTargetSystem(combat.alien); // nossos bolts acertam a nave alien
+
+  // Scanner de objetos espaciais (recompensa do "Reboque espacial"): tipa as
+  // rochas quando equipado e ligado (G / botão do meio).
+  const scanner = new ScannerSystem(save, () => asteroids, () => ship.ship, camera);
+
+  // --- Engine de missões + secundárias ----------------------------------------
+  const strange = createStrangeObjectsMission(scene);
+  cannon.addTargetSystem(strange.sat); // 2 tiros destroem o objeto
+  const spaceRocks = createSpaceRocksMission(scene);
+  const missions = new MissionManager({
+    scene, camera, ship, cannon, markers: markerSystem,
+    bodyById, combat, station, asteroids, scanner, save, saveManager, emit,
+  });
+  const rockChores = createRockChores(scene); // série secundária (Ferro, Gelo)
+  const neptune = createNeptuneIncident(scene); // ramo do satélite destruído
+  cannon.addTargetSystem(neptune.swarm); // 5 tiros por slime
+  missions.register(strange);
+  missions.register(spaceRocks);
+  missions.register(neptune);
+  for (const c of rockChores) missions.register(c);
+
+  // já derrotou a 1ª nave num save anterior? a secundária já pode aparecer
+  if (save.flags.alienDefeated && missions.status("strange-objects") === MISSION.LOCKED) {
+    missions.makeAvailable("strange-objects");
+  }
+  // entregou o satélite alien? libera o Reboque espacial (dá o scanner).
+  on("milestone", ({ id }) => {
+    if (id === "alien-tech-home") missions.makeAvailable("space-rocks");
+  });
+  // RETOMADA: reabre a etapa correta da cadeia conforme o que já foi concluído
+  const done = (id) => missions.status(id) === MISSION.COMPLETED;
+  const locked = (id) => missions.status(id) === MISSION.LOCKED;
+  if (done("strange-objects") && locked("space-rocks") && !done("space-rocks")) missions.makeAvailable("space-rocks");
+  if (done("space-rocks") && locked("sec-ferro") && !done("sec-ferro")) missions.makeAvailable("sec-ferro");
+  if (done("sec-ferro") && locked("sec-gelo") && !done("sec-gelo")) missions.makeAvailable("sec-gelo");
+
+  // COMBATE: botão esquerdo do mouse também dispara (Espaço continua valendo).
+  // Só sobre o canvas — clicar em botões/menus não pode soltar rajada.
+  window.addEventListener("mousedown", (e) => {
+    if (e.button === 0 && combat.active && e.target?.tagName === "CANVAS") cannon._fireHeld = true;
+  });
+  window.addEventListener("mouseup", (e) => {
+    if (e.button === 0) cannon._fireHeld = false;
+  });
+  // SCANNER: liga/desliga com o botão do MEIO do mouse (sobre o canvas)…
+  window.addEventListener("mousedown", (e) => {
+    if (e.button === 1 && e.target?.tagName === "CANVAS") {
+      e.preventDefault();
+      scanner.toggle();
+    }
+  });
+  // …ou com a tecla G
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "KeyG" && e.target?.tagName !== "INPUT") scanner.toggle();
+  });
+
   // Primeira missão: investigar o sinal de socorro perto de Júpiter
   const mission = new WreckMission({
     wreck,
     camera,
     onUnlock: () => {
       cannon.setEnabled(true);
+      save.ship.weapons.plasmaCannon = true; // antes do emit: o marco auto-salva
+      emit("milestone", { id: "weapon-unlocked" });
+      combatCountdown = 30; // …e 30s depois, a emboscada alien
       // o atalho novo entra na seção Teclado do menu de pausa
       keyList.insertAdjacentHTML(
         "beforeend",
@@ -95,6 +225,7 @@ export function startGameMode() {
   // AudioContext do ambiente, e SILENCIA quando alguma vibração de corpo
   // (Júpiter/Saturno/Sol) sobe — o fenômeno tem prioridade sobre a música.
   const music = new DeepSpaceMusic(() => audio.ctx);
+  const combatMusic = new CombatMusic(() => audio.ctx); // batida do PvE (entra/sai com o combate)
   const _shipFwd = new THREE.Vector3(); // forward da nave (p/ os encontros)
 
   // --- Pausa (Esc): Continuar / Menu principal + teclado -----------------------
@@ -118,37 +249,179 @@ export function startGameMode() {
         <div><span class="key">Shift</span>+<span class="key">W</span> supercruise</div>
         <div><span class="key">Esc</span> pausa</div>
       </div>
+      <div class="pause-missions"></div>
+      <label class="setting-row">
+        <input type="checkbox" data-setting="showSecondaryHud" />
+        Mostrar missões secundárias no HUD
+      </label>
+      <div class="pause-stats"></div>
       <div class="modal-row">
         <button class="modal-btn yes" data-act="resume">Continuar voando</button>
+        <button class="modal-btn" data-act="achievements">Conquistas</button>
         <button class="modal-btn" data-act="menu">Menu principal</button>
       </div>
     </div>`;
   document.body.appendChild(pauseOverlay);
   const keyList = pauseOverlay.querySelector(".key-list");
+  const statsBox = pauseOverlay.querySelector(".pause-stats");
+  const missBox = pauseOverlay.querySelector(".pause-missions");
+  const secToggle = pauseOverlay.querySelector('[data-setting="showSecondaryHud"]');
+  secToggle.addEventListener("change", () => {
+    save.settings = save.settings || {};
+    save.settings.showSecondaryHud = secToggle.checked;
+    missions.refreshHud(); // reflete na hora o chip secundário
+    saveManager.saveNow();
+  });
+
+  // progresso das missões ATIVAS/DISPONÍVEIS (primárias e secundárias)
+  function renderMissions() {
+    const list = missions.progressList();
+    if (!list.length) {
+      missBox.innerHTML = "";
+      return;
+    }
+    const rows = list
+      .map((m) => {
+        const tag = m.kind === "secondary" ? "SEC" : "PRINCIPAL";
+        if (m.status === "available") {
+          // disponível: dá pra aceitar aqui mesmo (caso tenha clicado "Agora não")
+          return `<div class="pmiss ${m.kind === "secondary" ? "sec" : ""}">
+            <span>${m.title} — <em>disponível</em></span>
+            <button class="modal-btn pmiss-accept" data-accept="${m.id}">Aceitar</button></div>`;
+        }
+        return `<div class="pmiss ${m.kind === "secondary" ? "sec" : ""}"><span>${m.objective || m.title}</span><span class="tag">${tag}</span></div>`;
+      })
+      .join("");
+    missBox.innerHTML = `<div class="pause-stats-title">Missões</div>${rows}`;
+    for (const btn of missBox.querySelectorAll(".pmiss-accept")) {
+      btn.addEventListener("click", () => {
+        missions.start(btn.dataset.accept);
+        renderMissions(); // reflete na hora (some o "Aceitar")
+      });
+    }
+  }
+
+  // painel de ESTATÍSTICAS do jogador (montado a cada pausa, com números vivos)
+  function renderStats() {
+    const s = stats;
+    const prestige = Math.round(save.prestige || 0);
+    const row = (label, val) => `<div class="pstat"><span>${label}</span><b>${val}</b></div>`;
+    statsBox.innerHTML =
+      `<div class="pause-stats-title">Estatísticas</div>` +
+      row("Naves inimigas destruídas", s.enemyShipsDestroyed || 0) +
+      row("Km percorridos", Math.round(s.distanceKm || 0).toLocaleString("pt-BR")) +
+      row("Asteroides destruídos", s.asteroidsDestroyed || 0) +
+      row("Satélites destruídos", s.satellitesDestroyed || 0) +
+      row("Objetos estranhos rebocados", s.strangeObjectsTowed || 0) +
+      row("Tempo de voo", `${Math.floor((s.timePlayedS || 0) / 60)} min`) +
+      `<div class="pstat"><span>Prestígio (planeta natal)</span><b>${prestige}%</b></div>` +
+      `<div class="prestige-track"><div class="prestige-fill" style="width:${prestige}%"></div></div>`;
+  }
 
   function setPaused(on) {
     paused = on;
     pauseOverlay.style.display = on ? "" : "none";
-    if (on) ship.keys.clear(); // solta as teclas: nada fica "preso" ao retomar
+    if (on) {
+      ship.keys.clear(); // solta as teclas: nada fica "preso" ao retomar
+      renderMissions();
+      secToggle.checked = save.settings?.showSecondaryHud !== false;
+      renderStats(); // estatísticas atualizadas a cada abertura da pausa
+    }
+    // pausa/retoma TODO o áudio de uma vez: drones dos planetas, sonificação
+    // do Sol e trilha lofi compartilham o MESMO AudioContext — suspender o
+    // contexto congela tudo (e o resume volta exatamente de onde parou)
+    if (audio.ctx) {
+      const p = on ? audio.ctx.suspend() : audio.ctx.resume();
+      p.catch(() => {});
+    }
+    setSfxPaused(on); // contexto dos efeitos de interface (jingle) idem
   }
   pauseOverlay.addEventListener("click", (e) => {
     const act = e.target?.dataset?.act;
     if (act === "resume") setPaused(false);
-    if (act === "menu") location.reload(); // volta ao menu inicial
+    if (act === "achievements") achScreen.open();
+    if (act === "menu") {
+      saveManager.saveNow(); // não perde nada ao sair pro menu
+      location.reload();
+    }
   });
   window.addEventListener("keydown", (e) => {
-    if (e.code === "Escape") setPaused(!paused);
+    if (e.code !== "Escape") return;
+    if (achScreen.isOpen) achScreen.close(); // Esc fecha conquistas primeiro
+    else setPaused(!paused);
   });
 
-  // --- Início: já pilotando perto da Terra ------------------------------------
-  // Um passo de simulação em t=0 posiciona os corpos nas longitudes orbitais
-  // corretas ANTES de engajar (o spawn da nave depende da posição da Terra).
-  for (const b of bodies) b.update(0, 0, 0);
+  // CONTINUAR: a arma volta instalada sem refazer a missão do destroço
+  if (isResume && save.ship.weapons.plasmaCannon) {
+    cannon.setEnabled(true);
+    mission.skipToDone();
+    keyList.insertAdjacentHTML(
+      "beforeend",
+      '<div><span class="key">Espaço</span> dispara o canhão</div>'
+    );
+    // a nave alien insiste a cada sessão até ser derrotada de vez
+    if (!save.flags?.alienDefeated) combatCountdown = 30;
+  }
+
+  // --- Snapshot do estado vivo pro save (gancho do SaveManager) ----------------
+  // Fotografa nave/mundo ANTES de cada escrita — o SaveManager não conhece nada
+  // disso; só chama o gancho. "Planeta atual" = corpo mais próximo da nave.
+  const _snap = new THREE.Vector3();
+  saveManager.onBeforeSave = (d) => {
+    d.ship.position = ship.ship.position.toArray();
+    d.ship.quaternion = ship.ship.quaternion.toArray();
+    d.ship.velocity = ship.velocity.toArray();
+    d.ship.speed = ship.speed;
+    d.ship.weapons.plasmaCannon = cannon.enabled;
+    let nearest = refBodyId;
+    let best = Infinity;
+    for (const b of bodyById.values()) {
+      const dist = b.worldPosition(_snap).distanceTo(ship.ship.position) - b.radius;
+      if (dist < best) {
+        best = dist;
+        nearest = b.id;
+      }
+    }
+    d.ship.referenceBodyId = nearest;
+    d.world.simDays = simDays;
+  };
+  window.addEventListener("beforeunload", () => {
+    saveManager.saveNow(); // local
+    saveManager.syncUpBeacon(); // nuvem (keepalive sobrevive ao fechar a aba)
+  });
+
+  // --- Início ------------------------------------------------------------------
+  // Um passo de simulação posiciona os corpos nas longitudes orbitais corretas
+  // ANTES de engajar (simDays vem do save no Continuar — planetas no lugar).
+  for (const b of bodies) b.update(simDays, 0, 0);
   ship.engage();
 
+  // CONTINUAR: a nave reaparece EXATAMENTE onde estava (posição, rotação,
+  // velocidade) — o engage acima só prepara o voo (escala/gravidade/HUD).
+  if (isResume) {
+    ship.ship.position.fromArray(save.ship.position);
+    ship.ship.quaternion.fromArray(save.ship.quaternion);
+    ship.velocity.fromArray(save.ship.velocity || [0, 0, 0]);
+    ship.speed = save.ship.speed || 0;
+    ship.intro = null; // sem tween cinematográfico: já estamos "no meio do voo"
+    // câmera direto atrás da nave (o chase assume no primeiro frame)
+    _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
+    camera.position.copy(ship.ship.position).addScaledVector(_shipFwd, -0.35);
+    camera.position.y += 0.12;
+    camera.lookAt(ship.ship.position);
+  }
+
+  // Setup completo (nome + snapshot da nave prontos): libera a nuvem e envia
+  // agora — regra "tem local, ainda não tem na nuvem? então sobe ao entrar".
+  if (playerName) {
+    saveManager._cloudReady = true;
+    saveManager.saveNow(); // grava local com o snapshot atual e espelha na nuvem
+  }
+
   // --- Loop --------------------------------------------------------------------
-  let simDays = 0;
   const clock = new THREE.Clock();
+  let visitTimer = 0; // detecção de descobertas é barata, mas 2×/s basta
+  let scWasOn = false;
 
   function animate() {
     requestAnimationFrame(animate);
@@ -180,10 +453,33 @@ export function startGameMode() {
         ship.update(dt);
       }
 
-      // GPS: some só durante a explosão (renasce junto com a nave)
+      // GPS: some durante a explosão E durante o combate (em combate a única
+      // seta de navegação é o marcador vermelho do inimigo)
       const flying = ship.isActive && !ship.exploding;
-      navHud.setVisible(flying);
+      navHud.setVisible(flying && !combat.active);
       navHud.update(dt);
+
+      // Combate PvE: contagem da emboscada + estado do encontro
+      if (combatCountdown > 0 && flying && !mission.holdShip) {
+        combatCountdown -= dt;
+        if (combatCountdown <= 0) combat.trigger();
+      }
+      const combatWasActive = combat.active;
+      combat.update(dt);
+      if (combat.active !== combatWasActive) {
+        audio.setDucked(combat.active); // abafa/devolve as vibrações dos corpos
+        combatMusic.setActive(combat.active); // a batida de batalha entra/sai junto
+      }
+      combatMusic.update();
+
+      // Missões: libera a secundária 1 min após a 1ª vitória; depois roda a
+      // missão ativa (satélite alien, marcador, rebocar…). Pausa no combate.
+      if (strangeAvailTimer > 0 && flying && !combat.active) {
+        strangeAvailTimer -= dt;
+        if (strangeAvailTimer <= 0) missions.makeAvailable("strange-objects");
+      }
+      if (flying && !combat.active && !mission.holdShip) missions.update(dt);
+      if (flying && !combat.active) scanner.update(); // rótulo de composição das rochas
 
       // Asteroides: mesma regra do voo no planetário — streaming ao redor da
       // nave, cinturões sempre visíveis, colisão só fora do supercruise.
@@ -214,13 +510,14 @@ export function startGameMode() {
       // Satélites da Terra: só existem de perto (o próprio sistema decide
       // mostrar/esconder pela distância ao raio atual da Terra)
       satellites.update(dt, flying ? ship.ship.position : camera.position);
+      station.update(dt, flying ? ship.ship.position : camera.position);
 
       // Missão do sinal de socorro (banner/chip/botão Investigar/história)
       mission.update(dt, { shipPos: ship.ship.position, flying });
 
       // Canhão de plasma: atira só no voo normal (nunca no supercruise, nunca
       // com a nave parada na investigação); os bolts/fumaça animam sempre
-      cannon.update(dt, { canFire: asteroidsActive && !mission.holdShip });
+      cannon.update(dt, { canFire: asteroidsActive && !mission.holdShip && !combat.holdShip });
 
       // Encontros ocasionais em viagem: só no voo normal (nunca no supercruise)
       _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
@@ -232,7 +529,38 @@ export function startGameMode() {
       });
 
       audio.update(camera, bodyById); // volume por proximidade
-      music.update(audio.proximityLevel); // trilha cede espaço às vibrações
+      // trilha ambiente cede espaço às vibrações — e SILENCIA no combate
+      // (prioridade: música PvE > ambiente/vibrações; efeitos de UI no topo)
+      music.update(combat.active ? 1 : audio.proximityLevel);
+
+      // --- Progressão: estatísticas + descobertas + auto-save -----------------
+      stats.timePlayedS += dt;
+      if (flying) {
+        stats.distanceKm += ship.velocity.length() * dt * EARTH_RADIUS_KM;
+        if (supercruising) {
+          stats.supercruiseS += dt;
+          if (!scWasOn) emit("milestone", { id: "first-supercruise" });
+        }
+        scWasOn = supercruising;
+      }
+      visitTimer += dt;
+      if (flying && visitTimer >= 0.5) {
+        visitTimer = 0;
+        // corpos: "visitado" quando a nave chega na zona de aproximação
+        // (6× o raio ATUAL — acompanha a inflação; o bus deduplica)
+        for (const b of bodyById.values()) {
+          const d = b.worldPosition(_snap).distanceTo(ship.ship.position);
+          if (d < b.radius * 6 + 8) emit("body:visited", { id: b.id });
+        }
+        // clusters de asteroides: descobertos entrando na região (sem GPS)
+        for (const r of regionById.values()) {
+          const d = r.worldPosition(_snap).distanceTo(ship.ship.position);
+          if (d < (r.approachRadius || 40) * 1.5) emit("poi:found", { id: r.id });
+        }
+        if (satellites.group.visible) emit("poi:found", { id: "satnet" });
+        if (wreck.revealed) emit("poi:found", { id: "wreck" });
+      }
+      saveManager.tick(dt); // auto-save periódico do voo (60s)
 
       // LOD por distância: textura detalhada só quando a câmera chega perto
       for (const b of bodies) b.updateDetail(camera.position, "real");

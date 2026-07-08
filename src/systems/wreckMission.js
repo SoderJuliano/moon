@@ -107,6 +107,16 @@ export class WreckMission {
     return this.state === "story" || this.state === "loot" || this.state === "image";
   }
 
+  // CONTINUAR de um save com a missão já concluída: pula direto pro estado
+  // final sem banner, chip nem história (nada de refazer a missão)
+  skipToDone() {
+    this.state = "done";
+    this._bannerT = -1;
+    this._chipFade = 0;
+    this.banner.remove();
+    this.chip.remove();
+  }
+
   _startStory() {
     this.state = "story";
     this.storyIdx = 0;

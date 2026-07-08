@@ -126,6 +126,13 @@ export class SpaceAudio {
     t.nodes = { src, filter, gain, osc };
   }
 
+  // abafa TODAS as vibrações de corpos (combate PvE: o som do encontro manda)
+  setDucked(on) {
+    if (this.ctx && this.master) {
+      this.master.gain.setTargetAtTime(on ? 0.12 : 0.9, this.ctx.currentTime, 0.5);
+    }
+  }
+
   setEnabled(on) {
     this.enabled = on;
     if (on) {

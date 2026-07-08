@@ -257,6 +257,22 @@ export class AsteroidSystem {
     return null;
   }
 
+  // asteroide ATIVO mais próximo de um ponto (dentro de maxDist) — o scanner usa
+  // pra rotular a rocha em mira. { id, center, dist } ou null. (só instâncias
+  // streaming; os cinturões densos têm hitTest próprio e não entram aqui.)
+  nearestActive(pos, maxDist = Infinity) {
+    let best = null;
+    let bestD = maxDist;
+    for (const inst of this._active.values()) {
+      const d = pos.distanceTo(inst.world);
+      if (d < bestD) {
+        bestD = d;
+        best = { id: inst.desc.id, center: inst.world.clone(), dist: d };
+      }
+    }
+    return best;
+  }
+
   // remove um asteroide específico (campo OU cinturão) — despawna/esconde e apaga
   // o descritor. Chamado ao colidir: o asteroide some junto com a nave.
   destroyAsteroid(id) {

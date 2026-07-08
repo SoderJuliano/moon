@@ -16,6 +16,7 @@ import { NavigationHud } from "../ui/navigationHud.js";
 import { ENTRY_OVERRIDES } from "../systems/asteroidConfig.js";
 import { createHud } from "../ui/hud.js";
 import { createMenu } from "../ui/menu.js";
+import { SpaceStation } from "../systems/spaceStation.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
 
 export function startExplorationMode() {
@@ -27,6 +28,9 @@ export function startExplorationMode() {
   // Mundo compartilhado (corpos, regiões, alvos de navegação, asteroides)
   const world = buildSolarSystem(scene, glow, { mode, withOrbitLines: true });
   const { sun, bodies, bodyById, resolveBody, orbitLines, markerTargets, asteroids, encounter } = world;
+
+  // ISS orbitando a Terra: cenário, só renderiza de perto (sem canhão aqui)
+  const station = new SpaceStation(scene, () => bodyById.get("earth"));
 
   // Navegação espacial (desacoplada do voo): a lógica de projeção/relevância
   // vive no SpaceMarkerSystem; a NavigationHud só desenha.
@@ -249,6 +253,8 @@ export function startExplorationMode() {
     });
 
     audio.update(camera, bodyById); // volume por proximidade (modo real)
+
+    station.update(dt, ship.isActive ? ship.ship.position : camera.position);
 
     // LOD por distância: textura detalhada (NASA/2k) só quando a câmera chega perto
     for (const b of bodies) b.updateDetail(camera.position, mode);

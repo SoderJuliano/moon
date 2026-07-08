@@ -17,6 +17,14 @@
 
 import * as THREE from "three";
 import { radialGlowTexture, starfieldTexture } from "../core/textures.js";
+import { SaveManager, LocalStorageBackend } from "../game/saveManager.js";
+import { buildCatalog } from "../game/discoveryRegistry.js";
+import { AchievementsScreen } from "../ui/achievementsScreen.js";
+import {
+  listPlayers, hasPlayer, addPlayer, saveKeyFor,
+  legacySaveExists, migrateLegacyTo, hasAnySave, normalizeName,
+} from "../game/players.js";
+import { pullSave } from "../game/cloudSync.js";
 
 const GALAXY_RADIUS = 100;
 const ARMS = 4; // como nas ilustrações da Via Láctea (2 maiores + 2 menores)
@@ -241,14 +249,54 @@ export function startMainMenu({ onSelect }) {
     <div class="mm-panel" hidden>
       <div class="mm-panel-title">Solar System</div>
       <div class="mm-panel-sub">Choose your experience</div>
-      <button class="mm-option" type="button" data-mode="exploration">
-        <span class="mm-option-name">Exploration</span>
-        <span class="mm-option-desc">Observe the Solar System in realistic scale.</span>
-      </button>
-      <button class="mm-option" type="button" data-mode="game">
-        <span class="mm-option-name">Game</span>
-        <span class="mm-option-desc">Pilot a spaceship through the Solar System.</span>
-      </button>
+      <div class="mm-view-modes">
+        <button class="mm-option" type="button" data-mode="exploration">
+          <span class="mm-option-name">Exploration</span>
+          <span class="mm-option-desc">Observe the Solar System in realistic scale.</span>
+        </button>
+        <button class="mm-option" type="button" data-mode="game">
+          <span class="mm-option-name">Game</span>
+          <span class="mm-option-desc">Pilot a spaceship through the Solar System.</span>
+        </button>
+      </div>
+      <div class="mm-view-game">
+        <button class="mm-option" type="button" data-game="continue">
+          <span class="mm-option-name">Continuar</span>
+          <span class="mm-option-desc">Volta exatamente de onde você parou.</span>
+        </button>
+        <button class="mm-option" type="button" data-game="new">
+          <span class="mm-option-name">Novo Jogo</span>
+          <span class="mm-option-desc">Começa uma exploração do zero.</span>
+        </button>
+        <button class="mm-option" type="button" data-game="achievements">
+          <span class="mm-option-name">Conquistas</span>
+          <span class="mm-option-desc">O que você já descobriu até agora.</span>
+        </button>
+        <div class="mm-save-row">
+          <button class="mm-save-btn" type="button" data-game="import">Importar Save</button>
+          <button class="mm-save-btn" type="button" data-game="export">Exportar Save</button>
+        </div>
+        <div class="mm-save-note"></div>
+        <button class="mm-save-btn" type="button" data-game="back">◂ Voltar</button>
+      </div>
+      <div class="mm-view-name">
+        <div class="mm-panel-title mm-name-title">Nome do jogador</div>
+        <input class="mm-name-input" type="text" maxlength="24" placeholder="Digite um nome…" />
+        <div class="mm-save-note mm-name-note"></div>
+        <div class="mm-save-row">
+          <button class="mm-save-btn" type="button" data-name="cancel">◂ Voltar</button>
+          <button class="mm-save-btn mm-name-ok" type="button" data-name="ok">Confirmar</button>
+        </div>
+      </div>
+      <div class="mm-view-players">
+        <div class="mm-panel-title">Continuar com quem?</div>
+        <div class="mm-players-list"></div>
+        <button class="mm-option" type="button" data-players="other">
+          <span class="mm-option-name">Não estou na lista</span>
+          <span class="mm-option-desc">Digitar um nome e baixar o save da nuvem.</span>
+        </button>
+        <button class="mm-save-btn" type="button" data-players="back">◂ Voltar</button>
+      </div>
     </div>
     <div class="mm-fade"></div>`;
   document.body.appendChild(root);
@@ -261,30 +309,180 @@ export function startMainMenu({ onSelect }) {
     panel.hidden = false;
     requestAnimationFrame(() => panel.classList.add("open"));
   });
-  // clicar fora do painel (no espaço) fecha
+  // clicar fora do painel (no espaço) fecha — e volta pra tela de modos
   renderer.domElement.addEventListener("click", () => {
     panel.classList.remove("open");
-    setTimeout(() => (panel.hidden = true), 250);
+    setTimeout(() => {
+      panel.hidden = true;
+      showScreen("modes");
+    }, 250);
   });
 
   let choosing = false;
-  for (const btn of root.querySelectorAll(".mm-option")) {
-    btn.addEventListener("click", () => {
-      if (choosing) return;
-      choosing = true;
-      fade.classList.add("on"); // escurece a galáxia antes de trocar de cena
-      setTimeout(() => {
-        dispose();
-        // recoloca a tela de carregamento — o modo a remove no primeiro frame
-        const loading = document.createElement("div");
-        loading.id = "loading";
-        loading.className = "loading";
-        loading.textContent = "Carregando o sistema solar…";
-        document.body.appendChild(loading);
-        onSelect(btn.dataset.mode);
-      }, 700);
-    });
+  function launch(mode, opts) {
+    if (choosing) return;
+    choosing = true;
+    fade.classList.add("on"); // escurece a galáxia antes de trocar de cena
+    setTimeout(() => {
+      dispose();
+      // recoloca a tela de carregamento — o modo a remove no primeiro frame
+      const loading = document.createElement("div");
+      loading.id = "loading";
+      loading.className = "loading";
+      loading.textContent = "Carregando o sistema solar…";
+      document.body.appendChild(loading);
+      onSelect(mode, opts);
+    }, 700);
   }
+
+  // --- Painel multi-tela: modos → Game → (nome | escolher jogador) -------------
+  // Save/conquistas só dentro do submenu do Game. New Game pede um nome;
+  // Continuar mostra os jogadores deste navegador (+ "outro nome" que baixa da
+  // nuvem). O save legado sem nome é batizado na 1ª vez que se clica Continuar.
+  const views = {
+    modes: root.querySelector(".mm-view-modes"),
+    game: root.querySelector(".mm-view-game"),
+    name: root.querySelector(".mm-view-name"),
+    players: root.querySelector(".mm-view-players"),
+  };
+  const saveNote = root.querySelector(".mm-save-note");
+  const nameInput = root.querySelector(".mm-name-input");
+  const nameTitle = root.querySelector(".mm-name-title");
+  const nameNote = root.querySelector(".mm-name-note");
+  const playersList = root.querySelector(".mm-players-list");
+  let achScreen = null;
+  let nameConfirm = null; // callback(name) da tela de nome atual
+
+  function showScreen(which) {
+    for (const [k, el] of Object.entries(views)) el.classList.toggle("on", k === which);
+    views.modes.style.display = which === "modes" ? "" : "none";
+    if (which === "game") {
+      const has = hasAnySave();
+      views.game.querySelector('[data-game="continue"]').style.display = has ? "" : "none";
+      views.game.querySelector('[data-game="export"]').style.display = has ? "" : "none";
+      saveNote.textContent = "";
+    }
+  }
+  showScreen("modes");
+
+  // tela de NOME reutilizável: título + placeholder + callback ao confirmar
+  function askName(title, placeholder, onConfirm) {
+    nameTitle.textContent = title;
+    nameInput.value = "";
+    nameInput.placeholder = placeholder;
+    nameNote.textContent = "";
+    nameConfirm = onConfirm;
+    showScreen("name");
+    setTimeout(() => nameInput.focus(), 60);
+  }
+  function submitName() {
+    const name = normalizeName(nameInput.value);
+    if (name.length < 2) {
+      nameNote.textContent = "Escolha um nome com pelo menos 2 letras.";
+      return;
+    }
+    nameConfirm?.(name);
+  }
+  root.querySelector('[data-name="ok"]').addEventListener("click", submitName);
+  root.querySelector('[data-name="cancel"]').addEventListener("click", () => showScreen("game"));
+  nameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitName();
+  });
+
+  root.querySelector('[data-mode="exploration"]').addEventListener("click", () => launch("exploration"));
+  root.querySelector('[data-mode="game"]').addEventListener("click", () => showScreen("game"));
+  views.game.querySelector('[data-game="back"]').addEventListener("click", () => showScreen("modes"));
+
+  // NOVO JOGO: pede um nome; se já existe (ou há legado), confirma sobrescrever
+  views.game.querySelector('[data-game="new"]').addEventListener("click", () => {
+    askName("Nome do jogador", "Como quer ser chamado?", (name) => {
+      const overwrites = hasPlayer(name) || (legacySaveExists() && !listPlayers().length);
+      if (overwrites && !confirm(`Isso apaga o save de "${name}". Continuar?`)) return;
+      if (legacySaveExists()) migrateLegacyTo(name); // some com o legado sem nome
+      addPlayer(name);
+      launch("game", { resume: false, playerName: name });
+    });
+  });
+
+  // CONTINUAR: escolher jogador (ou batizar o legado sem nome na 1ª vez)
+  views.game.querySelector('[data-game="continue"]').addEventListener("click", () => {
+    if (!listPlayers().length && legacySaveExists()) {
+      askName("Dê um nome ao seu jogo salvo", "Nome do jogador", (name) => {
+        migrateLegacyTo(name); // move o save legado → moon.save::<name>
+        launch("game", { resume: true, playerName: name });
+      });
+      return;
+    }
+    renderPlayers();
+    showScreen("players");
+  });
+
+  function renderPlayers() {
+    playersList.innerHTML = "";
+    for (const p of listPlayers()) {
+      const btn = document.createElement("button");
+      btn.className = "mm-option";
+      btn.type = "button";
+      btn.innerHTML = `<span class="mm-option-name">${p.name}</span>
+        <span class="mm-option-desc">Continuar este jogo.</span>`;
+      btn.addEventListener("click", () => launch("game", { resume: true, playerName: p.name }));
+      playersList.appendChild(btn);
+    }
+  }
+  views.players.querySelector('[data-players="back"]').addEventListener("click", () => showScreen("game"));
+
+  // "Não estou na lista": digita o nome e BAIXA o save da nuvem (abra-api)
+  views.players.querySelector('[data-players="other"]').addEventListener("click", () => {
+    askName("Carregar da nuvem", "Nome do jogador salvo", async (name) => {
+      nameNote.textContent = "Buscando na nuvem…";
+      const remote = await pullSave(name);
+      if (!remote) {
+        nameNote.textContent = `Nenhum save na nuvem para "${name}".`;
+        return;
+      }
+      // grava localmente e registra o jogador; o jogo carrega desse local
+      new LocalStorageBackend(saveKeyFor(name)).write(JSON.stringify(remote.save, null, 2));
+      addPlayer(name);
+      launch("game", { resume: true, playerName: name });
+    });
+  });
+
+  // CONQUISTAS: mostra as do 1º jogador (ou do legado) — a precisa é a do jogo
+  views.game.querySelector('[data-game="achievements"]').addEventListener("click", () => {
+    const first = listPlayers()[0];
+    const backend = first ? new LocalStorageBackend(saveKeyFor(first.name)) : new LocalStorageBackend();
+    const sm = new SaveManager(backend);
+    sm.load(); // pode não existir: a tela mostra tudo ??????
+    if (!achScreen) achScreen = new AchievementsScreen({ save: sm, catalog: new Map(buildCatalog().map((i) => [i.id, i])) });
+    else achScreen.save = sm;
+    achScreen.open();
+  });
+
+  // EXPORTAR/IMPORTAR: opera no 1º jogador (ou legado)
+  function currentBackendKey() {
+    const first = listPlayers()[0];
+    return first ? saveKeyFor(first.name) : "moon.save.v1";
+  }
+  views.game.querySelector('[data-game="export"]').addEventListener("click", () => {
+    const sm = new SaveManager(new LocalStorageBackend(currentBackendKey()));
+    saveNote.textContent = sm.exportToFile() ? "Save exportado (JSON)." : "Nenhum save para exportar.";
+  });
+  views.game.querySelector('[data-game="import"]').addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      file.text().then((text) => {
+        const sm = new SaveManager(new LocalStorageBackend(currentBackendKey()));
+        const ok = sm.importFromText(text);
+        saveNote.textContent = ok ? "Save importado! Clique em Continuar." : "Arquivo inválido — nada foi alterado.";
+        showScreen("game");
+      });
+    });
+    input.click();
+  });
 
   // --- loop -------------------------------------------------------------------
   const clock = new THREE.Clock();

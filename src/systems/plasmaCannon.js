@@ -21,6 +21,7 @@
 
 import * as THREE from "three";
 import { radialGlowTexture } from "../core/textures.js";
+import { emit } from "../game/events.js";
 
 const SHIP_SIZE = 0.06; // mesmo valor da ShipFlight (offsets das asas em escala local)
 const BOLT_SPEED = 25; // u/s somado à velocidade de avanço da nave
@@ -153,6 +154,9 @@ export class PlasmaCannon {
   }
 
   _fire() {
+    // progressão: marco de primeiro disparo + contador (o bus deduplica/ignora)
+    emit("milestone", { id: "first-shot" });
+    emit("stat", { key: "shotsFired" });
     const ship = this.ship.ship;
     this._tmp.set(0, 0, -1).applyQuaternion(ship.quaternion); // forward
     // bolt herda o avanço da nave (senão parece que anda pra trás no boost)
@@ -251,11 +255,14 @@ export class PlasmaCannon {
     const maxHp = hit.maxHp ?? maxHpFor(hit.r); // alvo pode ditar o próprio HP
     if (hp == null) hp = maxHp;
     hp -= 1;
+    // alvos com barra própria (nave alien) acompanham o HP que vive aqui
+    if (sys.onDamaged) sys.onDamaged(hit.id, Math.max(hp, 0), maxHp);
     // sem som: no vácuo o impacto é só visual (fumaça/flash/detritos)
     if (hp <= 0) {
       this._hp.delete(hit.id);
       if (sys.destroyAsteroid) sys.destroyAsteroid(hit.id);
       else sys.destroy(hit.id);
+      emit("stat", { key: sys === this.asteroids ? "asteroidsDestroyed" : "satellitesDestroyed" });
       this._explode(hit.center, hit.r); // estoura em detritos + fumaça no lugar
       if (this._hpTarget && this._hpTarget.id === hit.id) this._hpTarget = null;
     } else {

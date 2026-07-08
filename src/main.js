@@ -12,10 +12,10 @@
 
 import { startMainMenu } from "./app/mainMenu.js";
 
-async function startMode(mode) {
+async function startMode(mode, opts) {
   if (mode === "game") {
     const { startGameMode } = await import("./app/gameMode.js");
-    startGameMode();
+    startGameMode(opts); // { resume: true|false } do menu; ?mode=game = "auto"
   } else {
     const { startExplorationMode } = await import("./app/explorationMode.js");
     startExplorationMode();
