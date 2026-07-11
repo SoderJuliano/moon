@@ -156,6 +156,7 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
   // abafado, música própria (batida comum na invasão, TEMA DE BOSS nos Gêmeos).
   const fleet = new FleetEncounter(scene, camera, ship, {
     shield: playerShield,
+    renderer, // pré-compila shaders/texturas dos bosses no preload
     onEnd: () => saveManager.saveNow(), // resultado sempre persiste
   });
   cannon.addTargetSystem(fleet); // um só sistema de alvo pra frota inteira

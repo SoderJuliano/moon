@@ -38,12 +38,14 @@ const SINISTER = {
 };
 
 export class FleetEncounter {
-  // ship = ShipFlight; shield = PlayerShield|null; onEnd(result, mode)
-  constructor(scene, camera, ship, { onEnd = null, shield = null } = {}) {
+  // ship = ShipFlight; shield = PlayerShield|null; renderer = pré-compila
+  // shaders dos bosses no preload; onEnd(result, mode)
+  constructor(scene, camera, ship, { onEnd = null, shield = null, renderer = null } = {}) {
     this.scene = scene;
     this.camera = camera;
     this.ship = ship;
     this.shield = shield;
+    this.renderer = renderer;
     this.onEnd = onEnd;
 
     this.state = "idle";
@@ -174,28 +176,48 @@ export class FleetEncounter {
     this._begin();
   }
 
+  _ensureBosses() {
+    if (this.bosses) return;
+    this.bosses = [
+      new BossShip(this.scene, { id: "boss-eclipse", name: "ECLIPSE", modelUrl: "models/starship.glb" }),
+      new BossShip(this.scene, { id: "boss-vortice", name: "VÓRTICE", modelUrl: "models/combatstarship.glb" }),
+    ];
+    for (const b of this.bosses) {
+      b.onDestroyed = (boss) => {
+        playExplosionBig();
+        this._shake = Math.max(this._shake, 1.2);
+        this._enemyDown(boss);
+      };
+      b.onPlayerHit = (pos, dmg) => this._playerHit(pos, dmg);
+      b.onFlyby = () => {
+        playFlybyRumble(); // o cargueiro roçando no bote
+        this._shake = Math.max(this._shake, 1);
+      };
+    }
+    this._buildBossBars();
+  }
+
+  // PRÉ-CARREGAMENTO dos bosses (modelos ORIGINAIS, pesados de propósito):
+  // chamado quando a missão dos Gêmeos é aceita — muito antes do portal.
+  // O download roda em paralelo pelo navegador; ao chegar, o compileAsync
+  // pré-compila os shaders e sobe as texturas pra GPU (a "compilação de
+  // shaders" dos jogos) — quando o portal abrir, o custo já foi pago.
+  // Se ainda assim não deu tempo, o próprio portal É a tela de loading:
+  // o estado "opening" só solta os bosses quando os dois estão prontos.
+  preloadBosses() {
+    this._ensureBosses();
+    for (const b of this.bosses) {
+      b.load(() => {
+        if (!this.renderer?.compileAsync) return;
+        this.renderer.compileAsync(b.group, this.camera, this.scene).catch(() => {});
+      });
+    }
+  }
+
   triggerBoss() {
     if (this.state !== "idle") return;
     this.mode = "boss";
-    if (!this.bosses) {
-      this.bosses = [
-        new BossShip(this.scene, { id: "boss-eclipse", name: "ECLIPSE", modelUrl: "models/starship.glb" }),
-        new BossShip(this.scene, { id: "boss-vortice", name: "VÓRTICE", modelUrl: "models/combatstarship.glb" }),
-      ];
-      for (const b of this.bosses) {
-        b.onDestroyed = (boss) => {
-          playExplosionBig();
-          this._shake = Math.max(this._shake, 1.2);
-          this._enemyDown(boss);
-        };
-        b.onPlayerHit = (pos, dmg) => this._playerHit(pos, dmg);
-        b.onFlyby = () => {
-          playFlybyRumble(); // o cargueiro roçando no bote
-          this._shake = Math.max(this._shake, 1);
-        };
-      }
-      this._buildBossBars();
-    }
+    this._ensureBosses();
     this.enemies = [...this.bosses];
     for (const b of this.bosses) b.sfx = true;
     const shipObj = this.ship.ship;

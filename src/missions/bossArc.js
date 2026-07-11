@@ -115,6 +115,9 @@ export function createTwinsMission() {
       if (ph === "invasion") ctx.mgr.setPhase(this.id, "invasion-wait");
       if (ph === "boss") ctx.mgr.setPhase(this.id, "boss-wait");
       this._cd = ph.startsWith("boss") ? BOSS_DELAY : INVASION_DELAY;
+      // os GLBs ORIGINAIS dos Gêmeos começam a baixar/compilar JÁ — a espera
+      // e a invasão de treino inteiras escondem o carregamento
+      ctx.fleet?.preloadBosses?.();
     },
 
     update(dt, ctx) {
@@ -243,6 +246,7 @@ export function createDebrisChore(scene) {
         this.objective = "Reboque os destroços até a Estação Espacial";
       } else {
         this.objective = "Recolha os destroços dos Gêmeos no local da batalha";
+        loadModel(); // aceitou a missão = vai até lá; baixa o GLB original já
       }
       if (!this._marked) {
         ctx.markers.add({
