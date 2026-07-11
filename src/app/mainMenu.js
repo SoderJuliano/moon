@@ -275,6 +275,7 @@ export function startMainMenu({ onSelect }) {
         <div class="mm-save-row">
           <button class="mm-save-btn" type="button" data-game="import">Importar Save</button>
           <button class="mm-save-btn" type="button" data-game="export">Exportar Save</button>
+          <button class="mm-save-btn" type="button" data-game="reset-mission">Resetar Missão</button>
         </div>
         <div class="mm-save-note"></div>
         <button class="mm-save-btn" type="button" data-game="back">◂ Voltar</button>
@@ -482,6 +483,22 @@ export function startMainMenu({ onSelect }) {
       });
     });
     input.click();
+  });
+
+  // RESETAR MISSÃO (Admin)
+  views.game.querySelector('[data-game="reset-mission"]').addEventListener("click", () => {
+    askName("ID da Missão para resetar", "ex: rock-delivery", (missionId) => {
+      const sm = new SaveManager(new LocalStorageBackend(currentBackendKey()));
+      const data = sm.load();
+      if (data && data.missions && data.missions[missionId]) {
+        delete data.missions[missionId];
+        sm.saveNow();
+        saveNote.textContent = `Missão '${missionId}' resetada!`;
+      } else {
+        saveNote.textContent = `Missão '${missionId}' não iniciada/encontrada.`;
+      }
+      showScreen("game");
+    });
   });
 
   // --- loop -------------------------------------------------------------------

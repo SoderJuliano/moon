@@ -30,10 +30,15 @@ import { DiscoveryPopup } from "../ui/discoveryPopup.js";
 import { setSfxPaused } from "../ui/sfx.js";
 import { CombatEncounter } from "../combat/combatMode.js";
 import { CombatMusic } from "../combat/combatMusic.js";
+import { FleetEncounter } from "../combat/fleetEncounter.js";
+import { BossMusic } from "../combat/bossMusic.js";
+import { playCannonShot, setBattleSfxPaused } from "../combat/battleSfx.js";
+import { PlayerShield } from "../systems/playerShield.js";
 import { MissionManager, MISSION } from "../missions/missionManager.js";
 import { createStrangeObjectsMission } from "../missions/strangeObjects.js";
 import { createSpaceRocksMission, createRockChores } from "../missions/spaceRocks.js";
 import { createNeptuneIncident } from "../missions/neptuneIncident.js";
+import { createGhostSignalMission, createTwinsMission, createDebrisChore } from "../missions/bossArc.js";
 import { ScannerSystem } from "../systems/scanner.js";
 import { AchievementsScreen } from "../ui/achievementsScreen.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
@@ -143,6 +148,22 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
   });
   cannon.addTargetSystem(combat.alien); // nossos bolts acertam a nave alien
 
+  // --- Arco dos Gêmeos: escudo do jogador + encontros de FROTA -----------------
+  // O escudo (troféu da boss fight) absorve tiros inimigos quando equipado.
+  const playerShield = new PlayerShield(scene, save, () => ship.ship);
+  // FleetEncounter roda a invasão de treino (3 batedores) e a boss fight (os
+  // dois cruzadores capitais). Mesmo contrato do combate: GPS some, ambiente
+  // abafado, música própria (batida comum na invasão, TEMA DE BOSS nos Gêmeos).
+  const fleet = new FleetEncounter(scene, camera, ship, {
+    shield: playerShield,
+    onEnd: () => saveManager.saveNow(), // resultado sempre persiste
+  });
+  cannon.addTargetSystem(fleet); // um só sistema de alvo pra frota inteira
+  // sons de batalha (exceção autorizada): o canhão só SOA nos encontros épicos
+  cannon.sfxShot = () => {
+    if (fleet.active) playCannonShot();
+  };
+
   // Scanner de objetos espaciais (recompensa do "Reboque espacial"): tipa as
   // rochas quando equipado e ligado (G / botão do meio).
   const scanner = new ScannerSystem(save, () => asteroids, () => ship.ship, camera);
@@ -154,6 +175,7 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
   const missions = new MissionManager({
     scene, camera, ship, cannon, markers: markerSystem,
     bodyById, combat, station, asteroids, scanner, save, saveManager, emit,
+    wreck, fleet, shieldItem: playerShield, // arco dos Gêmeos
   });
   const rockChores = createRockChores(scene); // série secundária (Ferro, Gelo)
   const neptune = createNeptuneIncident(scene); // ramo do satélite destruído
@@ -162,6 +184,10 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
   missions.register(spaceRocks);
   missions.register(neptune);
   for (const c of rockChores) missions.register(c);
+  // ARCO DOS GÊMEOS: escaneia o cruzador → invasão de treino → boss fight
+  missions.register(createGhostSignalMission());
+  missions.register(createTwinsMission());
+  missions.register(createDebrisChore(scene));
 
   // já derrotou a 1ª nave num save anterior? a secundária já pode aparecer
   if (save.flags.alienDefeated && missions.status("strange-objects") === MISSION.LOCKED) {
@@ -177,11 +203,24 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
   if (done("strange-objects") && locked("space-rocks") && !done("space-rocks")) missions.makeAvailable("space-rocks");
   if (done("space-rocks") && locked("sec-ferro") && !done("sec-ferro")) missions.makeAvailable("sec-ferro");
   if (done("sec-ferro") && locked("sec-gelo") && !done("sec-gelo")) missions.makeAvailable("sec-gelo");
+  // arco dos Gêmeos: o scanner (de qualquer via) abre o "Eco no Cemitério"
+  if (save.inventory.scanner?.owned && locked("ghost-signal")) missions.makeAvailable("ghost-signal");
+  const _scanGrant = scanner.grant.bind(scanner);
+  scanner.grant = () => {
+    _scanGrant();
+    missions.makeAvailable("ghost-signal"); // no-op se já saiu de LOCKED
+  };
+  if (done("ghost-signal") && locked("twins")) missions.makeAvailable("twins");
+  if (done("twins") && locked("sec-destrocos") && save.flags.debrisPos && !save.flags.debrisTowed) {
+    missions.makeAvailable("sec-destrocos");
+  }
+  // troféu ganho mas ainda não instalado (fechou o jogo antes)? reoferece
+  if (save.inventory.shield?.owned && !save.inventory.shield.equipped) playerShield.grant();
 
   // COMBATE: botão esquerdo do mouse também dispara (Espaço continua valendo).
   // Só sobre o canvas — clicar em botões/menus não pode soltar rajada.
   window.addEventListener("mousedown", (e) => {
-    if (e.button === 0 && combat.active && e.target?.tagName === "CANVAS") cannon._fireHeld = true;
+    if (e.button === 0 && (combat.active || fleet.active) && e.target?.tagName === "CANVAS") cannon._fireHeld = true;
   });
   window.addEventListener("mouseup", (e) => {
     if (e.button === 0) cannon._fireHeld = false;
@@ -226,6 +265,7 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
   // (Júpiter/Saturno/Sol) sobe — o fenômeno tem prioridade sobre a música.
   const music = new DeepSpaceMusic(() => audio.ctx);
   const combatMusic = new CombatMusic(() => audio.ctx); // batida do PvE (entra/sai com o combate)
+  const bossMusic = new BossMusic(() => audio.ctx); // TEMA DE BOSS (só na luta dos Gêmeos)
   const _shipFwd = new THREE.Vector3(); // forward da nave (p/ os encontros)
 
   // --- Pausa (Esc): Continuar / Menu principal + teclado -----------------------
@@ -335,6 +375,7 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
       p.catch(() => {});
     }
     setSfxPaused(on); // contexto dos efeitos de interface (jingle) idem
+    setBattleSfxPaused(on); // sons de batalha (canhões/ronco) congelam junto
   }
   pauseOverlay.addEventListener("click", (e) => {
     const act = e.target?.dataset?.act;
@@ -456,30 +497,39 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
       // GPS: some durante a explosão E durante o combate (em combate a única
       // seta de navegação é o marcador vermelho do inimigo)
       const flying = ship.isActive && !ship.exploding;
-      navHud.setVisible(flying && !combat.active);
+      const anyCombatBefore = combat.active || fleet.active;
+      navHud.setVisible(flying && !anyCombatBefore);
       navHud.update(dt);
 
-      // Combate PvE: contagem da emboscada + estado do encontro
-      if (combatCountdown > 0 && flying && !mission.holdShip) {
+      // Combate PvE: contagem da emboscada + estado dos encontros (o 1v1 do
+      // alien e a FROTA — invasão/boss — nunca rodam ao mesmo tempo: a frota
+      // só é disparada pelas missões fora de combate)
+      if (combatCountdown > 0 && flying && !mission.holdShip && !fleet.active) {
         combatCountdown -= dt;
         if (combatCountdown <= 0) combat.trigger();
       }
-      const combatWasActive = combat.active;
       combat.update(dt);
-      if (combat.active !== combatWasActive) {
-        audio.setDucked(combat.active); // abafa/devolve as vibrações dos corpos
-        combatMusic.setActive(combat.active); // a batida de batalha entra/sai junto
+      fleet.update(dt);
+      const anyCombat = combat.active || fleet.active;
+      if (anyCombat !== anyCombatBefore) {
+        audio.setDucked(anyCombat); // abafa/devolve as vibrações dos corpos
+        // música por encontro: batida comum (alien 1v1 e invasão) vs TEMA DE
+        // BOSS (os Gêmeos) — só um toca por vez
+        combatMusic.setActive(combat.active || (fleet.active && fleet.mode === "invasion"));
+        bossMusic.setActive(fleet.active && fleet.mode === "boss");
       }
       combatMusic.update();
+      bossMusic.update();
+      playerShield.update(dt, { inCombat: anyCombat }); // pips + recarga + bolha
 
       // Missões: libera a secundária 1 min após a 1ª vitória; depois roda a
       // missão ativa (satélite alien, marcador, rebocar…). Pausa no combate.
-      if (strangeAvailTimer > 0 && flying && !combat.active) {
+      if (strangeAvailTimer > 0 && flying && !anyCombat) {
         strangeAvailTimer -= dt;
         if (strangeAvailTimer <= 0) missions.makeAvailable("strange-objects");
       }
-      if (flying && !combat.active && !mission.holdShip) missions.update(dt);
-      if (flying && !combat.active) scanner.update(); // rótulo de composição das rochas
+      if (flying && !anyCombat && !mission.holdShip) missions.update(dt);
+      if (flying && !anyCombat) scanner.update(); // rótulo de composição das rochas
 
       // Asteroides: mesma regra do voo no planetário — streaming ao redor da
       // nave, cinturões sempre visíveis, colisão só fora do supercruise.
@@ -517,7 +567,7 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
 
       // Canhão de plasma: atira só no voo normal (nunca no supercruise, nunca
       // com a nave parada na investigação); os bolts/fumaça animam sempre
-      cannon.update(dt, { canFire: asteroidsActive && !mission.holdShip && !combat.holdShip });
+      cannon.update(dt, { canFire: asteroidsActive && !mission.holdShip && !combat.holdShip && !fleet.holdShip });
 
       // Encontros ocasionais em viagem: só no voo normal (nunca no supercruise)
       _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
@@ -531,7 +581,7 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
       audio.update(camera, bodyById); // volume por proximidade
       // trilha ambiente cede espaço às vibrações — e SILENCIA no combate
       // (prioridade: música PvE > ambiente/vibrações; efeitos de UI no topo)
-      music.update(combat.active ? 1 : audio.proximityLevel);
+      music.update(anyCombat ? 1 : audio.proximityLevel);
 
       // --- Progressão: estatísticas + descobertas + auto-save -----------------
       stats.timePlayedS += dt;

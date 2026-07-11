@@ -34,6 +34,7 @@ export class AlienShip {
 
     this.alive = false;
     this.hp = ALIEN_MAX_HP;
+    this.idTag = "alien"; // id no canhão — instâncias múltiplas (invasão) trocam
     this.loaded = false;
     this._loading = false;
     this.onDestroyed = null; // setado pelo CombatEncounter
@@ -120,7 +121,7 @@ export class AlienShip {
   hitTest(pos) {
     if (!this.alive || !this.group.visible) return null;
     if (pos.distanceTo(this.group.position) < HIT_RADIUS) {
-      return { id: "alien", center: this.group.position.clone(), r: HIT_RADIUS, maxHp: ALIEN_MAX_HP };
+      return { id: this.idTag, center: this.group.position.clone(), r: HIT_RADIUS, maxHp: ALIEN_MAX_HP };
     }
     return null;
   }

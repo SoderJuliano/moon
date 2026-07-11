@@ -20,11 +20,12 @@ import { radialGlowTexture } from "../core/textures.js";
 const SIZE = 0.95; // ~16× a nave (0.06): estação claramente enorme perto dela
 // Órbita em MÚLTIPLO do raio ATUAL: a Terra infla ~60× ao se aproximar e a
 // colisão fica em 1.1×raio; uma altitude ABSOLUTA cairia dentro da colisão e a
-// estação (destino das entregas) ficaria inalcançável. 1.6× o raio fica sempre
-// acima da colisão e acima da rede de satélites fixos (r+10 absoluto).
-const SHELL_MUL = 1.6;
+// colisão fica em 1.1×raio. Usamos uma altitude fixa de 14 para acompanhar a
+// expansão da superfície sem o efeito visual de 'fugir' do jogador. Garantimos 
+// que fique sempre acima do raio de colisão (r * 1.1).
+const ALTITUDE = 14;
 const INCLINATION = (51.6 * Math.PI) / 180; // inclinação orbital real da ISS
-const ORBIT_RATE = 0.05; // rad/s — volta lenta e apreciável
+const ORBIT_RATE = 0; // rad/s — parada no espaço
 const SHOW_AT = 6; // aparece a < 6× o raio atual da Terra (igual à rede)
 const HIDE_AT = 8; // some a > 8× (histerese)
 const HIT_RADIUS = 0.4; // generoso: alvo grande, e o substep dos bolts é 0.12u
@@ -85,8 +86,18 @@ export class SpaceStation {
     const r = earth.radius; // raio ATUAL (inflado na aproximação)
     const d = cameraPos.distanceTo(this._center);
 
+    // Avança na órbita e calcula a posição SEMPRE, mesmo invisível,
+    // para que o marcador da missão saiba onde a estação está.
+    this._angle += ORBIT_RATE * dt;
+    const shell = Math.max(r + ALTITUDE, r * 1.1 + 4); // Garante que a estação fique fora da parede invisível (r * 1.1)
+    const dir = this._pos
+      .copy(this._u).multiplyScalar(Math.cos(this._angle))
+      .addScaledVector(this._v, Math.sin(this._angle));
+
+    this.glow.position.copy(this._center).addScaledVector(dir, shell);
+
     if (!this.group.visible) {
-      if (d >= r * SHOW_AT) return; // longe: nem atualiza
+      if (d >= r * SHOW_AT) return; // longe: não atualiza o modelo
       this.group.visible = true;
       this._load(); // primeira aproximação baixa o modelo
     } else if (d > r * HIDE_AT) {
@@ -94,12 +105,6 @@ export class SpaceStation {
       return;
     }
 
-    // avança na órbita e posiciona na casca própria (abaixo da rede)
-    this._angle += ORBIT_RATE * dt;
-    const shell = r * SHELL_MUL;
-    const dir = this._pos
-      .copy(this._u).multiplyScalar(Math.cos(this._angle))
-      .addScaledVector(this._v, Math.sin(this._angle));
     if (this.holder) {
       this._prev.copy(this.holder.position);
       this.holder.position.copy(this._center).addScaledVector(dir, shell);
@@ -107,8 +112,7 @@ export class SpaceStation {
       if (this._prev.lengthSq() > 0) this.holder.lookAt(this._prev);
     }
 
-    // glint no lugar da estação, esmaecendo ao chegar perto (o modelo assume)
-    this.glow.position.copy(this._center).addScaledVector(dir, shell);
+    // glint esmaecendo ao chegar perto (o modelo assume)
     const dc = cameraPos.distanceTo(this.glow.position);
     const t = THREE.MathUtils.clamp((dc - GLINT_FADE_NEAR) / (GLINT_FADE_FAR - GLINT_FADE_NEAR), 0, 1);
     this.glow.material.opacity = t * t * (3 - 2 * t) * 0.85;

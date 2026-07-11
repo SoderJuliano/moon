@@ -10,14 +10,17 @@
 import * as THREE from "three";
 import { radialGlowTexture } from "../core/textures.js";
 
-const SPARKS = 7;
-
+// Variante SINISTRA (boss): cores carmesim/violeta, mais fagulhas e uma onda
+// de choque que expande na abertura — passe `colors`/`sparks`/`shockwave`.
 export class Portal {
-  constructor(scene) {
+  constructor(scene, { colors = null, sparks = 7, shockwave = false } = {}) {
     this.group = new THREE.Group();
     this.group.visible = false;
     scene.add(this.group);
 
+    const pal = colors || {
+      core: "#04060c", veil: "#16205e", halo: "#3a2b8f", rim: "#5a7dff", spark: "#8fa8ff",
+    };
     const mk = (color, scale, opacity, blending) => {
       const s = new THREE.Sprite(
         new THREE.SpriteMaterial({ map: radialGlowTexture(color), transparent: true, opacity, blending, depthWrite: false })
@@ -26,17 +29,21 @@ export class Portal {
       this.group.add(s);
       return s;
     };
-    this.core = mk("#04060c", 1.0, 0.97, THREE.NormalBlending); // negro central
-    this.veil = mk("#16205e", 1.5, 0.75, THREE.AdditiveBlending); // azul profundo
-    this.halo = mk("#3a2b8f", 1.9, 0.5, THREE.AdditiveBlending); // violeta escuro
-    this.rim = mk("#5a7dff", 2.1, 0.4, THREE.AdditiveBlending); // fio da borda
+    this.core = mk(pal.core, 1.0, 0.97, THREE.NormalBlending); // negro central
+    this.veil = mk(pal.veil, 1.5, 0.75, THREE.AdditiveBlending); // véu profundo
+    this.halo = mk(pal.halo, 1.9, 0.5, THREE.AdditiveBlending); // halo escuro
+    this.rim = mk(pal.rim, 2.1, 0.4, THREE.AdditiveBlending); // fio da borda
 
     // fagulhas orbitando a borda (movimento do "redemoinho")
     this.sparks = [];
-    for (let i = 0; i < SPARKS; i++) {
-      const s = mk("#8fa8ff", 0.16 + Math.random() * 0.14, 0.85, THREE.AdditiveBlending);
-      this.sparks.push({ s, a: (i / SPARKS) * Math.PI * 2, r: 0.95 + Math.random() * 0.12, w: 2.2 + Math.random() * 1.4 });
+    for (let i = 0; i < sparks; i++) {
+      const s = mk(pal.spark, 0.16 + Math.random() * 0.14, 0.85, THREE.AdditiveBlending);
+      this.sparks.push({ s, a: (i / sparks) * Math.PI * 2, r: 0.95 + Math.random() * 0.12, w: 2.2 + Math.random() * 1.4 });
     }
+
+    // onda de choque na abertura (o rasgo EMPURRA o espaço em volta)
+    this.wave = shockwave ? mk(pal.rim, 0.1, 0, THREE.AdditiveBlending) : null;
+    this._waveT = -1; // -1 = inerte; 0..1 = expandindo
 
     this._t = 0; // abertura 0..1
     this._target = 0;
@@ -48,6 +55,7 @@ export class Portal {
     this._size = size;
     this._target = 1;
     this.group.visible = true;
+    if (this.wave) this._waveT = 0; // dispara a onda de choque
   }
 
   close() {
@@ -73,6 +81,17 @@ export class Portal {
     for (const p of this.sparks) {
       p.a += p.w * dt;
       p.s.position.set(Math.cos(p.a) * p.r, Math.sin(p.a) * p.r, 0.02);
+    }
+    // onda de choque: anel de luz que expande e esmaece na abertura
+    if (this.wave && this._waveT >= 0) {
+      this._waveT += dt * 0.7;
+      if (this._waveT >= 1) {
+        this._waveT = -1;
+        this.wave.material.opacity = 0;
+      } else {
+        this.wave.scale.setScalar(0.4 + this._waveT * 5.5);
+        this.wave.material.opacity = 0.5 * (1 - this._waveT);
+      }
     }
   }
 }

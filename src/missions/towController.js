@@ -13,7 +13,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-const TRAIL = 1.5; // distância do objeto atrás da nave
+const TRAIL = 0.4; // distância do objeto atrás da nave
 const CUT_DUR = 4.2; // s da cutscene de acoplamento
 
 export class TowController {
@@ -95,7 +95,7 @@ export class TowController {
     // rebocando: segue atrás/abaixo da nave
     const back = this._v.set(0, 0, 1).applyQuaternion(ship.ship.quaternion);
     const target = this._v2.copy(ship.ship.position).addScaledVector(back, TRAIL).addScaledVector(this._v3.set(0, -1, 0), 0.15);
-    p.position.lerp(target, Math.min(1, dt * 6));
+    p.position.lerp(target, Math.min(1, dt * 25));
     p.rotation.y += dt * 0.5;
     this._cable(ship);
     return this.state;

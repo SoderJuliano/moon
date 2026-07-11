@@ -128,7 +128,7 @@ export class SatelliteSystem {
       if (!this._built) {
         this._built = true;
         // casca no raio FINAL inflado (o atual ainda anima neste momento)
-        const shellRadius = Math.max(earth.approachRadius || r, r) + ALTITUDE;
+        const shellRadius = Math.max(earth.approachRadius || r, r) * 1.1 + Math.max(ALTITUDE, 2);
         this._buildGrid(cameraPos, shellRadius);
       }
       this._load(); // primeira aproximação baixa o modelo
@@ -137,7 +137,7 @@ export class SatelliteSystem {
       return;
     }
 
-    const shell = r + ALTITUDE;
+    const shell = Math.max(r + ALTITUDE, r * 1.1 + 2);
     for (const s of this.sats) {
       if (!s.alive || !s.mesh) continue;
       s.mesh.position.copy(this._center).addScaledVector(s.dir, shell);

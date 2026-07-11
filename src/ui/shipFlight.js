@@ -26,7 +26,7 @@ import { radialGlowTexture, warpRingTexture } from "../core/textures.js";
 const NAV_KEYS = new Set([
   "KeyW", "KeyS", "KeyA", "KeyD", "KeyX", "KeyZ", "KeyQ", "KeyE",
   "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
-  "ShiftLeft", "ShiftRight",
+  "ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight",
 ]);
 
 const SHIP_SIZE = 0.06; // fração de unidade (1 unidade = 1 raio terrestre no real)
@@ -36,6 +36,10 @@ const APPROACH_MUL = 40;
 const MIN_APPROACH_R = 60;
 const KM_PER_UNIT = 6371; // 1 unidade = 1 raio terrestre (modo real)
 const C_KM_S = 299792.458; // velocidade da luz, p/ mostrar % da luz
+const REVERSE_REL_SPEED_FOR_LIGHT = 0.002; // abaixo disso, ré nunca mostra % da luz
+const OBJECT_LOCK_BREAK_SECS = 2.0;
+const OBJECT_LOCK_DOT_MIN = 0.94;
+const OBJECT_LOCK_DIST = 18;
 
 // suaviza 0→1 (acelera no início, desacelera no fim) para a entrada cinematográfica
 function easeInOut(t) {
@@ -44,11 +48,19 @@ function easeInOut(t) {
 
 // velocidade legível: % da luz + km/s (a medida interna em u/s não diz nada)
 function formatSpeed(unitsPerSec) {
-  const kms = unitsPerSec * KM_PER_UNIT;
+  const kms = Math.abs(unitsPerSec) * KM_PER_UNIT;
   const kmsFmt = Math.round(kms).toLocaleString("pt-BR");
   const pctC = (kms / C_KM_S) * 100;
   if (pctC >= 0.05) return `${pctC.toFixed(1)}% da luz · ${kmsFmt} km/s`;
   return `${kmsFmt} km/s`;
+}
+
+function formatSpeedForwardOnly(unitsPerSec) {
+  const kms = Math.abs(unitsPerSec) * KM_PER_UNIT;
+  const kmsFmt = Math.round(kms).toLocaleString("pt-BR");
+  const pctC = (kms / C_KM_S) * 100;
+  if (unitsPerSec <= 0 || pctC < REVERSE_REL_SPEED_FOR_LIGHT) return `${kmsFmt} km/s`;
+  return formatSpeed(unitsPerSec);
 }
 
 function buildShipModel() {
@@ -119,7 +131,7 @@ export class ShipFlight {
     this.maxSpeed = 3.3; // cruzeiro ~7% da luz
     this.boostSpeed = 14; // boost ~30% da luz (Shift+W)
     this.accel = 3.2; // ganho/perda do empuxo (escalar)
-    this.reverseFrac = 1 / 3; // ré no máximo 1/3 do avanço
+    this.reverseFrac = 1 / 192; // ré no máximo 1/192 do avanço (mais controle em aproximações finas)
     this.speedDrag = 0.12; // arrasto espacial leve ao soltar (coast longo)
     this.velAlign = 2.6; // rapidez com que a velocidade gira p/ o forward (inércia/drift)
     this.gravity = 4; // suave (com planeta gigante, gravidade ~r² ficaria brutal)
@@ -137,9 +149,11 @@ export class ShipFlight {
     // --- rotação 6DoF (rad/s, eixos locais, com inércia) ---------------------
     this.pitchRate = 1.6; // cabrar/picar (local X)
     this.yawRate = 1.5; // guinada (local Y)
-    this.rollRate = 2.8; // giro das asas (local Z) — caça rola rápido e bem visível
+    this.rollRate = 2.8; // giro das asas (local Z) — caça rola rápido e visível
     this.turnAttack = 8; // rampa firme ao apertar a tecla
     this.turnRelease = 1.6; // decaimento ao soltar (deixa "girar de inércia")
+    this.brakeDamp = 120; // Ctrl = freio inercial instantâneo (zera a deriva rápido)
+    this.reverseAccelMul = 0.015625; // ré mais delicada: 1/64 da aceleração atual
 
     // --- câmera 3ª pessoa (orientação EXATA da nave, inclui roll) -------------
     this.trailBack = 0.5;
@@ -278,6 +292,11 @@ export class ShipFlight {
     this._zAxis = new THREE.Vector3(0, 0, 1);
     this._refDelta = new THREE.Vector3(); // deslocamento do referencial neste frame (p/ o rastro)
 
+    this.objectLock = null; // automira contextual em objetos/interações
+    this._lockForward = new THREE.Vector3();
+    this._lockTargetPos = new THREE.Vector3();
+    this._lockBreakHold = 0;
+
     window.addEventListener("keydown", (e) => this._onKeyDown(e));
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
@@ -335,6 +354,16 @@ export class ShipFlight {
     e.preventDefault();
     this.keys.add(e.code);
     if (this.enabled && !this.active && !this.exploding && (e.code === "KeyW" || e.code === "ArrowUp")) this.engage();
+  }
+
+  setObjectLock(lock) {
+    this.objectLock = lock || null;
+    this._lockBreakHold = 0;
+  }
+
+  clearObjectLock() {
+    this.objectLock = null;
+    this._lockBreakHold = 0;
   }
 
   engage() {
@@ -493,6 +522,7 @@ export class ShipFlight {
     this._hideFx();
     this._restoreApproach();
     this.readout.style.display = "none";
+    this.clearObjectLock();
     this.velocity.set(0, 0, 0);
     this.angVel.set(0, 0, 0);
     this.camera.up.set(0, 1, 0); // devolve o up global pro OrbitControls (após rolls)
@@ -510,6 +540,7 @@ export class ShipFlight {
     this._hideFx();
     this._restoreApproach();
     this.readout.style.display = "none";
+    this.clearObjectLock();
     this.camera.up.set(0, 1, 0); // a câmera de explosão/OrbitControls usa up global
     if (this._baseFov) { this.camera.fov = this._baseFov; this.camera.updateProjectionMatrix(); }
 
@@ -868,10 +899,12 @@ export class ShipFlight {
     }
 
     // 2) LEITURA DO INPUT — eixos combináveis (yaw+pitch+roll+empuxo ao mesmo tempo)
-    const shiftHeld = k.has("ShiftLeft") || k.has("ShiftRight");
-    const fwdKey = k.has("KeyW");
-    const revKey = k.has("KeyS");
-    const boosting = fwdKey && shiftHeld;
+      const shiftHeld = k.has("ShiftLeft") || k.has("ShiftRight");
+      const ctrlHeld = k.has("ControlLeft") || k.has("ControlRight");
+      const fwdKey = k.has("KeyW");
+      const revKey = k.has("KeyS");
+      const boosting = fwdKey && shiftHeld && !ctrlHeld;
+
     // sinais -1..1 por eixo de rotação (sem interferência entre eles)
     let pitchIn = 0, yawIn = 0, rollIn = 0;
     if (k.has("ArrowUp") || k.has("KeyX")) pitchIn += 1;   // cabra (nariz sobe)
@@ -881,18 +914,53 @@ export class ShipFlight {
     if (k.has("KeyQ")) rollIn += 1;  // rola asas (sentido anti-horário visto de trás)
     if (k.has("KeyE")) rollIn -= 1;  // rola asas (sentido horário) — caça vira de ponta-cabeça
 
-    // 3) ATUALIZA AS VELOCIDADES ANGULARES (inércia: rampa firme ao apertar,
-    //    decaimento lento ao soltar → toque rápido continua girando um pouco).
-    this.angVel.x = this._approachAngular(this.angVel.x, pitchIn * this.pitchRate, dt);
-    this.angVel.y = this._approachAngular(this.angVel.y, yawIn * this.yawRate, dt);
-    this.angVel.z = this._approachAngular(this.angVel.z, rollIn * this.rollRate, dt);
+      const steerMag = Math.max(Math.abs(pitchIn), Math.abs(yawIn), Math.abs(rollIn));
+      if (this.objectLock) {
+        const getPos = this.objectLock.getWorldPosition;
+        if (!getPos || boosting || !this.objectLock.active) {
+          this.clearObjectLock();
+        } else {
+          getPos(this._lockTargetPos);
+          this._lockForward.copy(this._lockTargetPos).sub(this.ship.position);
+          const distLock = this._lockForward.length();
+          if (distLock < 0.001 || distLock > (this.objectLock.maxDistance || OBJECT_LOCK_DIST)) {
+            this.clearObjectLock();
+          } else {
+            this._lockForward.normalize();
+            this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
+            const dot = this._fwd.dot(this._lockForward);
+            if (dot < (this.objectLock.minDot || OBJECT_LOCK_DOT_MIN)) {
+              this.clearObjectLock();
+            } else if (steerMag > 0) {
+              this._lockBreakHold += dt;
+              if (this._lockBreakHold >= (this.objectLock.breakSecs || OBJECT_LOCK_BREAK_SECS)) {
+                this.clearObjectLock();
+              }
+            } else {
+              this._lockBreakHold = 0;
+              this._up.set(0, 1, 0).applyQuaternion(this.ship.quaternion);
+              this._m.lookAt(this.ship.position, this._lockTargetPos, this._up);
+              this._tmpQ = this._tmpQ || new THREE.Quaternion();
+              this._tmpQ.setFromRotationMatrix(this._m);
+              this.ship.quaternion.slerp(this._tmpQ, Math.min(1, dt * 5));
+            }
+          }
+        }
+      }
 
-    // 4) APLICA AS ROTAÇÕES VIA QUATERNION nos eixos LOCAIS (acumulativo, sem
-    //    autoalinhamento, sem up global, sem gimbal lock). rotateX/Y/Z do three
-    //    pós-multiplicam no quaternion → giro sempre relativo ao nariz atual.
-    if (this.angVel.x) this.ship.rotateX(this.angVel.x * dt);
-    if (this.angVel.y) this.ship.rotateY(this.angVel.y * dt);
-    if (this.angVel.z) this.ship.rotateZ(this.angVel.z * dt);
+      // 3) ATUALIZA AS VELOCIDADES ANGULARES (inércia: rampa firme ao apertar,
+      //    decaimento lento ao soltar → toque rápido continua girando um pouco).
+      this.angVel.x = this._approachAngular(this.angVel.x, pitchIn * this.pitchRate, dt);
+      this.angVel.y = this._approachAngular(this.angVel.y, yawIn * this.yawRate, dt);
+      this.angVel.z = this._approachAngular(this.angVel.z, rollIn * this.rollRate, dt);
+
+      // 4) APLICA AS ROTAÇÕES VIA QUATERNION nos eixos LOCAIS (acumulativo, sem
+      //    autoalinhamento, sem up global, sem gimbal lock). rotateX/Y/Z do three
+      //    pós-multiplicam no quaternion → giro sempre relativo ao nariz atual.
+      if (this.angVel.x) this.ship.rotateX(this.angVel.x * dt);
+      if (this.angVel.y) this.ship.rotateY(this.angVel.y * dt);
+      if (this.angVel.z) this.ship.rotateZ(this.angVel.z * dt);
+
 
     // 5) VELOCIDADE LINEAR — modelo "arcade com inércia": um ESCALAR de empuxo
     //    (aceleração + arrasto suaves) define o MÓDULO; a DIREÇÃO da velocidade é
@@ -923,16 +991,22 @@ export class ShipFlight {
       this.boostSpeed + nearSurf * this.supercruiseGain, this.boostSpeed, this.supercruiseMax
     );
 
-    if (boosting) {
-      // supercruise: spool-up rápido até o teto que escala com a distância
-      this.speed = THREE.MathUtils.lerp(this.speed, scCap, 1 - Math.exp(-this.scAccel * dt));
-    } else if (fwdKey) {
-      this.speed += this.accel * dt;
-    } else if (revKey) {
-      this.speed -= this.accel * dt;
-    } else {
-      this.speed *= Math.max(0, 1 - this.speedDrag * dt); // coast: arrasto leve
-    }
+      if (ctrlHeld) {
+        this.speed = 0;
+        this.velocity.set(0, 0, 0);
+        this.angVel.set(0, 0, 0);
+      } else if (boosting) {
+
+        // supercruise: spool-up rápido até o teto que escala com a distância
+        this.speed = THREE.MathUtils.lerp(this.speed, scCap, 1 - Math.exp(-this.scAccel * dt));
+      } else if (fwdKey) {
+        this.speed += this.accel * dt;
+      } else if (revKey) {
+        this.speed -= this.accel * this.reverseAccelMul * dt;
+      } else {
+        this.speed *= Math.max(0, 1 - this.speedDrag * dt); // coast: arrasto leve
+      }
+
     // sem boost, desacelera o excesso de volta ao cruzeiro (e o supercruise FREIA
     // sozinho ao se aproximar, pois scCap encolhe junto com nearSurf → não atravessa)
     const softCap = boosting ? scCap : this.maxSpeed;
@@ -1051,16 +1125,19 @@ export class ShipFlight {
     }
 
     // velocidade legível (% da luz + km/s) e estado orbital
-    if (this._braking) {
-      this.readout.textContent = `⚠ FRENAGEM AUTOMÁTICA · ${formatSpeed(sp)}`;
-    } else if (supercruising) {
-      this.readout.textContent = `SUPERCRUISE · ${formatSpeed(sp)}`;
-    } else if (this.referenceBody) {
-      const status = sp > escapeSpeed ? "FUGA" : "EM ÓRBITA";
-      this.readout.textContent = `${formatSpeed(sp)} · ${status}`;
-    } else {
-      this.readout.textContent = formatSpeed(sp);
-    }
+      if (ctrlHeld && sp > 0.01) {
+        this.readout.textContent = `FREIO INERCIAL · ${formatSpeedForwardOnly(this.speed)}`;
+      } else if (this._braking) {
+        this.readout.textContent = `⚠ FRENAGEM AUTOMÁTICA · ${formatSpeedForwardOnly(this.speed)}`;
+      } else if (supercruising) {
+        this.readout.textContent = `SUPERCRUISE · ${formatSpeedForwardOnly(this.speed)}`;
+      } else if (this.referenceBody) {
+        const status = sp > escapeSpeed ? "FUGA" : "EM ÓRBITA";
+        this.readout.textContent = `${formatSpeedForwardOnly(this.speed)} · ${status}`;
+      } else {
+        this.readout.textContent = formatSpeedForwardOnly(this.speed);
+      }
+
 
     // efeitos de navegação: partículas/faíscas SÓ no boost (Shift segurado)
     const fx = boosting ? spN : 0;

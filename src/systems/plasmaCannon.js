@@ -157,6 +157,9 @@ export class PlasmaCannon {
     // progressão: marco de primeiro disparo + contador (o bus deduplica/ignora)
     emit("milestone", { id: "first-shot" });
     emit("stat", { key: "shotsFired" });
+    // som de canhão SÓ quando um encontro autoriza (batalha épica) — no resto
+    // do jogo vale a regra do vácuo: disparo silencioso
+    this.sfxShot?.();
     const ship = this.ship.ship;
     this._tmp.set(0, 0, -1).applyQuaternion(ship.quaternion); // forward
     // bolt herda o avanço da nave (senão parece que anda pra trás no boost)
@@ -255,8 +258,9 @@ export class PlasmaCannon {
     const maxHp = hit.maxHp ?? maxHpFor(hit.r); // alvo pode ditar o próprio HP
     if (hp == null) hp = maxHp;
     hp -= 1;
-    // alvos com barra própria (nave alien) acompanham o HP que vive aqui
-    if (sys.onDamaged) sys.onDamaged(hit.id, Math.max(hp, 0), maxHp);
+    // alvos com barra/efeitos próprios (nave alien, bosses) acompanham o HP que
+    // vive aqui — recebem também ONDE o tiro pegou (ondulação do escudo)
+    if (sys.onDamaged) sys.onDamaged(hit.id, Math.max(hp, 0), maxHp, at);
     // sem som: no vácuo o impacto é só visual (fumaça/flash/detritos)
     if (hp <= 0) {
       this._hp.delete(hit.id);
@@ -267,8 +271,9 @@ export class PlasmaCannon {
       if (this._hpTarget && this._hpTarget.id === hit.id) this._hpTarget = null;
     } else {
       this._hp.set(hit.id, hp);
-      this._spawnPuff(at); // fumacinha pontual do impacto
-      this._hpTarget = { id: hit.id, center: hit.center, hp, maxHp, timer: HPBAR_TTL };
+      if (!hit.noPuff) this._spawnPuff(at); // escudo faz o próprio efeito (noPuff)
+      // bosses têm barras longas próprias (noBar) — a fininha é só dos pequenos
+      if (!hit.noBar) this._hpTarget = { id: hit.id, center: hit.center, hp, maxHp, timer: HPBAR_TTL };
     }
   }
 

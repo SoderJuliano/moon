@@ -225,28 +225,17 @@ export function startExplorationMode() {
     navHud.setVisible(flying);
     navHud.update(dt);
 
-    // Asteroides: campos esparsos fazem streaming ao redor da NAVE em voo e da
-    // CÂMERA fora dele; o cinturão instanciado fica sempre de pé no modo real
-    // (visível até no supercruise — colisão é que só vale no voo normal).
-    const supercruising = ship.velocity.length() > ship.boostSpeed * 1.5;
-    const asteroidsActive = flying && !supercruising;
+    // Asteroides e encontros são exclusivos do modo Jogo. No modo Exploração,
+    // garantimos que fiquem ocultos e inativos.
     asteroids.update(dt, {
-      active: asteroidsActive || !ship.isActive,
+      active: false,
       shipPos: flying ? ship.ship.position : camera.position,
-      beltsVisible: mode === "real",
+      beltsVisible: false,
     });
-    if (asteroidsActive) {
-      const hit = asteroids.hitTest(ship.ship.position);
-      if (hit) {
-        asteroids.destroyAsteroid(hit.id); // remove o asteroide atingido junto com a nave
-        ship.explode();
-      }
-    }
 
-    // Encontros ocasionais em viagem: só no voo normal (nunca no supercruise)
     _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
     encounter.update(dt, {
-      active: asteroidsActive,
+      active: false,
       position: ship.ship.position,
       forward: _shipFwd,
       speed: ship.velocity.length(),
@@ -280,18 +269,21 @@ export function startExplorationMode() {
   let loadingHidden = false;
   animate();
 
-  // hook de debug TEMPORÁRIO (investigação do spawn em Urano) — remover depois
-  window.__dbg = (id) => {
-    const b = resolveBody(id);
-    const p = new THREE.Vector3();
-    if (b) b.worldPosition(p);
-    return {
-      body: b ? { pos: p.toArray().map((v) => +v.toFixed(1)), radius: +b.radius.toFixed(2), approachRadius: +b.approachRadius.toFixed(2) } : null,
-      ship: { pos: ship.ship.position.toArray().map((v) => +v.toFixed(1)), active: ship.active, exploding: ship.exploding, intro: !!ship.intro },
-      cam: camera.position.toArray().map((v) => +v.toFixed(1)),
-      tweening: rig.isTweening,
-      distShip: b ? +ship.ship.position.distanceTo(p).toFixed(1) : null,
-      distCam: b ? +camera.position.distanceTo(p).toFixed(1) : null,
+  if (typeof window !== "undefined") {
+    window.__dbg = (id) => {
+      const b = resolveBody(id);
+      const p = new THREE.Vector3();
+      if (b) b.worldPosition(p);
+      return {
+        body: b ? { pos: p.toArray().map((v) => +v.toFixed(1)), radius: +b.radius.toFixed(2), approachRadius: +b.approachRadius.toFixed(2) } : null,
+        ship: { pos: ship.ship.position.toArray().map((v) => +v.toFixed(1)), active: ship.active, exploding: ship.exploding, intro: !!ship.intro },
+        cam: camera.position.toArray().map((v) => +v.toFixed(1)),
+        tweening: rig.isTweening,
+        distShip: b ? +ship.ship.position.distanceTo(p).toFixed(1) : null,
+        distCam: b ? +camera.position.distanceTo(p).toFixed(1) : null,
+      };
     };
-  };
+  }
+
+  return { scene, camera, renderer, controls, rig, world };
 }

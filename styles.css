@@ -1244,3 +1244,135 @@ canvas {
   color: #8fb0d8;
   font-style: normal;
 }
+
+/* ===== BOSS FIGHT — Os Gêmeos do Ocaso ===================================== */
+
+/* banner de ameaça capital: variante vermelha e mais imponente */
+.mission-banner.boss {
+  font-size: 22px;
+  letter-spacing: 2px;
+  border-color: rgba(255, 70, 90, 0.45);
+  box-shadow: 0 0 34px rgba(255, 40, 60, 0.22);
+}
+.mission-banner.boss small {
+  color: #ff5a6e;
+}
+
+/* barras LONGAS dos bosses (estilo Dark Souls: nome + barra larga, embaixo) */
+.boss-bars {
+  position: fixed;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  width: min(64vw, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.boss-bar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3px;
+}
+.boss-name {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #f3d9dd;
+  text-shadow: 0 0 12px rgba(255, 60, 80, 0.5);
+}
+.boss-stage {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #9fb4d8;
+}
+.boss-track {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(8, 10, 18, 0.75);
+  border: 1px solid rgba(150, 160, 200, 0.28);
+  overflow: hidden;
+}
+.boss-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.18s ease-out;
+}
+.boss-fill.shield {
+  background: linear-gradient(90deg, #2f6dff, #7db4ff);
+  box-shadow: 0 0 10px rgba(90, 150, 255, 0.7);
+}
+.boss-fill.hull {
+  background: linear-gradient(90deg, #b8232f, #ff5a4a);
+  box-shadow: 0 0 10px rgba(255, 70, 60, 0.6);
+}
+.boss-bar.down .boss-name {
+  color: #5d6a80;
+  text-shadow: none;
+}
+.boss-bar.down .boss-stage {
+  color: #56d08a;
+}
+
+/* pips de carga do escudo do jogador */
+.shield-pips {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 25;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #9fc2ff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.shield-pips i {
+  width: 16px;
+  height: 7px;
+  border-radius: 2px;
+  border: 1px solid rgba(120, 160, 255, 0.5);
+  background: rgba(20, 30, 55, 0.6);
+}
+.shield-pips i.on {
+  background: linear-gradient(90deg, #2f6dff, #7db4ff);
+  box-shadow: 0 0 8px rgba(90, 150, 255, 0.8);
+}
+
+/* ficha inteira do escudo (imagem + instalar) */
+.shield-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 4, 10, 0.82);
+  backdrop-filter: blur(6px);
+}
+.shield-sheet-box {
+  max-width: min(88vw, 860px);
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.shield-sheet-box img {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+}
+.shield-sheet-box p {
+  font-size: 12.5px;
+  color: #bcd0ea;
+  margin: 12px auto;
+  max-width: 620px;
+  line-height: 1.5;
+}
