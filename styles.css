@@ -1376,3 +1376,97 @@ canvas {
   max-width: 620px;
   line-height: 1.5;
 }
+
+/* --- Controles touch (SÓ modo jogo em aparelho de toque) ---------------------
+   Escondido por padrão: em desktop (pointer fine, qualquer resolução) nunca
+   aparece — o JS nem cria o nó, e este CSS é a segunda trava. */
+.touch-ui {
+  display: none;
+}
+@media (pointer: coarse) {
+  .touch-ui {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40; /* abaixo de modais/pausa (60+), acima do canvas */
+    pointer-events: none; /* só os botões capturam toque */
+  }
+}
+.touch-btn {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(140, 190, 255, 0.45);
+  background: rgba(10, 20, 38, 0.45);
+  color: rgba(190, 220, 255, 0.9);
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(2px);
+}
+.touch-btn.held {
+  background: rgba(70, 140, 255, 0.35);
+  border-color: rgba(160, 210, 255, 0.9);
+}
+.touch-cluster {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.touch-fire {
+  width: 68px;
+  height: 68px;
+  font-size: 26px;
+  border-color: rgba(255, 150, 120, 0.5);
+  color: rgba(255, 190, 170, 0.95);
+}
+.touch-fire.held {
+  background: rgba(255, 110, 70, 0.3);
+  border-color: rgba(255, 180, 150, 0.9);
+}
+.touch-accel {
+  width: 58px;
+  height: 58px;
+}
+.touch-boost {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  opacity: 0.85;
+}
+.touch-pause {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  width: 38px;
+  height: 38px;
+  font-size: 13px;
+  opacity: 0.8;
+}
+/* Telefone em pé: pede pra deitar (o jogo é pensado pra paisagem) */
+.touch-rotate-hint {
+  display: none;
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  .touch-rotate-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    inset: 0;
+    background: rgba(4, 8, 16, 0.85);
+    color: #cfe4ff;
+    font-size: 18px;
+    text-align: center;
+    padding: 24px;
+    pointer-events: auto;
+  }
+}
