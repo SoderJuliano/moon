@@ -574,6 +574,30 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       satellites.update(dt, flying ? ship.ship.position : camera.position);
       station.update(dt, flying ? ship.ship.position : camera.position);
 
+      // Auto-lock assistente de mira para a ISS ao se aproximar dela
+      if (flying && station.alive && station.holder && station.group.visible) {
+        const issPos = station.holder.position;
+        const shipPos = ship.ship.position;
+        const dStation = shipPos.distanceTo(issPos);
+        if (dStation < 16 && !ship.objectLock) {
+          const toStation = new THREE.Vector3().copy(issPos).sub(shipPos);
+          const forward = new THREE.Vector3().set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
+          const dot = toStation.normalize().dot(forward);
+          if (dot > 0.5) {
+            ship.setObjectLock?.({
+              active: true,
+              minDot: 0,
+              maxDistance: 22,
+              breakSecs: 2,
+              getWorldPosition: (out) => {
+                if (station.holder) return out.copy(station.holder.position);
+                return out.set(0, 0, 0);
+              }
+            });
+          }
+        }
+      }
+
       // Missão do sinal de socorro (banner/chip/botão Investigar/história)
       mission.update(dt, { shipPos: ship.ship.position, flying });
 
