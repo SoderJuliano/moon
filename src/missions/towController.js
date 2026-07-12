@@ -21,6 +21,7 @@ export class TowController {
     this.scene = scene;
     this.payload = null;
     this.state = null; // null | "attaching" | "tow"
+    this._scaled = false;
     this._cut = 0;
     this._from = new THREE.Vector3();
     this._v = new THREE.Vector3();
@@ -63,6 +64,7 @@ export class TowController {
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
     this.payloadRadius = Math.max(size.x, size.y, size.z) * 0.5;
+    this._scaled = false; // Reset da flag de escalonamento para o novo acoplamento
   }
 
   release() {
@@ -71,14 +73,29 @@ export class TowController {
     this.cable.visible = false;
     if (this.anchor) this.anchor.visible = false;
     this.payloadRadius = 0.05;
+    this._scaled = false;
+  }
+
+  _scaleToShip() {
+    if (!this.payload || this._scaled) return;
+    this._scaled = true;
+    const box = new THREE.Box3().setFromObject(this.payload);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const shipSize = 0.06; // tamanho da nave
+    if (maxDim > shipSize) {
+      const factor = shipSize / maxDim;
+      this.payload.scale.multiplyScalar(factor);
+      this.payloadRadius = shipSize * 0.5;
+    }
   }
 
   update(dt, ship, camera) {
     if (!this.state || !this.payload) return null;
     const p = this.payload;
-    const trailDist = 0.4 + (this.payloadRadius || 0.05) * 1.5;
 
     if (this.state === "attaching") {
+      const trailDist = 0.4 + (this.payloadRadius || 0.05) * 1.5;
       ship.speed = 0;
       ship.velocity.set(0, 0, 0);
       ship.keys.clear();
@@ -99,9 +116,17 @@ export class TowController {
       return this.state;
     }
 
+    // A partir do momento em que acopla ("tow"), a rocha passa a ter no máximo o tamanho da nave
+    if (this.state === "tow" && !this._scaled) {
+      this._scaleToShip();
+    }
+
+    // recalculamos trailDist após o escalonamento para ajustar a distância do reboque
+    const currentTrailDist = 0.4 + (this.payloadRadius || 0.05) * 1.5;
+
     // rebocando: segue atrás/abaixo da nave (cópia direta p/ eliminar qualquer tremor)
     const back = this._v.set(0, 0, 1).applyQuaternion(ship.ship.quaternion);
-    const target = this._v2.copy(ship.ship.position).addScaledVector(back, trailDist).addScaledVector(this._v3.set(0, -1, 0), 0.15);
+    const target = this._v2.copy(ship.ship.position).addScaledVector(back, currentTrailDist).addScaledVector(this._v3.set(0, -1, 0), 0.15);
     p.position.copy(target);
     p.rotation.y += dt * 0.5;
     this._cable(ship);
