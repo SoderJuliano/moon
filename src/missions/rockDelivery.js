@@ -16,7 +16,7 @@ import { TowController } from "./towController.js";
 import { composition } from "../systems/scanner.js";
 
 const PROMPT_DIST = 2.2;
-const DELIVER_DIST = 2.5;
+const DELIVER_DIST = 6.0;
 
 function makeRock() {
   const geo = new THREE.IcosahedronGeometry(0.14, 1);

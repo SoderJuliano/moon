@@ -30,7 +30,7 @@ const INVASION_DELAY = 20; // s após reportar → batedores
 const BOSS_DELAY = 30; // s após a invasão → os Gêmeos (e entre tentativas)
 const DEBRIS_LOAD_DIST = 80; // lazy-load do GLB de 88MB só chegando perto
 const DEBRIS_PROMPT = 2.4;
-const DELIVER_DIST = 2.5;
+const DELIVER_DIST = 6.0;
 
 // ---- Missão 1: Eco no Cemitério -------------------------------------------------
 export function createGhostSignalMission() {

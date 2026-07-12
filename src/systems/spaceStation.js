@@ -17,7 +17,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture } from "../core/textures.js";
 
-const SIZE = 0.95; // ~16× a nave (0.06): estação claramente enorme perto dela
+const SIZE = 3.8; // ~64× a nave (0.06): estação claramente enorme perto dela
 // Órbita em MÚLTIPLO do raio ATUAL: a Terra infla ~60× ao se aproximar e a
 // colisão fica em 1.1×raio; uma altitude ABSOLUTA cairia dentro da colisão e a
 // colisão fica em 1.1×raio. Usamos uma altitude fixa de 14 para acompanhar a
@@ -28,7 +28,7 @@ const INCLINATION = (51.6 * Math.PI) / 180; // inclinação orbital real da ISS
 const ORBIT_RATE = 0; // rad/s — parada no espaço
 const SHOW_AT = 6; // aparece a < 6× o raio atual da Terra (igual à rede)
 const HIDE_AT = 8; // some a > 8× (histerese)
-const HIT_RADIUS = 0.4; // generoso: alvo grande, e o substep dos bolts é 0.12u
+const HIT_RADIUS = 1.6; // generoso: alvo grande, e o substep dos bolts é 0.12u
 const GLINT_ANG = 0.01; // ponto de luz de longe (tamanho angular ~constante)
 const GLINT_FADE_NEAR = 8;
 const GLINT_FADE_FAR = 22;
@@ -106,10 +106,15 @@ export class SpaceStation {
     }
 
     if (this.holder) {
-      this._prev.copy(this.holder.position);
-      this.holder.position.copy(this._center).addScaledVector(dir, shell);
-      // nariz na direção do movimento; "cima" apontando pro centro da Terra
-      if (this._prev.lengthSq() > 0) this.holder.lookAt(this._prev);
+      const pos = this._center.clone().addScaledVector(dir, shell);
+      this.holder.position.copy(pos);
+      // Nose in orbit tangent direction; "up" pointing away from Earth center (stable rotation)
+      const tangent = new THREE.Vector3()
+        .copy(this._v).multiplyScalar(Math.cos(this._angle))
+        .addScaledVector(this._u, -Math.sin(this._angle))
+        .normalize();
+      this.holder.up.copy(dir);
+      this.holder.lookAt(pos.clone().add(tangent));
     }
 
     // glint esmaecendo ao chegar perto (o modelo assume)
