@@ -286,6 +286,7 @@ export function attachMoon(planet, descriptor, mode) {
     id: descriptor.id,
     name: descriptor.name,
     mesh,
+    pivot,
     parent: planet,
     _targetX: 0,
     _targetScale: 1,
@@ -324,7 +325,7 @@ export function attachMoon(planet, descriptor, mode) {
 
       // ESPAÇAMENTO na aproximação: afasta a lua do planeta o bastante pra ela
       // (gigante) não engolir o pai. Sem inflar (_approachMul≈1) → órbita real.
-      const clearance = inflated * MOON_APPROACH_CLEARANCE + (planet.radius || 0);
+      const clearance = inflated * MOON_APPROACH_CLEARANCE + (planet.baseRadius || 0);
       const distTarget = Math.max(this._targetX, clearance);
       pivot.position.x = approach(pivot.position.x, distTarget, dt);
 

@@ -55,6 +55,7 @@ const EARTH_RADIUS_KM = 6371; // 1 unidade de mundo = 1 raio terrestre
 // playerName: jogador nomeado (save local próprio + sync na nuvem). Sem nome
 // cai no save legado sem nome (compatibilidade com atalho ?mode=game).
 export function startGameMode({ resume = "auto", playerName = null } = {}) {
+  window.isGameMode = true;
   const { scene, camera, renderer, controls, glow } = createScene();
   controls.enabled = false; // não existe câmera de observação no jogo
 

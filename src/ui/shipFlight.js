@@ -126,6 +126,7 @@ export class ShipFlight {
     this.referenceBody = null;
     this._approachBody = null; // corpo atualmente ampliado (gigante) ao nos aproximarmos
     this._hiddenMoons = []; // luas escondidas do corpo gigante durante o voo
+    this._wasInDangerZone = true; // inicia true para não desativar o supercruise no spawn
 
     // --- empuxo linear: escalar com inércia + DIREÇÃO que segue o nariz -------
     this.maxSpeed = 3.3; // cruzeiro ~7% da luz
@@ -482,9 +483,13 @@ export class ShipFlight {
       }
       this._approachBody = body;
       for (const m of body?.moons || []) {
-        if (m.mesh.visible) {
-          m.mesh.visible = false;
-          this._hiddenMoons.push(m);
+        const giantRadius = (body.baseRadius || 1) * Math.max(40, 60 / (body.baseRadius || 1));
+        const moonDist = m.pivot.position.x;
+        if (moonDist < giantRadius * 1.2) {
+          if (m.mesh.visible) {
+            m.mesh.visible = false;
+            this._hiddenMoons.push(m);
+          }
         }
       }
     }
@@ -898,12 +903,11 @@ export class ShipFlight {
       this._prevRef.copy(this._refPos);
     }
 
-    // 2) LEITURA DO INPUT — eixos combináveis (yaw+pitch+roll+empuxo ao mesmo tempo)
       const shiftHeld = k.has("ShiftLeft") || k.has("ShiftRight");
       const ctrlHeld = k.has("ControlLeft") || k.has("ControlRight");
       const fwdKey = k.has("KeyW");
       const revKey = k.has("KeyS");
-      const boosting = fwdKey && shiftHeld && !ctrlHeld;
+      let boosting = fwdKey && shiftHeld && !ctrlHeld;
 
     // sinais -1..1 por eixo de rotação (sem interferência entre eles)
     let pitchIn = 0, yawIn = 0, rollIn = 0;
@@ -987,6 +991,34 @@ export class ShipFlight {
     }
     if (!isFinite(nearSurf)) nearSurf = 0;
     nearSurf = Math.max(0, nearSurf);
+
+    if (nearestBody) {
+      const r = nearestBody.radius;
+      if (nearestBody.id === "earth" || nearestBody.id === "moon") {
+        const isCurrentlyInDangerZone = nearSurf < r * 3.5;
+        
+        // Se acabou de entrar na zona de perigo vindo de fora
+        if (isCurrentlyInDangerZone && !this._wasInDangerZone) {
+          nearestBody.worldPosition(this._tmp2);
+          const toBody = new THREE.Vector3().copy(this._tmp2).sub(this.ship.position);
+          toBody.normalize();
+          const vIn = this.velocity.dot(toBody);
+          // E está se aproximando no supercruise, corta a velocidade
+          if (vIn > 0.05 && boosting) {
+            this.speed = this.maxSpeed;
+            boosting = false;
+            // Zera a inércia do supercruise cortando a velocidade física instantaneamente
+            this.velocity.copy(this._fwd).multiplyScalar(this.maxSpeed);
+          }
+        }
+        
+        this._wasInDangerZone = isCurrentlyInDangerZone;
+      } else {
+        this._wasInDangerZone = false;
+      }
+    } else {
+      this._wasInDangerZone = false;
+    }
     const scCap = THREE.MathUtils.clamp(
       this.boostSpeed + nearSurf * this.supercruiseGain, this.boostSpeed, this.supercruiseMax
     );
