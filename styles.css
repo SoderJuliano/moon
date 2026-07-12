@@ -876,7 +876,8 @@ canvas {
 .mm-view-game,
 .mm-view-name,
 .mm-view-password,
-.mm-view-players {
+.mm-view-players,
+.mm-view-profile {
   display: none;
   flex-direction: column;
   gap: 8px;
@@ -884,7 +885,8 @@ canvas {
 .mm-view-game.on,
 .mm-view-name.on,
 .mm-view-password.on,
-.mm-view-players.on {
+.mm-view-players.on,
+.mm-view-profile.on {
   display: flex;
 }
 .mm-name-input,

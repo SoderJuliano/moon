@@ -268,10 +268,6 @@ export function startMainMenu({ onSelect }) {
           <span class="mm-option-name">Novo Jogo</span>
           <span class="mm-option-desc">Começa uma exploração do zero.</span>
         </button>
-        <button class="mm-option" type="button" data-game="achievements">
-          <span class="mm-option-name">Conquistas</span>
-          <span class="mm-option-desc">O que você já descobriu até agora.</span>
-        </button>
         <div class="mm-save-row">
           <button class="mm-save-btn" type="button" data-game="import">Importar Save</button>
           <button class="mm-save-btn" type="button" data-game="export">Exportar Save</button>
@@ -306,6 +302,18 @@ export function startMainMenu({ onSelect }) {
           <span class="mm-option-desc">Digitar um nome e baixar o save da nuvem.</span>
         </button>
         <button class="mm-save-btn" type="button" data-players="back">◂ Voltar</button>
+      </div>
+      <div class="mm-view-profile">
+        <div class="mm-panel-title mm-profile-title">Jogador</div>
+        <button class="mm-option" type="button" data-profile="play">
+          <span class="mm-option-name">Jogar</span>
+          <span class="mm-option-desc">Continuar sua jornada no espaço.</span>
+        </button>
+        <button class="mm-option" type="button" data-profile="achievements">
+          <span class="mm-option-name">Conquistas</span>
+          <span class="mm-option-desc">Ver suas conquistas neste perfil.</span>
+        </button>
+        <button class="mm-save-btn" type="button" data-profile="back">◂ Voltar</button>
       </div>
     </div>
     <div class="mm-fade"></div>`;
@@ -355,6 +363,7 @@ export function startMainMenu({ onSelect }) {
     name: root.querySelector(".mm-view-name"),
     password: root.querySelector(".mm-view-password"),
     players: root.querySelector(".mm-view-players"),
+    profile: root.querySelector(".mm-view-profile"),
   };
   const saveNote = root.querySelector(".mm-save-note");
   const nameInput = root.querySelector(".mm-name-input");
@@ -365,6 +374,7 @@ export function startMainMenu({ onSelect }) {
   const passwordNote = root.querySelector(".mm-password-note");
   const playersList = root.querySelector(".mm-players-list");
   let achScreen = null;
+  let currentPlayerName = null;
   let nameConfirm = null; // callback(name) da tela de nome atual
 
   function showScreen(which) {
@@ -375,6 +385,9 @@ export function startMainMenu({ onSelect }) {
       views.game.querySelector('[data-game="continue"]').style.display = has ? "" : "none";
       views.game.querySelector('[data-game="export"]').style.display = has ? "" : "none";
       saveNote.textContent = "";
+    }
+    if (which === "profile") {
+      root.querySelector(".mm-profile-title").textContent = `Jogador: ${currentPlayerName}`;
     }
   }
   showScreen("modes");
@@ -487,7 +500,8 @@ export function startMainMenu({ onSelect }) {
           if (save.player && save.player.password) {
             askPassword("Digite a senha do seu save", "Senha", (pwd) => {
               if (pwd === save.player.password) {
-                launch("game", { resume: true, playerName: p.name });
+                currentPlayerName = p.name;
+                showScreen("profile");
               } else {
                 passwordNote.textContent = "Senha incorreta!";
               }
@@ -497,11 +511,13 @@ export function startMainMenu({ onSelect }) {
               save.player = save.player || {};
               save.player.password = pwd;
               sm.saveNow();
-              launch("game", { resume: true, playerName: p.name });
+              currentPlayerName = p.name;
+              showScreen("profile");
             }, () => showScreen("players"));
           }
         } else {
-          launch("game", { resume: true, playerName: p.name });
+          currentPlayerName = p.name;
+          showScreen("profile");
         }
       });
       playersList.appendChild(btn);
@@ -525,7 +541,8 @@ export function startMainMenu({ onSelect }) {
           if (pwd === save.player.password) {
             new LocalStorageBackend(saveKeyFor(name)).write(JSON.stringify(save, null, 2));
             addPlayer(name);
-            launch("game", { resume: true, playerName: name });
+            currentPlayerName = name;
+            showScreen("profile");
           } else {
             passwordNote.textContent = "Senha incorreta!";
           }
@@ -542,21 +559,32 @@ export function startMainMenu({ onSelect }) {
           sm.load();
           sm.saveNow();
           
-          launch("game", { resume: true, playerName: name });
+          currentPlayerName = name;
+          showScreen("profile");
         }, () => showScreen("players"));
       }
     });
   });
 
-  // CONQUISTAS: mostra as do 1º jogador (ou do legado) — a precisa é a do jogo
-  views.game.querySelector('[data-game="achievements"]').addEventListener("click", () => {
-    const first = listPlayers()[0];
-    const backend = first ? new LocalStorageBackend(saveKeyFor(first.name)) : new LocalStorageBackend();
-    const sm = new SaveManager(backend);
-    sm.load(); // pode não existir: a tela mostra tudo ??????
-    if (!achScreen) achScreen = new AchievementsScreen({ save: sm, catalog: new Map(buildCatalog().map((i) => [i.id, i])) });
-    else achScreen.save = sm;
-    achScreen.open();
+  // BOTOES DE PERFIL (JOGAR / CONQUISTAS)
+  views.profile.querySelector('[data-profile="play"]').addEventListener("click", () => {
+    if (currentPlayerName) {
+      launch("game", { resume: true, playerName: currentPlayerName });
+    }
+  });
+
+  views.profile.querySelector('[data-profile="achievements"]').addEventListener("click", () => {
+    if (currentPlayerName) {
+      const sm = createPlayerSave(currentPlayerName);
+      sm.load();
+      if (!achScreen) achScreen = new AchievementsScreen({ save: sm, catalog: new Map(buildCatalog().map((i) => [i.id, i])) });
+      else achScreen.save = sm;
+      achScreen.open();
+    }
+  });
+
+  views.profile.querySelector('[data-profile="back"]').addEventListener("click", () => {
+    showScreen("players");
   });
 
   // EXPORTAR/IMPORTAR: opera no 1º jogador (ou legado)
