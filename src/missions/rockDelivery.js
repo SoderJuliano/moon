@@ -75,7 +75,9 @@ export function createRockDeliveryMission(scene, opts) {
 
       // Clique direto sobre o asteroide na tela 3D
       this._onMouseDown = (e) => {
-        if (e.button !== 0 || e.target?.tagName !== "CANVAS") return;
+        if (e.button !== 0) return;
+        // Evita disparar ao clicar em botões, inputs ou links da UI
+        if (e.target?.closest("button") || e.target?.closest("input") || e.target?.closest("a")) return;
         if (tow.phase) return;
 
         const near = this._eligible(ctx);
@@ -88,8 +90,8 @@ export function createRockDeliveryMission(scene, opts) {
             const dy = e.clientY - screenY;
             const distPx = Math.sqrt(dx * dx + dy * dy);
             
-            // Tolerância de 70px para clicar diretamente na rocha
-            if (distPx < 70) {
+            // Tolerância aumentada para 120px para melhor jogabilidade
+            if (distPx < 120) {
               this._grab(ctx);
             }
           }
