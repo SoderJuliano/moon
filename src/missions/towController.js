@@ -58,6 +58,11 @@ export class TowController {
     this.state = "attaching";
     this.cable.visible = true;
     if (this.anchor) this.anchor.visible = true;
+
+    // Calcula o raio/tamanho do objeto rebocado para afastar o cabo e ajustar a câmera
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    this.payloadRadius = Math.max(size.x, size.y, size.z) * 0.5;
   }
 
   release() {
@@ -65,11 +70,13 @@ export class TowController {
     this.payload = null;
     this.cable.visible = false;
     if (this.anchor) this.anchor.visible = false;
+    this.payloadRadius = 0.05;
   }
 
   update(dt, ship, camera) {
     if (!this.state || !this.payload) return null;
     const p = this.payload;
+    const trailDist = 0.4 + (this.payloadRadius || 0.05) * 1.5;
 
     if (this.state === "attaching") {
       ship.speed = 0;
@@ -79,7 +86,7 @@ export class TowController {
       const t = Math.min(1, this._cut / CUT_DUR);
       const e = t * t * (3 - 2 * t);
       const back = this._v.set(0, 0, 1).applyQuaternion(ship.ship.quaternion);
-      const tow = this._v2.copy(ship.ship.position).addScaledVector(back, TRAIL).addScaledVector(this._v3.set(0, -1, 0), 0.15);
+      const tow = this._v2.copy(ship.ship.position).addScaledVector(back, trailDist).addScaledVector(this._v3.set(0, -1, 0), 0.15);
       p.position.copy(this._from).lerp(tow, e);
       p.rotation.y += dt * 0.7;
       if (this.anchor && t > 0.55) this.anchor.rotation.z += dt * 4;
@@ -92,10 +99,10 @@ export class TowController {
       return this.state;
     }
 
-    // rebocando: segue atrás/abaixo da nave
+    // rebocando: segue atrás/abaixo da nave (cópia direta p/ eliminar qualquer tremor)
     const back = this._v.set(0, 0, 1).applyQuaternion(ship.ship.quaternion);
-    const target = this._v2.copy(ship.ship.position).addScaledVector(back, TRAIL).addScaledVector(this._v3.set(0, -1, 0), 0.15);
-    p.position.lerp(target, Math.min(1, dt * 25));
+    const target = this._v2.copy(ship.ship.position).addScaledVector(back, trailDist).addScaledVector(this._v3.set(0, -1, 0), 0.15);
+    p.position.copy(target);
     p.rotation.y += dt * 0.5;
     this._cable(ship);
     return this.state;

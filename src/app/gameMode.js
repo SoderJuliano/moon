@@ -541,6 +541,33 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
         if (strangeAvailTimer <= 0) missions.makeAvailable("strange-objects");
       }
       if (flying && !anyCombat && !mission.holdShip) missions.update(dt);
+
+      // Ajuste inteligente do distanciamento da câmera ao rebocar objetos grandes (evita que a câmera entre na rocha)
+      let cameraBackTarget = 0.5;
+      let cameraUpTarget = 0.12;
+      if (flying) {
+        const activeSec = missions._activeSecondary;
+        const activePri = missions._activePrimary;
+        let activeTow = null;
+        if (activeSec && activeSec.tow && activeSec.tow.payload) {
+          activeTow = activeSec.tow;
+        } else if (activePri && activePri.tow && activePri.tow.payload) {
+          activeTow = activePri.tow;
+        }
+
+        if (activeTow) {
+          cameraBackTarget = 0.5 + activeTow.payloadRadius * 2.0;
+          cameraUpTarget = 0.12 + activeTow.payloadRadius * 0.5;
+        } else if (activePri && activePri.id === "strange-objects" && activePri.towing) {
+          // A missão de Saturno ("strange-objects") tem escala grande, usamos estimativa de raio 0.25
+          cameraBackTarget = 0.5 + 0.25 * 2.0;
+          cameraUpTarget = 0.12 + 0.25 * 0.5;
+        }
+      }
+      // Interpolação suave para transições perfeitas
+      ship.trailBack += (cameraBackTarget - ship.trailBack) * Math.min(1, dt * 5);
+      ship.trailUp += (cameraUpTarget - ship.trailUp) * Math.min(1, dt * 5);
+
       if (flying && !anyCombat) scanner.update(); // rótulo de composição das rochas
 
       // Asteroides: mesma regra do voo no planetário — streaming ao redor da
