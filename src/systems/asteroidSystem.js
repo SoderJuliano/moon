@@ -286,8 +286,9 @@ export class AsteroidSystem {
       const cy = Math.floor(tmpLocal.y / CELL);
       const cz = Math.floor(tmpLocal.z / CELL);
 
-      // Limita a busca às células próximas com base na melhor distância atual
-      const cellRange = Math.max(1, Math.ceil(bestD / CELL));
+      // Limita a busca às células próximas com base na melhor distância atual (teto de 60 unidades para evitar loop infinito com Infinity)
+      const searchLimit = Math.min(bestD, 60);
+      const cellRange = Math.max(1, Math.ceil(searchLimit / CELL));
       for (let ix = cx - cellRange; ix <= cx + cellRange; ix++) {
         for (let iy = cy - cellRange; iy <= cy + cellRange; iy++) {
           for (let iz = cz - cellRange; iz <= cz + cellRange; iz++) {
