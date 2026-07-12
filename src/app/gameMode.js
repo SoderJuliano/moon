@@ -558,7 +558,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
         if (activeTow) {
           cameraBackTarget = 0.5 + activeTow.payloadRadius * 2.0;
           cameraUpTarget = 0.12 + activeTow.payloadRadius * 0.5;
-        } else if (activePri && activePri.id === "strange-objects" && activePri.towing) {
+        } else if (activePri && activePri.id === "strange-objects" && activePri.sat && activePri.sat.towing) {
           // A missão de Saturno ("strange-objects") tem escala grande, usamos estimativa de raio 0.25
           cameraBackTarget = 0.5 + 0.25 * 2.0;
           cameraUpTarget = 0.12 + 0.25 * 0.5;
