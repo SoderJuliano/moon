@@ -90,6 +90,15 @@ export function createRockDeliveryMission(scene, opts) {
       rock.visible = true;
       ctx.asteroids.destroyAsteroid(near.id);
       tow.attach(rock);
+
+      // Adiciona o marcador da ISS para orientar o voo de entrega
+      ctx.markers.add({
+        id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+        getWorldPosition: (v) => {
+          if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
+          return v.set(0, 0, 0);
+        }
+      });
     },
 
     update(dt, ctx) {
@@ -120,6 +129,7 @@ export function createRockDeliveryMission(scene, opts) {
     _deliver(ctx) {
       tow.release();
       rock.visible = false;
+      ctx.markers.remove("iss-delivery");
       const n = this._count(ctx) + 1;
       this._setCount(ctx, n);
       this._refresh(ctx);

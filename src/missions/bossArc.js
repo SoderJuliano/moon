@@ -244,19 +244,28 @@ export function createDebrisChore(scene) {
         tow.attach(group);
         tow.state = "tow";
         this.objective = "Reboque os destroços até a Estação Espacial";
+        
+        ctx.markers.add({
+          id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+          getWorldPosition: (v) => {
+            if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
+            return v.set(0, 0, 0);
+          }
+        });
       } else {
         this.objective = "Recolha os destroços dos Gêmeos no local da batalha";
         loadModel(); // aceitou a missão = vai até lá; baixa o GLB original já
-      }
-      if (!this._marked) {
-        ctx.markers.add({
-          id: "battle-debris",
-          name: "Destroços",
-          color: "#c9a15a",
-          kind: "ship",
-          getWorldPosition: (v) => v.copy(group.position),
-        });
-        this._marked = true;
+        
+        if (!this._marked) {
+          ctx.markers.add({
+            id: "battle-debris",
+            name: "Destroços",
+            color: "#c9a15a",
+            kind: "ship",
+            getWorldPosition: (v) => v.copy(group.position),
+          });
+          this._marked = true;
+        }
       }
       btn.onclick = (e) => {
         e.currentTarget.blur();
@@ -264,6 +273,15 @@ export function createDebrisChore(scene) {
         tow.attach(group);
         ctx.mgr.setPhase(this.id, "tow");
         this.objective = "Reboque os destroços até a Estação Espacial";
+        
+        ctx.markers.remove("battle-debris");
+        ctx.markers.add({
+          id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+          getWorldPosition: (v) => {
+            if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
+            return v.set(0, 0, 0);
+          }
+        });
       };
     },
 
@@ -280,6 +298,7 @@ export function createDebrisChore(scene) {
             group.visible = false;
             ctx.save.flags.debrisTowed = true;
             ctx.markers.remove("battle-debris");
+            ctx.markers.remove("iss-delivery");
             ctx.save.prestige = Math.min(100, (ctx.save.prestige || 0) + 15); // bônus além do padrão
             ctx.mgr.stationSay("Tecnologia capital intacta?! Isso muda TUDO pra nós. O planeta inteiro te deve uma.", 7);
             ctx.mgr.complete(this.id);

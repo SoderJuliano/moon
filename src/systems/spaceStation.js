@@ -37,7 +37,7 @@ export class SpaceStation {
   constructor(scene, getEarth) {
     this.getEarth = getEarth;
     this.group = new THREE.Group();
-    this.group.visible = false;
+    this.group.visible = true; // Sempre visível para que o brilho (glow) apareça de longe
     scene.add(this.group);
 
     this.alive = true;
@@ -81,33 +81,37 @@ export class SpaceStation {
 
   update(dt, cameraPos) {
     const earth = this.getEarth();
-    if (!earth || !this.alive) return;
+    if (!earth || !this.alive) {
+      this.group.visible = false;
+      return;
+    }
+    this.group.visible = true;
     earth.worldPosition(this._center);
     const r = earth.radius; // raio ATUAL (inflado na aproximação)
     const d = cameraPos.distanceTo(this._center);
 
-    // Avança na órbita e calcula a posição SEMPRE, mesmo invisível,
-    // para que o marcador da missão saiba onde a estação está.
+    // Avança na órbita e calcula a posição SEMPRE
     this._angle += ORBIT_RATE * dt;
     const shell = Math.max(r + ALTITUDE, r * 1.1 + 4); // Garante que a estação fique fora da parede invisível (r * 1.1)
     const dir = this._pos
       .copy(this._u).multiplyScalar(Math.cos(this._angle))
       .addScaledVector(this._v, Math.sin(this._angle));
 
-    this.glow.position.copy(this._center).addScaledVector(dir, shell);
+    const pos = this._center.clone().addScaledVector(dir, shell);
+    this.glow.position.copy(pos);
 
-    if (!this.group.visible) {
-      if (d >= r * SHOW_AT) return; // longe: não atualiza o modelo
-      this.group.visible = true;
-      this._load(); // primeira aproximação baixa o modelo
-    } else if (d > r * HIDE_AT) {
-      this.group.visible = false;
-      return;
+    const far = d >= r * SHOW_AT;
+
+    if (!far) {
+      if (!this.loaded) {
+        this._load(); // primeira aproximação baixa o modelo
+      }
     }
 
     if (this.holder) {
-      const pos = this._center.clone().addScaledVector(dir, shell);
       this.holder.position.copy(pos);
+      this.holder.visible = !far;
+      
       // Nose in orbit tangent direction; "up" pointing away from Earth center (stable rotation)
       const tangent = new THREE.Vector3()
         .copy(this._v).multiplyScalar(Math.cos(this._angle))
@@ -126,7 +130,7 @@ export class SpaceStation {
 
   // interface de alvo do PlasmaCannon (só usada no Game Mode)
   hitTest(pos) {
-    if (!this.group.visible || !this.alive || !this.holder) return null;
+    if (!this.alive || !this.holder || !this.holder.visible) return null;
     if (pos.distanceTo(this.holder.position) < HIT_RADIUS) {
       return { id: "iss", center: this.holder.position.clone(), r: HIT_RADIUS, maxHp: 3 };
     }
