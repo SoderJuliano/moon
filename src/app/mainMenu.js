@@ -17,7 +17,7 @@
 
 import * as THREE from "three";
 import { radialGlowTexture, starfieldTexture } from "../core/textures.js";
-import { SaveManager, LocalStorageBackend } from "../game/saveManager.js";
+import { SaveManager, LocalStorageBackend, createPlayerSave } from "../game/saveManager.js";
 import { buildCatalog } from "../game/discoveryRegistry.js";
 import { AchievementsScreen } from "../ui/achievementsScreen.js";
 import {
@@ -289,6 +289,15 @@ export function startMainMenu({ onSelect }) {
           <button class="mm-save-btn mm-name-ok" type="button" data-name="ok">Confirmar</button>
         </div>
       </div>
+      <div class="mm-view-password">
+        <div class="mm-panel-title mm-password-title">Senha do save</div>
+        <input class="mm-password-input" type="password" maxlength="32" placeholder="Digite a senha…" />
+        <div class="mm-save-note mm-password-note"></div>
+        <div class="mm-save-row">
+          <button class="mm-save-btn" type="button" data-password="cancel">◂ Voltar</button>
+          <button class="mm-save-btn mm-password-ok" type="button" data-password="ok">Confirmar</button>
+        </div>
+      </div>
       <div class="mm-view-players">
         <div class="mm-panel-title">Continuar com quem?</div>
         <div class="mm-players-list"></div>
@@ -344,12 +353,16 @@ export function startMainMenu({ onSelect }) {
     modes: root.querySelector(".mm-view-modes"),
     game: root.querySelector(".mm-view-game"),
     name: root.querySelector(".mm-view-name"),
+    password: root.querySelector(".mm-view-password"),
     players: root.querySelector(".mm-view-players"),
   };
   const saveNote = root.querySelector(".mm-save-note");
   const nameInput = root.querySelector(".mm-name-input");
   const nameTitle = root.querySelector(".mm-name-title");
   const nameNote = root.querySelector(".mm-name-note");
+  const passwordInput = root.querySelector(".mm-password-input");
+  const passwordTitle = root.querySelector(".mm-password-title");
+  const passwordNote = root.querySelector(".mm-password-note");
   const playersList = root.querySelector(".mm-players-list");
   let achScreen = null;
   let nameConfirm = null; // callback(name) da tela de nome atual
@@ -390,6 +403,33 @@ export function startMainMenu({ onSelect }) {
     if (e.key === "Enter") submitName();
   });
 
+  // tela de SENHA reutilizável: título + placeholder + callback ao confirmar
+  let passwordConfirm = null;
+  let passwordCancel = null;
+  function askPassword(title, placeholder, onConfirm, onCancel) {
+    passwordTitle.textContent = title;
+    passwordInput.value = "";
+    passwordInput.placeholder = placeholder;
+    passwordNote.textContent = "";
+    passwordConfirm = onConfirm;
+    passwordCancel = onCancel || (() => showScreen("game"));
+    showScreen("password");
+    setTimeout(() => passwordInput.focus(), 60);
+  }
+  function submitPassword() {
+    const pwd = passwordInput.value.trim();
+    if (pwd.length < 3) {
+      passwordNote.textContent = "A senha deve ter pelo menos 3 caracteres.";
+      return;
+    }
+    passwordConfirm?.(pwd);
+  }
+  root.querySelector('[data-password="ok"]').addEventListener("click", submitPassword);
+  root.querySelector('[data-password="cancel"]').addEventListener("click", () => passwordCancel?.());
+  passwordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitPassword();
+  });
+
   root.querySelector('[data-mode="exploration"]').addEventListener("click", () => launch("exploration"));
   root.querySelector('[data-mode="game"]').addEventListener("click", () => showScreen("game"));
   views.game.querySelector('[data-game="back"]').addEventListener("click", () => showScreen("modes"));
@@ -399,9 +439,12 @@ export function startMainMenu({ onSelect }) {
     askName("Nome do jogador", "Como quer ser chamado?", (name) => {
       const overwrites = hasPlayer(name) || (legacySaveExists() && !listPlayers().length);
       if (overwrites && !confirm(`Isso apaga o save de "${name}". Continuar?`)) return;
-      if (legacySaveExists()) migrateLegacyTo(name); // some com o legado sem nome
-      addPlayer(name);
-      launch("game", { resume: false, playerName: name });
+      
+      askPassword("Crie uma senha para seu save", "Escolha uma senha", (password) => {
+        if (legacySaveExists()) migrateLegacyTo(name); // some com o legado sem nome
+        addPlayer(name);
+        launch("game", { resume: false, playerName: name, playerPassword: password });
+      }, () => showScreen("game"));
     });
   });
 
@@ -409,8 +452,19 @@ export function startMainMenu({ onSelect }) {
   views.game.querySelector('[data-game="continue"]').addEventListener("click", () => {
     if (!listPlayers().length && legacySaveExists()) {
       askName("Dê um nome ao seu jogo salvo", "Nome do jogador", (name) => {
-        migrateLegacyTo(name); // move o save legado → moon.save::<name>
-        launch("game", { resume: true, playerName: name });
+        askPassword("Crie uma senha para seu save", "Escolha uma senha", (password) => {
+          migrateLegacyTo(name); // move o save legado → moon.save::<name>
+          
+          // E bota a senha no save recém migrado
+          const sm = createPlayerSave(name);
+          const save = sm.load();
+          if (save) {
+            save.player = save.player || {};
+            save.player.password = password;
+            sm.saveNow();
+          }
+          launch("game", { resume: true, playerName: name });
+        }, () => showScreen("game"));
       });
       return;
     }
@@ -426,7 +480,30 @@ export function startMainMenu({ onSelect }) {
       btn.type = "button";
       btn.innerHTML = `<span class="mm-option-name">${p.name}</span>
         <span class="mm-option-desc">Continuar este jogo.</span>`;
-      btn.addEventListener("click", () => launch("game", { resume: true, playerName: p.name }));
+      btn.addEventListener("click", () => {
+        const sm = createPlayerSave(p.name);
+        const save = sm.load();
+        if (save) {
+          if (save.player && save.player.password) {
+            askPassword("Digite a senha do seu save", "Senha", (pwd) => {
+              if (pwd === save.player.password) {
+                launch("game", { resume: true, playerName: p.name });
+              } else {
+                passwordNote.textContent = "Senha incorreta!";
+              }
+            }, () => showScreen("players"));
+          } else {
+            askPassword("Crie uma senha para seu save", "Escolha uma senha", (pwd) => {
+              save.player = save.player || {};
+              save.player.password = pwd;
+              sm.saveNow();
+              launch("game", { resume: true, playerName: p.name });
+            }, () => showScreen("players"));
+          }
+        } else {
+          launch("game", { resume: true, playerName: p.name });
+        }
+      });
       playersList.appendChild(btn);
     }
   }
@@ -441,10 +518,33 @@ export function startMainMenu({ onSelect }) {
         nameNote.textContent = `Nenhum save na nuvem para "${name}".`;
         return;
       }
-      // grava localmente e registra o jogador; o jogo carrega desse local
-      new LocalStorageBackend(saveKeyFor(name)).write(JSON.stringify(remote.save, null, 2));
-      addPlayer(name);
-      launch("game", { resume: true, playerName: name });
+      
+      const save = remote.save;
+      if (save && save.player && save.player.password) {
+        askPassword("Digite a senha do save online", "Senha", (pwd) => {
+          if (pwd === save.player.password) {
+            new LocalStorageBackend(saveKeyFor(name)).write(JSON.stringify(save, null, 2));
+            addPlayer(name);
+            launch("game", { resume: true, playerName: name });
+          } else {
+            passwordNote.textContent = "Senha incorreta!";
+          }
+        }, () => showScreen("players"));
+      } else {
+        askPassword("Crie uma senha para este save", "Escolha uma senha", (pwd) => {
+          save.player = save.player || {};
+          save.player.password = pwd;
+          
+          new LocalStorageBackend(saveKeyFor(name)).write(JSON.stringify(save, null, 2));
+          addPlayer(name);
+          
+          const sm = createPlayerSave(name);
+          sm.load();
+          sm.saveNow();
+          
+          launch("game", { resume: true, playerName: name });
+        }, () => showScreen("players"));
+      }
     });
   });
 

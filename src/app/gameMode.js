@@ -54,7 +54,7 @@ const EARTH_RADIUS_KM = 6371; // 1 unidade de mundo = 1 raio terrestre
 // "auto" (padrão/?mode=game) = carrega se existir, senão cria — nunca apaga.
 // playerName: jogador nomeado (save local próprio + sync na nuvem). Sem nome
 // cai no save legado sem nome (compatibilidade com atalho ?mode=game).
-export function startGameMode({ resume = "auto", playerName = null } = {}) {
+export function startGameMode({ resume = "auto", playerName = null, playerPassword = null } = {}) {
   window.isGameMode = true;
   const { scene, camera, renderer, controls, glow } = createScene();
   controls.enabled = false; // não existe câmera de observação no jogo
@@ -79,6 +79,10 @@ export function startGameMode({ resume = "auto", playerName = null } = {}) {
   const save = saveManager.data;
   if (playerName) {
     save.player.name = playerName;
+    if (playerPassword) {
+      save.player.password = playerPassword;
+      saveManager.saveNow();
+    }
     addPlayer(playerName); // garante que aparece na lista "Continuar"
     // (a nuvem já nasce gated em createPlayerSave; liberada após o setup)
   }

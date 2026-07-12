@@ -875,6 +875,7 @@ canvas {
 /* cada "tela" fica escondida; showScreen() liga a .on da tela ativa */
 .mm-view-game,
 .mm-view-name,
+.mm-view-password,
 .mm-view-players {
   display: none;
   flex-direction: column;
@@ -882,10 +883,12 @@ canvas {
 }
 .mm-view-game.on,
 .mm-view-name.on,
+.mm-view-password.on,
 .mm-view-players.on {
   display: flex;
 }
-.mm-name-input {
+.mm-name-input,
+.mm-password-input {
   width: 100%;
   padding: 11px 13px;
   border: 1px solid rgba(255, 255, 255, 0.16);
@@ -894,7 +897,8 @@ canvas {
   color: #eaf1ff;
   font-size: 14px;
 }
-.mm-name-input:focus {
+.mm-name-input:focus,
+.mm-password-input:focus {
   outline: none;
   border-color: rgba(110, 168, 255, 0.6);
 }
