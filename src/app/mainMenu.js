@@ -418,8 +418,8 @@ export function startMainMenu({ onSelect }) {
   }
   function submitPassword() {
     const pwd = passwordInput.value.trim();
-    if (pwd.length < 3) {
-      passwordNote.textContent = "A senha deve ter pelo menos 3 caracteres.";
+    if (pwd.length < 4) {
+      passwordNote.textContent = "A senha deve ter pelo menos 4 caracteres.";
       return;
     }
     passwordConfirm?.(pwd);
