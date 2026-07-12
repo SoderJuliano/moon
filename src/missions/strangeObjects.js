@@ -215,7 +215,7 @@ export function createStrangeObjectsMission(scene) {
   new GLTFLoader().load("models/SteelCableAnchorPoint.glb", (g) => {
     anchorModel = g.scene;
     const box = new THREE.Box3().setFromObject(anchorModel);
-    const s = 0.12 / Math.max(...box.getSize(new THREE.Vector3()).toArray());
+    const s = 0.03 / Math.max(...box.getSize(new THREE.Vector3()).toArray());
     anchorModel.scale.setScalar(s);
     anchorModel.visible = false;
     scene.add(anchorModel);
@@ -379,7 +379,7 @@ export function createStrangeObjectsMission(scene) {
           ? toSat.normalize().dot(_forward.set(0, 0, -1).applyQuaternion(ctx.ship.ship.quaternion))
           : 1;
 
-        if (d < LOCK_ON_DIST && forwardDot > 0.94 && !ctx.ship.objectLock) {
+        if (d < LOCK_ON_DIST && forwardDot > 0.5 && !ctx.ship.objectLock) {
           ctx.ship.setObjectLock?.({
             active: true,
             minDot: 0,
@@ -413,7 +413,10 @@ export function createStrangeObjectsMission(scene) {
       p.setXYZ(0, tail.x, tail.y, tail.z);
       p.setXYZ(1, satPos.x, satPos.y, satPos.z);
       p.needsUpdate = true;
-      if (anchorModel) anchorModel.position.copy(satPos);
+      if (anchorModel) {
+        anchorModel.position.copy(satPos);
+        anchorModel.lookAt(tail);
+      }
     },
 
     _deliver(ctx) {

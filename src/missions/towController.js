@@ -38,7 +38,7 @@ export class TowController {
     new GLTFLoader().load("models/SteelCableAnchorPoint.glb", (g) => {
       this.anchor = g.scene;
       const box = new THREE.Box3().setFromObject(this.anchor);
-      this.anchor.scale.setScalar(0.12 / Math.max(...box.getSize(new THREE.Vector3()).toArray()));
+      this.anchor.scale.setScalar(0.03 / Math.max(...box.getSize(new THREE.Vector3()).toArray()));
       this.anchor.visible = false;
       scene.add(this.anchor);
     });
@@ -108,6 +108,9 @@ export class TowController {
     pos.setXYZ(0, tail.x, tail.y, tail.z);
     pos.setXYZ(1, this.payload.position.x, this.payload.position.y, this.payload.position.z);
     pos.needsUpdate = true;
-    if (this.anchor) this.anchor.position.copy(this.payload.position);
+    if (this.anchor) {
+      this.anchor.position.copy(this.payload.position);
+      this.anchor.lookAt(tail);
+    }
   }
 }
