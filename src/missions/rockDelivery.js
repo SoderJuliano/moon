@@ -18,7 +18,7 @@ import { composition } from "../systems/scanner.js";
 const PROMPT_DIST = 4.5;
 const DELIVER_DIST = 6.0;
 
-function makeRock() {
+function makeFallbackRock() {
   const geo = new THREE.IcosahedronGeometry(0.14, 1);
   const p = geo.attributes.position;
   for (let i = 0; i < p.count; i++) {
@@ -26,15 +26,13 @@ function makeRock() {
     p.setXYZ(i, p.getX(i) * s, p.getY(i) * s, p.getZ(i) * s);
   }
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x7a6f63, roughness: 1, metalness: 0.1 }));
-  mesh.visible = false;
-  return mesh;
+  return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x7a6f63, roughness: 1, metalness: 0.1 }));
 }
 
 export function createRockDeliveryMission(scene, opts) {
   const { id, title, kind = "secondary", goal = 10, material = null, reward = null, onDone = null } = opts;
   const tow = new TowController(scene);
-  const rock = makeRock();
+  const rock = new THREE.Group();
   scene.add(rock);
 
   const collectBtn = document.createElement("button");
@@ -123,6 +121,54 @@ export function createRockDeliveryMission(scene, opts) {
       const near = this._eligible(ctx);
       if (!near) return;
       collectBtn.style.display = "none";
+
+      // 1) Descobre qual é a rocha original que capturamos e clona seu visual/material
+      let originalMesh = null;
+      const astSys = ctx.asteroids;
+
+      // Busca nos cinturões instanciados
+      for (const belt of astSys.belts) {
+        const rockInfo = belt._byId.get(near.id);
+        if (rockInfo) {
+          originalMesh = new THREE.Mesh(rockInfo.mesh.geometry, rockInfo.mesh.material);
+          originalMesh.scale.copy(rockInfo.scale);
+          originalMesh.quaternion.copy(rockInfo.quat);
+          break;
+        }
+      }
+
+      // Busca nos asteroides ativos de streaming
+      if (!originalMesh) {
+        const inst = astSys._active.get(near.id);
+        if (inst && inst.obj) {
+          originalMesh = inst.obj.clone();
+          originalMesh.position.set(0, 0, 0);
+        }
+      }
+
+      // Fallback genérico caso falhe
+      if (!originalMesh) {
+        originalMesh = makeFallbackRock();
+      }
+
+      // Limpa os filhos anteriores do reboque
+      while (rock.children.length > 0) {
+        rock.remove(rock.children[0]);
+      }
+
+      // Adiciona o mesh original ao grupo de reboque
+      rock.add(originalMesh);
+
+      // Limita o tamanho visual da rocha rebocada para não tampar a nave toda
+      const box = new THREE.Box3().setFromObject(originalMesh);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const limit = 0.45;
+      if (maxDim > limit) {
+        const factor = limit / maxDim;
+        originalMesh.scale.multiplyScalar(factor);
+      }
+
       rock.position.copy(near.center);
       rock.visible = true;
       ctx.asteroids.destroyAsteroid(near.id);
