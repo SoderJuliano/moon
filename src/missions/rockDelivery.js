@@ -15,7 +15,7 @@ import * as THREE from "three";
 import { TowController } from "./towController.js";
 import { composition } from "../systems/scanner.js";
 
-const PROMPT_DIST = 2.2;
+const PROMPT_DIST = 4.5;
 const DELIVER_DIST = 6.0;
 
 function makeRock() {
@@ -72,6 +72,38 @@ export function createRockDeliveryMission(scene, opts) {
         e.currentTarget.blur();
         this._grab(ctx);
       };
+
+      // Clique direto sobre o asteroide na tela 3D
+      this._onMouseDown = (e) => {
+        if (e.button !== 0 || e.target?.tagName !== "CANVAS") return;
+        if (tow.phase) return;
+
+        const near = this._eligible(ctx);
+        if (near) {
+          const proj = new THREE.Vector3().copy(near.center).project(ctx.camera);
+          if (proj.z < 1) {
+            const screenX = (proj.x * 0.5 + 0.5) * window.innerWidth;
+            const screenY = (-proj.y * 0.5 + 0.5) * window.innerHeight;
+            const dx = e.clientX - screenX;
+            const dy = e.clientY - screenY;
+            const distPx = Math.sqrt(dx * dx + dy * dy);
+            
+            // Tolerância de 70px para clicar diretamente na rocha
+            if (distPx < 70) {
+              this._grab(ctx);
+            }
+          }
+        }
+      };
+      window.addEventListener("mousedown", this._onMouseDown);
+    },
+
+    onComplete(ctx) {
+      if (this._onMouseDown) {
+        window.removeEventListener("mousedown", this._onMouseDown);
+        this._onMouseDown = null;
+      }
+      collectBtn.style.display = "none";
     },
 
     // só oferece coletar rochas ELEGÍVEIS (material certo, se a missão exige)
