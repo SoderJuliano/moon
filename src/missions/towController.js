@@ -36,10 +36,13 @@ export class TowController {
     scene.add(this.cable);
 
     this.anchor = null;
+    this.anchorBaseScale = 1.0;
     new GLTFLoader().load("models/SteelCableAnchorPoint.glb", (g) => {
       this.anchor = g.scene;
       const box = new THREE.Box3().setFromObject(this.anchor);
-      this.anchor.scale.setScalar(0.03 / Math.max(...box.getSize(new THREE.Vector3()).toArray()));
+      const size = Math.max(...box.getSize(new THREE.Vector3()).toArray());
+      this.anchorBaseScale = size > 0 ? 1.0 / size : 1.0;
+      this.anchor.scale.setScalar(this.anchorBaseScale * 0.03);
       this.anchor.visible = false;
       scene.add(this.anchor);
     });
@@ -95,15 +98,18 @@ export class TowController {
     const p = this.payload;
 
     if (this.state === "attaching") {
-      const trailDist = 0.4 + (this.payloadRadius || 0.05) * 1.5;
+      const trailDist = 0.06 + (this.payloadRadius || 0.05) * 1.0;
       ship.speed = 0;
       ship.velocity.set(0, 0, 0);
       ship.keys.clear();
       this._cut += dt;
       const t = Math.min(1, this._cut / CUT_DUR);
       const e = t * t * (3 - 2 * t);
-      const back = this._v.set(0, 0, 1).applyQuaternion(ship.ship.quaternion);
-      const tow = this._v2.copy(ship.ship.position).addScaledVector(back, trailDist).addScaledVector(this._v3.set(0, -1, 0), 0.15);
+      
+      // Alinhamento local atrás da nave (-Z local, ou seja, +Z) e levemente abaixo (-Y local)
+      const localTarget = this._v.set(0, -0.02, trailDist);
+      const tow = this._v2.copy(localTarget).applyQuaternion(ship.ship.quaternion).add(ship.ship.position);
+      
       p.position.copy(this._from).lerp(tow, e);
       p.rotation.y += dt * 0.7;
       if (this.anchor && t > 0.55) this.anchor.rotation.z += dt * 4;
@@ -122,11 +128,11 @@ export class TowController {
     }
 
     // recalculamos trailDist após o escalonamento para ajustar a distância do reboque
-    const currentTrailDist = 0.4 + (this.payloadRadius || 0.05) * 1.5;
+    const currentTrailDist = 0.06 + (this.payloadRadius || 0.05) * 1.0;
 
-    // rebocando: segue atrás/abaixo da nave (cópia direta p/ eliminar qualquer tremor)
-    const back = this._v.set(0, 0, 1).applyQuaternion(ship.ship.quaternion);
-    const target = this._v2.copy(ship.ship.position).addScaledVector(back, currentTrailDist).addScaledVector(this._v3.set(0, -1, 0), 0.15);
+    // Alinhamento local constante atrás e abaixo da nave em coordenadas locais (evita que fique em cima da nave ao rotacionar)
+    const localTarget = this._v.set(0, -0.02, currentTrailDist);
+    const target = this._v2.copy(localTarget).applyQuaternion(ship.ship.quaternion).add(ship.ship.position);
     p.position.copy(target);
     p.rotation.y += dt * 0.5;
     this._cable(ship);
@@ -135,14 +141,32 @@ export class TowController {
 
   _cable(ship) {
     if (!this.payload) return;
-    const tail = this._v.set(0, -0.03, 0.1).applyQuaternion(ship.ship.quaternion).add(ship.ship.position);
+    
+    // Ponto de saída do cabo na traseira da nave (coordenadas locais do gancho na nave)
+    const tail = this._v.set(0, -0.015, 0.03)
+      .applyQuaternion(ship.ship.quaternion)
+      .add(ship.ship.position);
+      
+    // Direção da rocha para a traseira da nave
+    const dirToShip = this._v2.copy(tail).sub(this.payload.position).normalize();
+    
+    // Posição de engate na superfície da rocha
+    const anchorPos = this._v3.copy(this.payload.position)
+      .addScaledVector(dirToShip, this.payloadRadius || 0.05);
+
     const pos = this.cable.geometry.attributes.position;
     pos.setXYZ(0, tail.x, tail.y, tail.z);
-    pos.setXYZ(1, this.payload.position.x, this.payload.position.y, this.payload.position.z);
+    pos.setXYZ(1, anchorPos.x, anchorPos.y, anchorPos.z);
     pos.needsUpdate = true;
-    if (this.anchor) {
-      this.anchor.position.copy(this.payload.position);
+    
+    if (this.anchor && this.anchorBaseScale) {
+      // Posiciona o gancho na superfície da rocha apontando para a traseira da nave
+      this.anchor.position.copy(anchorPos);
       this.anchor.lookAt(tail);
+      
+      // Ajusta o tamanho do gancho para ser proporcional à rocha (35% do raio)
+      const targetSize = Math.max(0.008, (this.payloadRadius || 0.05) * 0.35);
+      this.anchor.scale.setScalar(this.anchorBaseScale * targetSize);
     }
   }
 }
