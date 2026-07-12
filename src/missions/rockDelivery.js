@@ -158,7 +158,7 @@ export function createRockDeliveryMission(scene, opts) {
       let show = false;
       if (near) {
         _v.copy(near.center).project(ctx.camera);
-        if (_v.z < 1 && Math.abs(_v.x) < 0.95 && Math.abs(_v.y) < 0.9) {
+        if (_v.z < 1 && Math.abs(_v.x) < 1.0 && Math.abs(_v.y) < 1.0) {
           collectBtn.style.left = `${(_v.x * 0.5 + 0.5) * window.innerWidth}px`;
           collectBtn.style.top = `${(-_v.y * 0.5 + 0.5) * window.innerHeight}px`;
           show = true;

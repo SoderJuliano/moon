@@ -264,48 +264,35 @@ export class AsteroidSystem {
   // streaming; os cinturões densos têm hitTest próprio e não entram aqui.)
   nearestActive(pos, maxDist = Infinity) {
     let best = null;
-    let bestD = maxDist;
+    let bestD = maxDist; // representará a distância até a SUPERFÍCIE
 
     // 1) Busca nos asteroides esparsos (streaming)
     for (const inst of this._active.values()) {
-      const d = pos.distanceTo(inst.world);
+      const radius = inst.collisionR || 0.1;
+      const d = pos.distanceTo(inst.world) - radius;
       if (d < bestD) {
         bestD = d;
-        best = { id: inst.desc.id, center: inst.world.clone(), dist: d };
+        best = { id: inst.desc.id, center: inst.world.clone(), dist: d, radius };
       }
     }
 
-    // 2) Busca nos cinturões densos (instanciados) usando o grid espacial para performance
-    const tmpLocal = new THREE.Vector3();
+    // 2) Busca nos cinturões densos (instanciados)
     for (const belt of this.belts) {
       if (!belt.built || !belt.group.visible) continue;
       
-      // Converte a posição de busca para coordenadas locais do cinturão
-      tmpLocal.copy(pos).sub(belt.group.position);
-      const cx = Math.floor(tmpLocal.x / CELL);
-      const cy = Math.floor(tmpLocal.y / CELL);
-      const cz = Math.floor(tmpLocal.z / CELL);
-
-      // Limita a busca às células próximas com base na melhor distância atual (teto de 60 unidades para evitar loop infinito com Infinity)
-      const searchLimit = Math.min(bestD, 60);
-      const cellRange = Math.max(1, Math.ceil(searchLimit / CELL));
-      for (let ix = cx - cellRange; ix <= cx + cellRange; ix++) {
-        for (let iy = cy - cellRange; iy <= cy + cellRange; iy++) {
-          for (let iz = cz - cellRange; iz <= cz + cellRange; iz++) {
-            const cell = belt._grid.get(`${ix},${iy},${iz}`);
-            if (!cell) continue;
-            for (const ri of cell) {
-              const rock = belt._rocks[ri];
-              if (belt._destroyed.has(rock.id)) continue;
-              
-              const rockWorld = rock.pos.clone().add(belt.group.position);
-              const d = pos.distanceTo(rockWorld);
-              if (d < bestD) {
-                bestD = d;
-                best = { id: rock.id, center: rockWorld, dist: d };
-              }
-            }
-          }
+      const center = belt.getCenter(this.getBody, this._center);
+      // Se a nave está totalmente fora do volume de influência do cinturão, pula
+      if (pos.distanceTo(center) > belt.boundingRadius + bestD) continue;
+      
+      for (const rock of belt._rocks) {
+        if (belt._destroyed.has(rock.id)) continue;
+        
+        const rockWorld = rock.pos.clone().add(center);
+        const radius = rock.collisionR || 0.1;
+        const d = pos.distanceTo(rockWorld) - radius;
+        if (d < bestD) {
+          bestD = d;
+          best = { id: rock.id, center: rockWorld, dist: d, radius };
         }
       }
     }
