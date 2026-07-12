@@ -22,6 +22,8 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
+const CELL = 24;
+
 // modelos disponíveis (servidos de /public/models). needsRock = aplica PBR de rocha
 // real (modelo sem textura própria). type fbx|glb.
 const DEFAULT_MODELS = {
@@ -263,6 +265,8 @@ export class AsteroidSystem {
   nearestActive(pos, maxDist = Infinity) {
     let best = null;
     let bestD = maxDist;
+
+    // 1) Busca nos asteroides esparsos (streaming)
     for (const inst of this._active.values()) {
       const d = pos.distanceTo(inst.world);
       if (d < bestD) {
@@ -270,6 +274,41 @@ export class AsteroidSystem {
         best = { id: inst.desc.id, center: inst.world.clone(), dist: d };
       }
     }
+
+    // 2) Busca nos cinturões densos (instanciados) usando o grid espacial para performance
+    const tmpLocal = new THREE.Vector3();
+    for (const belt of this.belts) {
+      if (!belt.built || !belt.group.visible) continue;
+      
+      // Converte a posição de busca para coordenadas locais do cinturão
+      tmpLocal.copy(pos).sub(belt.group.position);
+      const cx = Math.floor(tmpLocal.x / CELL);
+      const cy = Math.floor(tmpLocal.y / CELL);
+      const cz = Math.floor(tmpLocal.z / CELL);
+
+      // Limita a busca às células próximas com base na melhor distância atual
+      const cellRange = Math.max(1, Math.ceil(bestD / CELL));
+      for (let ix = cx - cellRange; ix <= cx + cellRange; ix++) {
+        for (let iy = cy - cellRange; iy <= cy + cellRange; iy++) {
+          for (let iz = cz - cellRange; iz <= cz + cellRange; iz++) {
+            const cell = belt._grid.get(`${ix},${iy},${iz}`);
+            if (!cell) continue;
+            for (const ri of cell) {
+              const rock = belt._rocks[ri];
+              if (belt._destroyed.has(rock.id)) continue;
+              
+              const rockWorld = rock.pos.clone().add(belt.group.position);
+              const d = pos.distanceTo(rockWorld);
+              if (d < bestD) {
+                bestD = d;
+                best = { id: rock.id, center: rockWorld, dist: d };
+              }
+            }
+          }
+        }
+      }
+    }
+
     return best;
   }
 

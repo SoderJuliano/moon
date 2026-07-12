@@ -39,7 +39,7 @@ export function createRockDeliveryMission(scene, opts) {
 
   const collectBtn = document.createElement("button");
   collectBtn.className = "invest-btn";
-  collectBtn.textContent = material ? `⚓ Coletar rocha de ${material}` : "⚓ Coletar rocha";
+  collectBtn.textContent = material ? `⚓ Coletar rocha de ${material} (ou clique nela)` : "⚓ Coletar rocha (ou clique nela)";
   collectBtn.style.display = "none";
   document.body.appendChild(collectBtn);
 
@@ -105,6 +105,9 @@ export function createRockDeliveryMission(scene, opts) {
         window.removeEventListener("mousedown", this._onMouseDown);
         this._onMouseDown = null;
       }
+      if (document.body.style.cursor === "pointer") {
+        document.body.style.cursor = "";
+      }
       collectBtn.style.display = "none";
     },
 
@@ -137,6 +140,10 @@ export function createRockDeliveryMission(scene, opts) {
 
     update(dt, ctx) {
       if (tow.phase) {
+        // Reseta o cursor se começou a rebocar
+        if (document.body.style.cursor === "pointer") {
+          document.body.style.cursor = "";
+        }
         tow.update(dt, ctx.ship, ctx.camera);
         if (tow.isTowing()) {
           ctx.station?.update(dt, ctx.ship.ship.position);
@@ -155,6 +162,12 @@ export function createRockDeliveryMission(scene, opts) {
           collectBtn.style.left = `${(_v.x * 0.5 + 0.5) * window.innerWidth}px`;
           collectBtn.style.top = `${(-_v.y * 0.5 + 0.5) * window.innerHeight}px`;
           show = true;
+          document.body.style.cursor = "pointer"; // Indica que a rocha é clicável
+        }
+      }
+      if (!show) {
+        if (document.body.style.cursor === "pointer") {
+          document.body.style.cursor = "";
         }
       }
       collectBtn.style.display = show ? "" : "none";
