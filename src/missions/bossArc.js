@@ -23,6 +23,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { TowController } from "./towController.js";
 import { emit } from "../game/events.js";
+import { resolveAssetUrl } from "../game/remoteAssets.js";
 
 const SCAN_DIST = 30; // u do casco pra "escanear" o cruzador
 const REPORT_DIST = 4; // u da Estação pra reportar
@@ -211,7 +212,9 @@ export function createDebrisChore(scene) {
   function loadModel() {
     if (loaded || loading) return;
     loading = true;
-    new GLTFLoader().load("models/destrocosDaNave.glb", (gltf) => {
+    // no Android o GLB vem do cache baixado do Drive; na web é o caminho local
+    resolveAssetUrl("models/destrocosDaNave.glb").then((url) =>
+    new GLTFLoader().load(url, (gltf) => {
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
@@ -221,7 +224,8 @@ export function createDebrisChore(scene) {
       model.scale.setScalar(scale);
       group.add(model);
       loaded = true;
-    });
+    })
+    );
   }
 
   return {

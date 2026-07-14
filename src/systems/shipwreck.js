@@ -19,6 +19,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { AsteroidBelt } from "./asteroidBelt.js";
 import { radialGlowTexture } from "../core/textures.js";
+import { resolveAssetUrl } from "../game/remoteAssets.js";
 
 // Lado OPOSTO à entrada de Júpiter (ENTRY_OVERRIDES usa [1, 0.02, 0]): o jogador
 // precisa contornar o gigante pra chegar aqui. dist 760 deixa a borda interna da
@@ -120,8 +121,10 @@ export class Shipwreck {
 
   _load() {
     this._loading = true;
+    // no Android o GLB vem do cache baixado do Drive; na web é o caminho local
+    resolveAssetUrl("models/brokenstarship.glb").then((url) =>
     new GLTFLoader().load(
-      "models/brokenstarship.glb",
+      url,
       (gltf) => {
         const s = gltf.scene;
         // o export traz specularColorFactor 2.0 — sem env map isso estoura o
@@ -168,6 +171,7 @@ export class Shipwreck {
         console.warn("[Shipwreck] falha ao carregar brokenstarship.glb:", err);
         this._loading = false; // permite tentar de novo ao reaproximar
       }
+    )
     );
   }
 

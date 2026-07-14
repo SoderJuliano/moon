@@ -23,6 +23,7 @@ import { SatelliteSystem } from "../systems/satellites.js";
 import { SpaceStation } from "../systems/spaceStation.js";
 import { DeepSpaceMusic } from "../ui/spaceMusic.js";
 import { createTouchControls } from "../ui/touchControls.js";
+import { startBackgroundInstall } from "../game/remoteAssets.js";
 import { SaveManager, createPlayerSave } from "../game/saveManager.js";
 import { addPlayer } from "../game/players.js";
 import { AchievementSystem } from "../game/achievementSystem.js";
@@ -442,6 +443,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // nada é criado — teclado/mouse seguem sendo o input. Os botões disparam
   // eventos de teclado sintéticos, então nenhum sistema de voo/combate muda.
   createTouchControls();
+  // no app Android baixa os modelos pesados (fora do APK) do Drive na 1ª vez;
+  // na web é no-op. Em background — o jogo já é jogável perto da Terra.
+  startBackgroundInstall();
 
   // --- Início ------------------------------------------------------------------
   // Um passo de simulação posiciona os corpos nas longitudes orbitais corretas

@@ -16,6 +16,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture } from "../core/textures.js";
 import { playShieldHit, playShieldBreak, playHeavyCannon } from "./battleSfx.js";
+import { resolveAssetUrl } from "../game/remoteAssets.js";
 
 export const BOSS_SHIELD_HP = 10;
 export const BOSS_HULL_HP = 20;
@@ -144,7 +145,9 @@ export class BossShip {
     }
     if (this._loading) return;
     this._loading = true;
-    new GLTFLoader().load(this.modelUrl, (gltf) => {
+    // no Android o GLB vem do cache baixado do Drive; na web é o caminho local
+    resolveAssetUrl(this.modelUrl).then((url) =>
+    new GLTFLoader().load(url, (gltf) => {
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
@@ -163,7 +166,8 @@ export class BossShip {
       this.group.add(model);
       this.loaded = true;
       onDone?.();
-    });
+    })
+    );
   }
 
   spawnAt(pos) {

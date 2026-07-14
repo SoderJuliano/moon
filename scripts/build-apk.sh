@@ -25,7 +25,8 @@ log() { printf '\n\033[1;36m[moon]\033[0m %s\n' "$*"; }
 find_jdk() {
   local cand
   for cand in "${JAVA_HOME:-}" "$TOOLING"/jdk-* /usr/lib/jvm/java-21-* /usr/lib/jvm/java-17-* /usr/lib/jvm/*; do
-    [ -x "$cand/bin/java" ] || continue
+    # exige JDK completo: java + javac (JRE puro não compila o projeto Android)
+    [ -x "$cand/bin/java" ] && [ -x "$cand/bin/javac" ] || continue
     local v
     v=$("$cand/bin/java" -version 2>&1 | head -1 | sed -E 's/.*"([0-9]+).*/\1/')
     if [ "$v" -ge 17 ] && [ "$v" -le 24 ]; then echo "$cand"; return 0; fi
@@ -78,6 +79,12 @@ cd "$ROOT"
 [ -d node_modules ] || { log "Instalando dependências npm…"; npm install; }
 log "Buildando o jogo (vite build)…"
 npm run build
+# Os 4 modelos gigantes (~320MB) NÃO vão no APK — o app os baixa do Drive na 1ª
+# execução (src/game/remoteAssets.js). Removidos só da cópia do dist; os
+# originais em public/ ficam intactos para a versão web.
+log "Removendo modelos pesados do pacote (baixados do Drive em runtime)…"
+rm -f dist/models/brokenstarship.glb dist/models/starship.glb \
+      dist/models/combatstarship.glb dist/models/destrocosDaNave.glb
 log "Sincronizando dist/ → android/ (capacitor)…"
 npx cap sync android
 
@@ -89,13 +96,13 @@ if [ "$MODE" = "release" ]; then
     log "       Veja o README (seção Android) pra criar a chave da Play Store."
   fi
   log "Gerando APK + AAB de release (primeira vez demora — o Gradle baixa a si mesmo)…"
-  ./gradlew assembleRelease bundleRelease
+  ./gradlew clean assembleRelease bundleRelease
   cp -f app/build/outputs/apk/release/app-release*.apk "$ROOT/moon-release.apk"
   cp -f app/build/outputs/bundle/release/app-release.aab "$ROOT/moon-release.aab"
   log "PRONTO ✅  → moon-release.apk (instalar) e moon-release.aab (subir na Play Store)"
 else
   log "Gerando APK de debug (primeira vez demora — o Gradle baixa a si mesmo)…"
-  ./gradlew assembleDebug
+  ./gradlew clean assembleDebug
   cp -f app/build/outputs/apk/debug/app-debug.apk "$ROOT/moon-debug.apk"
   log "PRONTO ✅  → moon-debug.apk na raiz do projeto"
   log "Instalar no celular: adb install -r moon-debug.apk  (ou copie o arquivo e abra nele)"

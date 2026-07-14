@@ -48,6 +48,43 @@ npm run build
 npm run preview
 ```
 
+## Android (gerar o APK)
+
+O jogo é empacotado com **Capacitor** (embute o `dist/` num WebView nativo).
+O script `scripts/build-apk.sh` é autossuficiente: se faltar JDK 17–24 ou o
+Android SDK, ele baixa os dois para `./.tooling/` (sem `sudo`, só neste projeto).
+A primeira execução baixa ~700MB de ferramentas; as seguintes levam ~2 min.
+
+```bash
+npm run apk           # gera moon-debug.apk na raiz (instalar/testar)
+npm run apk:release   # gera moon-release.apk + moon-release.aab (Play Store)
+```
+
+Instalar no celular:
+
+```bash
+adb install -r moon-debug.apk    # ou copie o arquivo e abra nele (fontes desconhecidas)
+```
+
+### Assets pesados fora do APK
+
+Os 4 modelos gigantes (`brokenstarship`, `starship`, `combatstarship`,
+`destrocosDaNave` — ~320MB juntos) **não entram no pacote**: o script os remove
+do `dist/` antes de empacotar e o app os baixa do Google Drive na primeira
+execução (`src/game/remoteAssets.js`, com barra de progresso e cache local em
+`Directory.Data`). Isso derruba o APK de ~277MB para ~34MB — abaixo do limite de
+~200MB da Play Store. Na versão web nada muda (os arquivos seguem em `public/`).
+
+Se um modelo for re-enviado ao Drive, o `driveId` muda — atualize a tabela
+`REMOTE_ASSETS` em `src/game/remoteAssets.js` (e só lá).
+
+### Release / Play Store
+
+Antes de `npm run apk:release`, crie a chave de assinatura e o
+`android/keystore.properties` (o script assina o `.aab` se ele existir; sem ele,
+o release sai sem assinatura). A cada envio, incremente `versionCode` em
+`android/app/build.gradle`.
+
 ## Visão do projeto
 
 - Modo Planetário: observação, escalas e órbitas com foco educativo
