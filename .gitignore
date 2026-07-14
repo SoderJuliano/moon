@@ -6,3 +6,14 @@ dist/
 # nave 3d baixada pra avaliar depois (não usar ainda)
 src/assets/
 *.rar
+
+# toolchain baixado pelo build-apk.sh (JDK + Android SDK, ~700MB) — nunca versionar
+.tooling/
+
+# artefatos de build do Android / empacotamento
+*.apk
+*.aab
+android/.gradle/
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/
