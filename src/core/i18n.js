@@ -54,6 +54,10 @@ export function setLang(l, { reload = false } = {}) {
 
 export const SUPPORTED_LANGS = SUPPORTED;
 
+export function hasLangKey(key) {
+  return (DICTS[_lang] && DICTS[_lang][key] !== undefined) || (DICTS.pt && DICTS.pt[key] !== undefined);
+}
+
 // traduz uma chave. vars: { n: 12 } substitui {n} no texto.
 export function t(key, vars) {
   let s = DICTS[_lang]?.[key];

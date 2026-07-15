@@ -160,11 +160,13 @@ function makeDetailLOD(mesh, descriptor) {
     mesh.getWorldPosition(_lodPos);
     const dist = cameraPos.distanceTo(_lodPos);
     const r = mesh.scale.x;
-    const onAt = r * 7 + 6;
-    const offAt = r * 12 + 12; // histerese pra não piscar
+    const onAt = Math.max(16, r * 7 + 6);
+    const offAt = Math.max(26, r * 12 + 12); // histerese pra não piscar
     if (!on && dist < onAt) {
       if (!hiresMap) {
-        hiresMap = textureLoader.load(descriptor.hiresTextureUrl);
+        hiresMap = textureLoader.load(descriptor.hiresTextureUrl, () => {
+          mesh.material.needsUpdate = true;
+        });
         hiresMap.colorSpace = THREE.SRGBColorSpace;
         hiresMap.anisotropy = 8;
       }
@@ -268,7 +270,9 @@ export function createBody(descriptor, mode) {
 }
 
 // Cria uma lua presa ao PIVOT do planeta (segue a posição, não a escala/spin).
-export function attachMoon(planet, descriptor, mode) {
+// moonIndex = ordem da lua no planeta (0,1,2…): espalha as órbitas em cascas
+// distintas pra várias luas não empilharem no mesmo raio.
+export function attachMoon(planet, descriptor, mode, moonIndex = 0) {
   const mesh = makeMesh(descriptor, false);
   const pivot = new THREE.Object3D();
   pivot.add(mesh);
@@ -279,6 +283,16 @@ export function attachMoon(planet, descriptor, mode) {
   // raio "fantasia" do planeta é constante; usado para posicionar a lua perto
   // dele no modo fantasia
   const planetFantasyRadius = bodyRadius(planet.descriptor.realRadiusKm, "fantasy");
+
+  // DISTÂNCIA INFLADA FIXA (modo real/game): ao pilotar perto, o planeta cresce
+  // pra "gigante" (~40× o raio, ou mais pros pequenos — ver APPROACH_MUL=40 e
+  // MIN_APPROACH_R=60 no ShipFlight). As luas precisam orbitar FORA desse
+  // gigante, senão são engolidas. Valor FIXO (não escala com a inflação) → nunca
+  // engolidas E nunca "andam sozinhas" quando o planeta incha. O índice espalha
+  // as luas em cascas concêntricas (1.3×, 1.9×, 2.5×… o raio-gigante).
+  const planetRealRadius = bodyRadius(planet.descriptor.realRadiusKm, "real");
+  const giantRadius = planetRealRadius * Math.max(40, 60 / planetRealRadius);
+
   const lod = makeDetailLOD(mesh, descriptor);
 
   const moon = {
@@ -310,7 +324,14 @@ export function attachMoon(planet, descriptor, mode) {
     },
 
     applyMode(currentMode, instant = true) {
-      this._targetX = moonOrbitRadius(planetFantasyRadius, descriptor.moonDistanceKm, currentMode);
+      if (currentMode === "real") {
+        // fixo, FORA do planeta inflado, com as luas espalhadas em cascas por índice
+        const orbit = moonOrbitRadius(planetFantasyRadius, descriptor.moonDistanceKm, currentMode);
+        this._targetX = Math.max(orbit, giantRadius * (1.3 + moonIndex * 0.6));
+      } else {
+        // fantasia/exploração: sem inflação; espalha as luas em cascas distintas
+        this._targetX = planetFantasyRadius * (4.5 + moonIndex * 1.8);
+      }
       this._targetScale = bodyRadius(descriptor.realRadiusKm, currentMode);
       if (instant) {
         pivot.position.x = this._targetX;

@@ -43,10 +43,10 @@ export function buildSolarSystem(scene, glow, { mode, withOrbitLines = true }) {
     // luas (por ora só a da Terra)
     const moons = MOONS[desc.id];
     if (moons) {
-      for (const md of moons) {
-        const moon = attachMoon(body, md, mode);
+      moons.forEach((md, i) => {
+        const moon = attachMoon(body, md, mode, i);
         bodyById.set(moon.id, moon);
-      }
+      });
     }
   }
 

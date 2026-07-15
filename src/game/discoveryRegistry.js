@@ -14,7 +14,7 @@
 //          subtitle (texto da popup) }
 
 import { MENU_ORDER, MOONS } from "../bodies/index.js";
-import { t } from "../core/i18n.js";
+import { t, hasLangKey } from "../core/i18n.js";
 
 export const CATEGORIES = {
   PLANETS: "Planetas",
@@ -77,11 +77,12 @@ export function buildCatalog() {
     let displaySub = item.subtitle;
     if (item.id.startsWith("body:")) {
       const bodyId = item.id.substring(5);
-      displayName = t("body.name." + bodyId) || item.name;
-      displaySub = t("discovery.firstVisit") || item.subtitle;
+      const bodyKey = "body." + bodyId;
+      displayName = hasLangKey(bodyKey) ? t(bodyKey) : item.name;
+      displaySub = hasLangKey("discovery.firstVisit") ? t("discovery.firstVisit") : item.subtitle;
     } else {
-      displayName = t("discovery.name." + item.id) || item.name;
-      displaySub = t("discovery.sub." + item.id) || item.subtitle;
+      displayName = hasLangKey("discovery.name." + item.id) ? t("discovery.name." + item.id) : item.name;
+      displaySub = hasLangKey("discovery.sub." + item.id) ? t("discovery.sub." + item.id) : item.subtitle;
     }
     return {
       ...item,

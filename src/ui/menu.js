@@ -70,9 +70,21 @@ export function createMenu({ onSelect }) {
     moonStrip.classList.add("visible");
   }
 
+  function getParentPlanetId(id) {
+    for (const [planetId, moons] of Object.entries(MOONS)) {
+      if (moons.some((m) => m.id === id)) return planetId;
+    }
+    return null;
+  }
+
   function select(id) {
+    const parentId = getParentPlanetId(id);
+    if (parentId) {
+      showMoons(parentId);
+    } else {
+      showMoons(id);
+    }
     highlight(id);
-    showMoons(id);
     onSelect(id);
   }
 

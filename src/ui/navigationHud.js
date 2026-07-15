@@ -9,7 +9,7 @@
 // para não martelar o DOM. A posição é atualizada todo frame (barato).
 
 import { formatDistance } from "./spaceMarkers.js";
-import { t } from "../core/i18n.js";
+import { t, hasLangKey } from "../core/i18n.js";
 
 const STYLE_ID = "nav-hud-style";
 const CSS = `
@@ -160,7 +160,9 @@ export class NavigationHud {
 
     const name = document.createElement("span");
     name.className = "name";
-    name.textContent = t("discovery.name." + target.id) || t("body." + target.id) || target.name;
+    const nameKey = "discovery.name." + target.id;
+    const bodyKey = "body." + target.id;
+    name.textContent = hasLangKey(nameKey) ? t(nameKey) : (hasLangKey(bodyKey) ? t(bodyKey) : target.name);
 
     const dist = document.createElement("span");
     dist.className = "dist";

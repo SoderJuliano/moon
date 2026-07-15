@@ -7,7 +7,7 @@
 // miniaturas (menuColor) — nada de imagem baixada, custo zero. Itens sem cor
 // (POIs/marcos) usam o emoji do catálogo.
 
-import { t, getLang } from "../core/i18n.js";
+import { t, getLang, hasLangKey } from "../core/i18n.js";
 
 const SHOW_SECS = 4.5;
 
@@ -47,8 +47,8 @@ export class DiscoveryPopup {
       ? `<span class="disc-ball" style="${ballStyle(item.color)}"></span>`
       : `<span class="disc-icon">${item.icon || "✦"}</span>`;
 
-    const displayName = t("discovery.name." + item.id) || item.name;
-    const displaySub = t("discovery.sub." + item.id) || item.subtitle || "";
+    const displayName = hasLangKey("discovery.name." + item.id) ? t("discovery.name." + item.id) : item.name;
+    const displaySub = hasLangKey("discovery.sub." + item.id) ? t("discovery.sub." + item.id) : (item.subtitle || "");
 
     this.el.innerHTML = `
       ${thumb}

@@ -5,7 +5,7 @@
 // "??????" e "Não descoberto". Abre pelo menu de pausa do Game Mode.
 
 import { CATEGORIES } from "../game/discoveryRegistry.js";
-import { t, getLang } from "../core/i18n.js";
+import { t, getLang, hasLangKey } from "../core/i18n.js";
 
 function ballStyle(color) {
   return `background: radial-gradient(circle at 35% 30%, #fff6, ${color} 45%, #000a 130%)`;
@@ -69,7 +69,7 @@ export class AchievementsScreen {
               <div class="ach-item ${got ? "" : "ach-locked"}">
                 ${thumb}
                 <div class="ach-text">
-                  <div class="ach-name">${got ? (t("discovery.name." + item.id) || item.name) : "??????"}</div>
+                  <div class="ach-name">${got ? (hasLangKey("discovery.name." + item.id) ? t("discovery.name." + item.id) : item.name) : "??????"}</div>
                   <div class="ach-meta">${t("cat." + cat)} · ${meta}</div>
                 </div>
               </div>`;
