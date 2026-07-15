@@ -7,6 +7,8 @@
 // miniaturas (menuColor) — nada de imagem baixada, custo zero. Itens sem cor
 // (POIs/marcos) usam o emoji do catálogo.
 
+import { t, getLang } from "../core/i18n.js";
+
 const SHOW_SECS = 4.5;
 
 function ballStyle(color) {
@@ -37,17 +39,22 @@ export class DiscoveryPopup {
     this._busy = true;
     const { item, atIso } = entry;
     const when = new Date(atIso);
-    const date = when.toLocaleDateString("pt-BR");
-    const time = when.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const lang = getLang();
+    const locale = lang === "pt" ? "pt-BR" : "en-US";
+    const date = when.toLocaleDateString(locale);
+    const time = when.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
     const thumb = item.color
       ? `<span class="disc-ball" style="${ballStyle(item.color)}"></span>`
       : `<span class="disc-icon">${item.icon || "✦"}</span>`;
 
+    const displayName = t("discovery.name." + item.id) || item.name;
+    const displaySub = t("discovery.sub." + item.id) || item.subtitle || "";
+
     this.el.innerHTML = `
       ${thumb}
-      <small>DESCOBERTA</small>
-      <div class="disc-name">${item.name}</div>
-      <div class="disc-sub">${item.subtitle || ""}</div>
+      <small>${t("disc.discovery")}</small>
+      <div class="disc-name">${displayName}</div>
+      <div class="disc-sub">${displaySub}</div>
       <div class="disc-date">${date} · ${time}</div>`;
     this.el.classList.add("on");
 

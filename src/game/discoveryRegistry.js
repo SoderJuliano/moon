@@ -14,6 +14,7 @@
 //          subtitle (texto da popup) }
 
 import { MENU_ORDER, MOONS } from "../bodies/index.js";
+import { t } from "../core/i18n.js";
 
 export const CATEGORIES = {
   PLANETS: "Planetas",
@@ -71,5 +72,21 @@ export function buildCatalog() {
     { id: "mark:twins-defeated", name: "Caçador de Gigantes", category: CATEGORIES.MARKS, icon: "🏆", subtitle: "Derrubou os Gêmeos do Ocaso — Eclipse e Vórtice" }
   );
 
-  return items;
+  return items.map((item) => {
+    let displayName = item.name;
+    let displaySub = item.subtitle;
+    if (item.id.startsWith("body:")) {
+      const bodyId = item.id.substring(5);
+      displayName = t("body.name." + bodyId) || item.name;
+      displaySub = t("discovery.firstVisit") || item.subtitle;
+    } else {
+      displayName = t("discovery.name." + item.id) || item.name;
+      displaySub = t("discovery.sub." + item.id) || item.subtitle;
+    }
+    return {
+      ...item,
+      name: displayName,
+      subtitle: displaySub,
+    };
+  });
 }

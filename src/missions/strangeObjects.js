@@ -13,6 +13,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { t } from "../core/i18n.js";
 import { radialGlowTexture } from "../core/textures.js";
 import { emit } from "../game/events.js";
 
@@ -223,7 +224,7 @@ export function createStrangeObjectsMission(scene) {
 
   const collectBtn = document.createElement("button");
   collectBtn.className = "invest-btn";
-  collectBtn.textContent = "⚓ Coletar e rebocar";
+  collectBtn.textContent = t("mission.strange.collect");
   collectBtn.style.display = "none";
   document.body.appendChild(collectBtn);
 
@@ -238,7 +239,7 @@ export function createStrangeObjectsMission(scene) {
 
   const mission = {
     id: "strange-objects",
-    title: "Objetos estranhos no Sistema Solar",
+    title: t("mission.strange.title"),
     firstPhase: "investigate",
     objective: "",
     active: false,
@@ -248,7 +249,7 @@ export function createStrangeObjectsMission(scene) {
       sat.getAnchor = () => ctx.bodyById.get(ANCHOR_ID);
       sat.onDestroyed = () => this._onSatDestroyed(ctx);
       ctx.markers.add({
-        id: "alien-sat", name: "Objeto estranho", color: "#9dff7a", kind: "poi",
+        id: "alien-sat", name: t("mission.strange.marker"), color: "#9dff7a", kind: "poi",
         getWorldPosition: (v) => sat.worldPosition(v),
       });
       this._setObjective(ctx);
@@ -269,7 +270,7 @@ export function createStrangeObjectsMission(scene) {
         } else {
           ctx.markers.remove("alien-sat");
           ctx.markers.add({
-            id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+            id: "iss-delivery", name: t("mission.strange.issMarker"), color: "#66ccff", kind: "poi",
             getWorldPosition: (v) => {
               if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
               return v.set(0, 0, 0);
@@ -284,7 +285,7 @@ export function createStrangeObjectsMission(scene) {
       if (phase === "tow") {
         ctx.markers.remove("alien-sat");
         ctx.markers.add({
-          id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+          id: "iss-delivery", name: t("mission.strange.issMarker"), color: "#66ccff", kind: "poi",
           getWorldPosition: (v) => {
             if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
             return v.set(0, 0, 0);
@@ -295,8 +296,8 @@ export function createStrangeObjectsMission(scene) {
 
     _setObjective(ctx) {
       const ph = ctx.mgr.phase(this.id);
-      if (ph === "tow") this.objective = "Reboque o objeto até a Estação Espacial Internacional (Terra)";
-      else this.objective = "Investigue o objeto estranho na órbita de Saturno";
+      if (ph === "tow") this.objective = t("mission.strange.objTow");
+      else this.objective = t("mission.strange.objInvestigate");
     },
 
     _onSatDestroyed(ctx) {
@@ -431,7 +432,7 @@ export function createStrangeObjectsMission(scene) {
       emit("stat", { key: "strangeObjectsTowed" });
       emit("milestone", { id: "alien-tech-home" });
       ctx.save.prestige = Math.min(100, (ctx.save.prestige || 0) + PRESTIGE_REWARD);
-      ctx.mgr.stationSay("Impressionante! Esse objeto alienígena vai render muita ciência. Obrigado, piloto.", 7);
+      ctx.mgr.stationSay(t("mission.strange.dialogSuccess"), 7);
       ctx.mgr.complete(this.id);
     },
   };

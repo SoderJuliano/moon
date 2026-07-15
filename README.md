@@ -80,10 +80,66 @@ Se um modelo for re-enviado ao Drive, o `driveId` muda — atualize a tabela
 
 ### Release / Play Store
 
-Antes de `npm run apk:release`, crie a chave de assinatura e o
-`android/keystore.properties` (o script assina o `.aab` se ele existir; sem ele,
-o release sai sem assinatura). A cada envio, incremente `versionCode` em
-`android/app/build.gradle`.
+App id: `com.moon.solarsystem`. A Play Store aceita **`.aab`** (Android App
+Bundle), gerado por `npm run apk:release`.
+
+#### 1. Uma vez só: conta e chave de assinatura
+
+1. Crie a conta no [Google Play Console](https://play.google.com/console)
+   (taxa única de US$ 25) e, dentro dela, **crie o app** `Moon` com o
+   package `com.moon.solarsystem`.
+2. Gere a chave de upload (JDK do sistema ou a de `.tooling/jdk-*/bin`):
+
+   ```bash
+   keytool -genkeypair -v -keystore android/moon-upload.keystore \
+     -alias moon -keyalg RSA -keysize 2048 -validity 10000
+   ```
+
+3. Crie `android/keystore.properties` (o Gradle assina o release com ele):
+
+   ```properties
+   storeFile=moon-upload.keystore
+   storePassword=SUA_SENHA_DO_STORE
+   keyAlias=moon
+   keyPassword=SUA_SENHA_DA_CHAVE
+   ```
+
+   > A chave (`*.keystore`) e o `keystore.properties` são **segredos** e já estão
+   > no `.gitignore` — guarde-os fora do repo (perdê-los = não conseguir mais
+   > atualizar o app). Ative o **Play App Signing** no Console: você envia
+   > assinado com a chave de *upload* e o Google reassina com a de distribuição.
+
+#### 2. A cada versão
+
+1. Incremente `versionCode` (e, se quiser, `versionName`) em
+   `android/app/build.gradle` — o Console recusa um `versionCode` repetido.
+2. Gere o bundle assinado:
+
+   ```bash
+   npm run apk:release   # produz moon-release.aab (+ moon-release.apk) na raiz
+   ```
+
+#### 3. Enviar
+
+- **Primeiro envio (manual):** no Console → *Testes internos* (ou *Produção*) →
+  *Criar versão* → suba o `moon-release.aab`, preencha a ficha da loja (ícone,
+  screenshots, descrição, política de privacidade) e envie pra revisão.
+- **Envios seguintes (automatizável por API):** dá pra publicar via
+  **Google Play Developer Publishing API** sem abrir o Console, com uma
+  *service account*:
+  1. No Console → *Configurações → Acesso via API*, vincule um projeto Google
+     Cloud e crie uma **service account** com permissão de release; baixe o JSON
+     (`play-service-account.json` — também no `.gitignore`).
+  2. Use uma ferramenta que fala com a API. Duas opções comuns:
+     - **[Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher)**
+       (plugin `com.github.triplet.play`): depois de configurado,
+       `./gradlew publishReleaseBundle` sobe o `.aab` direto.
+     - **[fastlane](https://docs.fastlane.tools/actions/supply/) `supply`**:
+       `fastlane supply --aab moon-release.aab --track internal`.
+
+  > **Importante:** o *primeiro* release de um app costuma exigir upload manual;
+  > a API entra pras atualizações. E a publicação é feita **por você**, com as
+  > **suas** credenciais — nenhuma parte disso roda a partir daqui.
 
 ## Visão do projeto
 

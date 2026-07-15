@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { emit } from "../game/events.js";
 import { SlimeSwarm } from "../combat/slimeSwarm.js";
+import { t } from "../core/i18n.js";
 
 const ISS_DIST = 2.6; // u da ISS pra "reportar"
 const NEPTUNE_MUL = 6; // <6× o raio de Netuno pra chegar
@@ -21,7 +22,7 @@ export function createNeptuneIncident(scene) {
 
   const mission = {
     id: "neptune-incident",
-    title: "Incidente em Netuno",
+    title: t("mission.neptune.title"),
     kind: "primary",
     firstPhase: "report1",
     objective: "",
@@ -30,7 +31,7 @@ export function createNeptuneIncident(scene) {
     onStart(ctx, restoring) {
       swarm.getNeptune = () => ctx.bodyById.get("neptune");
       swarm.onCleared = () => {
-        ctx.mgr.stationSay("As criaturas foram eliminadas. Volte e reporte — bom trabalho, piloto.", 6);
+        ctx.mgr.stationSay(t("mission.neptune.clearedDialog"), 6);
         ctx.mgr.setPhase(this.id, "report2");
       };
       swarm.onSwallow = () => ctx.ship.explode(); // engolido = morte (renasce)
@@ -45,10 +46,10 @@ export function createNeptuneIncident(scene) {
     _refresh(ctx) {
       const ph = ctx.mgr.phase(this.id);
       this.objective =
-        ph === "report2" ? "Volte à Estação Espacial e reporte o ocorrido"
-        : ph === "fight" ? `Elimine as criaturas na órbita de Netuno (${5 - swarm.remaining}/5)`
-        : ph === "goto-neptune" ? "Vá até Netuno investigar a perturbação avistada"
-        : "Volte à Estação Espacial e reporte o objeto destruído";
+        ph === "report2" ? t("mission.neptune.objReport2")
+        : ph === "fight" ? t("mission.neptune.objFight", { n: 5 - swarm.remaining })
+        : ph === "goto-neptune" ? t("mission.neptune.objGoto")
+        : t("mission.neptune.objReport1");
     },
 
     _nearISS(ctx) {
@@ -69,7 +70,7 @@ export function createNeptuneIncident(scene) {
 
       if (ph === "report1") {
         if (this._nearISS(ctx)) {
-          ctx.mgr.stationSay("Você destruiu o objeto? Entendido. Detectamos algo se movendo na órbita de Netuno… vá investigar.", 7);
+          ctx.mgr.stationSay(t("mission.neptune.startDialog"), 7);
           ctx.mgr.setPhase(this.id, "goto-neptune");
         }
         return;
@@ -78,7 +79,7 @@ export function createNeptuneIncident(scene) {
       if (ph === "goto-neptune") {
         if (this._nearNeptune(ctx)) {
           swarm.spawn(ctx.ship);
-          ctx.mgr.stationSay("Contato! Criaturas desconhecidas. Cuidado — não deixe que encostem na nave.", 6);
+          ctx.mgr.stationSay(t("mission.neptune.contactDialog"), 6);
           ctx.mgr.setPhase(this.id, "fight");
         }
         return;
@@ -104,7 +105,7 @@ export function createNeptuneIncident(scene) {
       swarm.clear();
       emit("milestone", { id: "neptune-cleared" }); // conquista
       ctx.scanner?.grant(); // MESMA recompensa do outro ramo: o scanner
-      ctx.mgr.stationSay("Excelente. Aqui está um scanner — vai te ajudar nas próximas tarefas. Obrigado, piloto.", 7);
+      ctx.mgr.stationSay(t("mission.neptune.finishDialog"), 7);
       ctx.mgr.complete(this.id);
       ctx.mgr.makeAvailable("sec-ferro"); // segue pras secundárias
     },

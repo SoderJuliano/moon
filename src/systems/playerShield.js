@@ -14,6 +14,7 @@
 import * as THREE from "three";
 import { playDiscovery } from "../ui/sfx.js";
 import { playShieldHit } from "../combat/battleSfx.js";
+import { t } from "../core/i18n.js";
 
 const MAX_CHARGES = 2; // danificado: aguenta 2 tiros
 const RECHARGE_S = 45; // por carga (a ficha promete 3.2s… quando novo)
@@ -78,13 +79,13 @@ export class PlayerShield {
     const k = view / CROP.size;
     this.reward.innerHTML = `
       <div class="scan-reward-box">
-        <small>RECOMPENSA DE BATALHA</small>
-        <b>Shield Gen SG-01 (danificado)</b>
-        <button class="scan-thumb" title="Ver o item"
+        <small>${t("shield.battleReward")}</small>
+        <b>${t("shield.name")}</b>
+        <button class="scan-thumb" title="${t("shield.viewTitle")}"
           style="width:${view}px;height:${view}px;background-image:url(itens/escudo_inpacto.png);
           background-size:${Math.round(IMG_W * k)}px auto;
           background-position:-${Math.round(CROP.x * k)}px -${Math.round(CROP.y * k)}px"></button>
-        <p>Recuperado dos destroços dos Gêmeos. Clique no item para examinar.</p>
+        <p>${t("shield.rewardDesc")}</p>
       </div>`;
     this.reward.style.display = "";
     this.reward.querySelector(".scan-thumb").onclick = (e) => {
@@ -97,11 +98,9 @@ export class PlayerShield {
   _openSheet() {
     this.sheet.innerHTML = `
       <div class="shield-sheet-box">
-        <img src="itens/escudo_inpacto.png" alt="Escudo Invisível — Shield Gen SG-01" />
-        <p>Gerador de campo defletor arrancado do casco de um dos Gêmeos. A célula
-        está rachada: absorve <b>2 impactos</b> e leva um bom tempo pra recarregar —
-        mas entre nada e isso, você fica com isso.</p>
-        <button class="modal-btn yes" data-act="install">Instalar na nave</button>
+        <img src="itens/escudo_inpacto.png" alt="${t("shield.alt")}" />
+        <p>${t("shield.detailDesc")}</p>
+        <button class="modal-btn yes" data-act="install">${t("shield.install")}</button>
       </div>`;
     this.sheet.style.display = "";
     this.sheet.querySelector('[data-act="install"]').onclick = (e) => {
@@ -150,7 +149,7 @@ export class PlayerShield {
     this.hud.style.display = show ? "" : "none";
     if (show) {
       this.hud.innerHTML =
-        "ESCUDO " +
+        t("shield.hudLabel") +
         Array.from({ length: MAX_CHARGES }, (_, i) => `<i class="${i < inv.charges ? "on" : ""}"></i>`).join("");
     }
   }

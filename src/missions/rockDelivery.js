@@ -14,6 +14,7 @@
 import * as THREE from "three";
 import { TowController } from "./towController.js";
 import { composition } from "../systems/scanner.js";
+import { t } from "../core/i18n.js";
 
 const PROMPT_DIST = 4.5;
 const DELIVER_DIST = 6.0;
@@ -37,7 +38,8 @@ export function createRockDeliveryMission(scene, opts) {
 
   const collectBtn = document.createElement("button");
   collectBtn.className = "invest-btn";
-  collectBtn.textContent = material ? `⚓ Coletar rocha de ${material} (ou clique nela)` : "⚓ Coletar rocha (ou clique nela)";
+  const matName = material ? (t("material." + material) || material) : "";
+  collectBtn.textContent = material ? t("mission.rocks.collectMat", { mat: matName }) : t("mission.rocks.collect");
   collectBtn.style.display = "none";
   document.body.appendChild(collectBtn);
 
@@ -60,8 +62,9 @@ export function createRockDeliveryMission(scene, opts) {
     },
     _refresh(ctx) {
       const n = this._count(ctx);
-      const what = material ? `rochas de ${material}` : "rochas espaciais";
-      this.objective = `Reboque ${goal} ${what} até a Estação Espacial (${n}/${goal})`;
+      const matName = material ? (t("material." + material) || material) : "";
+      const what = material ? t("mission.rocks.whatMat", { mat: matName }) : t("mission.rocks.whatSpace");
+      this.objective = t("mission.rocks.objective", { goal, what, n });
     },
 
     onStart(ctx) {
@@ -176,7 +179,7 @@ export function createRockDeliveryMission(scene, opts) {
 
       // Adiciona o marcador da ISS para orientar o voo de entrega
       ctx.markers.add({
-        id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+        id: "iss-delivery", name: t("mission.strange.issMarker"), color: "#66ccff", kind: "poi",
         getWorldPosition: (v) => {
           if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
           return v.set(0, 0, 0);
@@ -226,14 +229,14 @@ export function createRockDeliveryMission(scene, opts) {
       const n = this._count(ctx) + 1;
       this._setCount(ctx, n);
       this._refresh(ctx);
-      const what = material ? `de ${material} ` : "";
+      const matName = material ? (t("material." + material) || material) : "";
       if (n >= goal) {
-        ctx.mgr.stationSay(`Última rocha ${what}recebida! Missão concluída. Obrigado pelo empenho.`, 6);
+        ctx.mgr.stationSay(material ? t("mission.rocks.doneMatDialog", { mat: matName }) : t("mission.rocks.doneDialog"), 6);
         reward?.(ctx);
         ctx.mgr.complete(this.id);
         onDone?.(ctx);
       } else {
-        ctx.mgr.stationSay(`Rocha ${what}recebida. ${n}/${goal} — obrigado, piloto!`, 4);
+        ctx.mgr.stationSay(material ? t("mission.rocks.progressMatDialog", { mat: matName, n, goal }) : t("mission.rocks.progressDialog", { n, goal }), 4);
       }
     },
   };

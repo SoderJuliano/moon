@@ -18,6 +18,7 @@ import { createHud } from "../ui/hud.js";
 import { createMenu } from "../ui/menu.js";
 import { SpaceStation } from "../systems/spaceStation.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
+import { t } from "../core/i18n.js";
 
 export function startExplorationMode() {
   let mode = "fantasy"; // padrão pedido: modo imaginação/fantasia
@@ -158,11 +159,11 @@ export function startExplorationMode() {
   escOverlay.style.display = "none";
   escOverlay.innerHTML = `
     <div class="modal">
-      <h3>Exploração</h3>
-      <p>Voltar ao menu principal?</p>
+      <h3>${t("exp.title")}</h3>
+      <p>${t("exp.backPrompt")}</p>
       <div class="modal-row">
-        <button class="modal-btn yes" data-act="stay">Continuar explorando</button>
-        <button class="modal-btn" data-act="menu">Menu principal</button>
+        <button class="modal-btn yes" data-act="stay">${t("exp.continue")}</button>
+        <button class="modal-btn" data-act="menu">${t("exp.mainMenu")}</button>
       </div>
     </div>`;
   document.body.appendChild(escOverlay);

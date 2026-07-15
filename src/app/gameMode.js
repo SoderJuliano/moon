@@ -44,6 +44,7 @@ import { createGhostSignalMission, createTwinsMission, createDebrisChore } from 
 import { ScannerSystem } from "../systems/scanner.js";
 import { AchievementsScreen } from "../ui/achievementsScreen.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
+import { t, getLang } from "../core/i18n.js";
 
 // Tempo quase parado, como ao pilotar no planetário: a translação orbital é
 // anulada pela trava de referencial e a rotação fica lenta e apreciável.
@@ -174,7 +175,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
 
   // Scanner de objetos espaciais (recompensa do "Reboque espacial"): tipa as
   // rochas quando equipado e ligado (G / botão do meio).
-  const scanner = new ScannerSystem(save, () => asteroids, () => ship.ship, camera);
+  const scanner = new ScannerSystem(save, () => asteroids, () => ship.ship, camera, () => regionById.values());
 
   // --- Engine de missões + secundárias ----------------------------------------
   const strange = createStrangeObjectsMission(scene);
@@ -257,7 +258,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       // o atalho novo entra na seção Teclado do menu de pausa
       keyList.insertAdjacentHTML(
         "beforeend",
-        '<div><span class="key">Espaço</span> dispara o canhão</div>'
+        t("game.cannonHint")
       );
     },
   });
@@ -285,28 +286,28 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   pauseOverlay.style.display = "none";
   pauseOverlay.innerHTML = `
     <div class="modal">
-      <h3>Pausado</h3>
-      <p>A nave fica parada no espaço enquanto você decide.</p>
+      <h3>${t("pause.title")}</h3>
+      <p>${t("pause.desc")}</p>
       <div class="key-list">
-        <div><span class="key">W</span>/<span class="key">↑</span> acelera</div>
-        <div><span class="key">S</span>/<span class="key">↓</span> ré</div>
-        <div><span class="key">A</span><span class="key">D</span> (←→) vira</div>
-        <div><span class="key">X</span> sobe o nariz</div>
-        <div><span class="key">Z</span> desce o nariz</div>
-        <div><span class="key">Q</span><span class="key">E</span> rolagem</div>
-        <div><span class="key">Shift</span>+<span class="key">W</span> supercruise</div>
-        <div><span class="key">Esc</span> pausa</div>
+        <div><span class="key">W</span>/<span class="key">↑</span> ${t("pause.key.w")}</div>
+        <div><span class="key">S</span>/<span class="key">↓</span> ${t("pause.key.s")}</div>
+        <div><span class="key">A</span><span class="key">D</span> (←→) ${t("pause.key.ad")}</div>
+        <div><span class="key">X</span> ${t("pause.key.x")}</div>
+        <div><span class="key">Z</span> ${t("pause.key.z")}</div>
+        <div><span class="key">Q</span><span class="key">E</span> ${t("pause.key.qe")}</div>
+        <div><span class="key">Shift</span>+<span class="key">W</span> ${t("pause.key.shiftw")}</div>
+        <div><span class="key">Esc</span> ${t("pause.key.esc")}</div>
       </div>
       <div class="pause-missions"></div>
       <label class="setting-row">
         <input type="checkbox" data-setting="showSecondaryHud" />
-        Mostrar missões secundárias no HUD
+        ${t("pause.showSecondaryHud")}
       </label>
       <div class="pause-stats"></div>
       <div class="modal-row">
-        <button class="modal-btn yes" data-act="resume">Continuar voando</button>
-        <button class="modal-btn" data-act="achievements">Conquistas</button>
-        <button class="modal-btn" data-act="menu">Menu principal</button>
+        <button class="modal-btn yes" data-act="resume">${t("pause.resume")}</button>
+        <button class="modal-btn" data-act="achievements">${t("pause.achievements")}</button>
+        <button class="modal-btn" data-act="menu">${t("pause.mainMenu")}</button>
       </div>
     </div>`;
   document.body.appendChild(pauseOverlay);
@@ -330,17 +331,17 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     }
     const rows = list
       .map((m) => {
-        const tag = m.kind === "secondary" ? "SEC" : "PRINCIPAL";
+        const tag = m.kind === "secondary" ? t("mission.tagSec") : t("mission.tagPri");
         if (m.status === "available") {
           // disponível: dá pra aceitar aqui mesmo (caso tenha clicado "Agora não")
           return `<div class="pmiss ${m.kind === "secondary" ? "sec" : ""}">
-            <span>${m.title} — <em>disponível</em></span>
-            <button class="modal-btn pmiss-accept" data-accept="${m.id}">Aceitar</button></div>`;
+            <span>${m.title} — <em>${t("mission.available")}</em></span>
+            <button class="modal-btn pmiss-accept" data-accept="${m.id}">${t("mission.accept")}</button></div>`;
         }
         return `<div class="pmiss ${m.kind === "secondary" ? "sec" : ""}"><span>${m.objective || m.title}</span><span class="tag">${tag}</span></div>`;
       })
       .join("");
-    missBox.innerHTML = `<div class="pause-stats-title">Missões</div>${rows}`;
+    missBox.innerHTML = `<div class="pause-stats-title">${t("mission.title")}</div>${rows}`;
     for (const btn of missBox.querySelectorAll(".pmiss-accept")) {
       btn.addEventListener("click", () => {
         missions.start(btn.dataset.accept);
@@ -354,15 +355,17 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     const s = stats;
     const prestige = Math.round(save.prestige || 0);
     const row = (label, val) => `<div class="pstat"><span>${label}</span><b>${val}</b></div>`;
+    const lang = getLang();
+    const locale = lang === "pt" ? "pt-BR" : "en-US";
     statsBox.innerHTML =
-      `<div class="pause-stats-title">Estatísticas</div>` +
-      row("Naves inimigas destruídas", s.enemyShipsDestroyed || 0) +
-      row("Km percorridos", Math.round(s.distanceKm || 0).toLocaleString("pt-BR")) +
-      row("Asteroides destruídos", s.asteroidsDestroyed || 0) +
-      row("Satélites destruídos", s.satellitesDestroyed || 0) +
-      row("Objetos estranhos rebocados", s.strangeObjectsTowed || 0) +
-      row("Tempo de voo", `${Math.floor((s.timePlayedS || 0) / 60)} min`) +
-      `<div class="pstat"><span>Prestígio (planeta natal)</span><b>${prestige}%</b></div>` +
+      `<div class="pause-stats-title">${t("stats.title")}</div>` +
+      row(t("stats.enemyShips"), s.enemyShipsDestroyed || 0) +
+      row(t("stats.kmTraveled"), Math.round(s.distanceKm || 0).toLocaleString(locale)) +
+      row(t("stats.asteroids"), s.asteroidsDestroyed || 0) +
+      row(t("stats.satellites"), s.satellitesDestroyed || 0) +
+      row(t("stats.strangeObjects"), s.strangeObjectsTowed || 0) +
+      row(t("stats.flightTime"), t("stats.min", { n: Math.floor((s.timePlayedS || 0) / 60) })) +
+      `<div class="pstat"><span>${t("stats.prestige")}</span><b>${prestige}%</b></div>` +
       `<div class="prestige-track"><div class="prestige-fill" style="width:${prestige}%"></div></div>`;
   }
 
@@ -406,7 +409,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     mission.skipToDone();
     keyList.insertAdjacentHTML(
       "beforeend",
-      '<div><span class="key">Espaço</span> dispara o canhão</div>'
+      t("game.cannonHint")
     );
     // a nave alien insiste a cada sessão até ser derrotada de vez
     if (!save.flags?.alienDefeated) combatCountdown = 30;

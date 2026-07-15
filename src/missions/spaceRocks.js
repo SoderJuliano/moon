@@ -5,12 +5,13 @@
 
 import { createRockDeliveryMission } from "./rockDelivery.js";
 import { emit } from "../game/events.js";
+import { t } from "../core/i18n.js";
 
 // 1ª missão de rochas: 5 quaisquer → recompensa SCANNER (progressão principal)
 export function createSpaceRocksMission(scene) {
   return createRockDeliveryMission(scene, {
     id: "space-rocks",
-    title: "Reboque espacial — rochas para análise",
+    title: t("mission.rocks.primaryTitle"),
     kind: "primary",
     goal: 5,
     material: null,
@@ -27,16 +28,16 @@ export function createSpaceRocksMission(scene) {
 export function createRockChores(scene) {
   return [
     createRockDeliveryMission(scene, {
-      id: "sec-ferro", title: "Coleta secundária — Ferro", kind: "secondary",
+      id: "sec-ferro", title: t("mission.rocks.secIronTitle"), kind: "secondary",
       goal: 10, material: "Ferro",
       onDone: (ctx) => ctx.mgr.makeAvailable("sec-gelo"),
     }),
     createRockDeliveryMission(scene, {
-      id: "sec-gelo", title: "Coleta secundária — Gelo", kind: "secondary",
+      id: "sec-gelo", title: t("mission.rocks.secIceTitle"), kind: "secondary",
       goal: 10, material: "Gelo",
       onDone: (ctx) => {
         emit("milestone", { id: "space-worker" }); // conquista final da série
-        ctx.mgr.stationSay("Você concluiu todas as coletas! Ganhou o título de Trabalhador Espacial.", 7);
+        ctx.mgr.stationSay(t("mission.rocks.allDoneDialog"), 7);
       },
     }),
   ];

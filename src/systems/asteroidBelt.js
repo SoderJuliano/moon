@@ -16,6 +16,7 @@
 //    tocadas pela CPU).
 
 import * as THREE from "three";
+import { materialTint } from "./materials.js";
 
 const TRI_BUDGET_PER_MODEL = 550_000; // teto de tris instanciados por modelo (padrão)
 const SPIN_RADIUS = 90; // pedras até essa distância da nave ganham rotação
@@ -61,6 +62,7 @@ export class AsteroidBelt {
     this._local = new THREE.Vector3();
     this._q = new THREE.Quaternion();
     this._m = new THREE.Matrix4();
+    this._col = new THREE.Color();
     this._rocks = []; // { id, mesh, index, pos, quat, scale, spinAxis, spinSpeed, collisionR }
     this._byId = new Map();
     this._grid = new Map(); // "ix,iy,iz" -> [índices em _rocks]
@@ -141,6 +143,9 @@ export class AsteroidBelt {
           mesh, index: i, pos, quat, scale, spinAxis, spinSpeed,
           collisionR: 0.7 * Math.max(scale.x, scale.y, scale.z),
         };
+        // COR por material: tinge a instância (instanceColor multiplica o
+        // material) — cada pedra ganha a tonalidade da sua composição.
+        mesh.setColorAt(i, materialTint(rock.id, this._col));
         const ri = this._rocks.length;
         this._rocks.push(rock);
         this._byId.set(rock.id, rock);
@@ -210,6 +215,16 @@ export class AsteroidBelt {
           }
         }
     return null;
+  }
+
+  // posição em mundo de uma pedra por id ("beltId:n") — os rótulos do scanner
+  // recomputam a cada frame (o centro do cinturão acompanha o planeta). null se
+  // não existe mais (destruída) ou não é deste cinturão.
+  rockWorld(id, getBody, out) {
+    const rock = this._byId.get(id);
+    if (!rock || this._destroyed.has(id)) return null;
+    this.getCenter(getBody, out);
+    return out.add(rock.pos);
   }
 
   // esconde a pedra atingida (escala 0 — não deixa "fantasma" nem buraco no buffer)

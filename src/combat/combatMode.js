@@ -21,6 +21,7 @@ import { radialGlowTexture } from "../core/textures.js";
 import { playPortalRupture } from "../ui/sfx.js";
 import { Portal } from "./portal.js";
 import { AlienShip } from "./alienShip.js";
+import { t } from "../core/i18n.js";
 
 // ASSISTENTE DE MIRA: virar na direção da nave (cone de ~30°) ou ela aparecer
 // na tela ENGATA uma trava de 2s — o nariz acompanha o strafe dela, tempo de
@@ -86,7 +87,7 @@ export class CombatEncounter {
     // barra de vida do JOGADOR (só existe em combate)
     this.hpBar = document.createElement("div");
     this.hpBar.className = "player-hp";
-    this.hpBar.innerHTML = '<span>CASCO</span><div class="player-hp-track"><div class="player-hp-fill"></div></div>';
+    this.hpBar.innerHTML = `<span>${t("combat.hull")}</span><div class="player-hp-track"><div class="player-hp-fill"></div></div>`;
     this.hpBar.style.display = "none";
     document.body.appendChild(this.hpBar);
     this._hpFill = this.hpBar.querySelector(".player-hp-fill");
@@ -155,10 +156,10 @@ export class CombatEncounter {
   _showBanner() {
     const banner = document.createElement("div");
     banner.className = "mission-banner";
-    banner.innerHTML = "<small>NOVA MISSÃO</small>Defenda o Sistema Solar";
+    banner.innerHTML = `<small>${t("combat.newMission")}</small>${t("combat.defendSolarSystem")}`;
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 5200);
-    this.chip.textContent = "◈ Missão: defenda o Sistema Solar";
+    this.chip.textContent = t("combat.missionDefend");
     this.chip.style.display = "";
   }
 
@@ -199,7 +200,7 @@ export class CombatEncounter {
       this.alien.setFiring(false);
       this.state = "leaving";
       this._t = 0;
-      this.chip.textContent = "✦ A nave alienígena fugiu pelo portal…";
+      this.chip.textContent = t("combat.alienFled");
       this._chipFade = 6;
       return;
     }
@@ -208,7 +209,7 @@ export class CombatEncounter {
     this.alien.hide();
     this.hpBar.style.display = "none";
     this.mark.style.display = "none";
-    this.chip.textContent = result === "victory" ? "✓ Sistema Solar defendido!" : "✖ A nave alien venceu — dessa vez.";
+    this.chip.textContent = result === "victory" ? t("combat.victory") : t("combat.defeat");
     this._chipFade = 6;
     if (this.onEnd) this.onEnd(result);
   }

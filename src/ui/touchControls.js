@@ -15,6 +15,8 @@
 //   ◎ atirar           → segura Space
 //   ❚❚ pausa           → Escape
 
+import { t } from "../core/i18n.js";
+
 const DEADZONE = 22; // px de arrasto antes de começar a virar
 
 function key(type, code) {
@@ -29,13 +31,13 @@ export function createTouchControls() {
   const root = document.createElement("div");
   root.className = "touch-ui";
   root.innerHTML = `
-    <button class="touch-btn touch-pause" data-keys="Escape" aria-label="Pausa">❚❚</button>
+    <button class="touch-btn touch-pause" data-keys="Escape" aria-label="${t("touch.pause")}">❚❚</button>
     <div class="touch-cluster">
-      <button class="touch-btn touch-boost" data-keys="ShiftLeft KeyW" aria-label="Turbo">»</button>
-      <button class="touch-btn touch-accel" data-keys="KeyW" aria-label="Acelerar">▲</button>
-      <button class="touch-btn touch-fire" data-keys="Space" aria-label="Atirar">◎</button>
+      <button class="touch-btn touch-boost" data-keys="ShiftLeft KeyW" aria-label="${t("touch.boost")}">»</button>
+      <button class="touch-btn touch-accel" data-keys="KeyW" aria-label="${t("touch.accel")}">▲</button>
+      <button class="touch-btn touch-fire" data-keys="Space" aria-label="${t("touch.fire")}">◎</button>
     </div>
-    <div class="touch-rotate-hint">Gire o aparelho para jogar 📱↻</div>
+    <div class="touch-rotate-hint">${t("touch.rotateHint")} 📱↻</div>
   `;
   document.body.appendChild(root);
 

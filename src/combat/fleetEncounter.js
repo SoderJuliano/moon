@@ -23,6 +23,7 @@ import { AlienShip, ALIEN_MAX_HP } from "./alienShip.js";
 import { BossShip, BOSS_SHIELD_HP, BOSS_HULL_HP } from "./bossShip.js";
 import { playBossRupture, playFlybyRumble, playExplosionBig } from "./battleSfx.js";
 import { playPortalRupture } from "../ui/sfx.js";
+import { t } from "../core/i18n.js";
 
 const PLAYER_MAX_HP = 8;
 const LOCK_SECS = 2.0; // mira colada por 2s…
@@ -94,7 +95,7 @@ export class FleetEncounter {
 
     this.hpBar = document.createElement("div");
     this.hpBar.className = "player-hp";
-    this.hpBar.innerHTML = '<span>CASCO</span><div class="player-hp-track"><div class="player-hp-fill"></div></div>';
+    this.hpBar.innerHTML = `<span>${t("combat.hull")}</span><div class="player-hp-track"><div class="player-hp-fill"></div></div>`;
     this.hpBar.style.display = "none";
     document.body.appendChild(this.hpBar);
     this._hpFill = this.hpBar.querySelector(".player-hp-fill");
@@ -179,8 +180,8 @@ export class FleetEncounter {
   _ensureBosses() {
     if (this.bosses) return;
     this.bosses = [
-      new BossShip(this.scene, { id: "boss-eclipse", name: "ECLIPSE", modelUrl: "models/starship.glb" }),
-      new BossShip(this.scene, { id: "boss-vortice", name: "VÓRTICE", modelUrl: "models/combatstarship.glb" }),
+      new BossShip(this.scene, { id: "boss-eclipse", name: t("boss.eclipse"), modelUrl: "models/starship.glb" }),
+      new BossShip(this.scene, { id: "boss-vortice", name: t("boss.vortice"), modelUrl: "models/combatstarship.glb" }),
     ];
     for (const b of this.bosses) {
       b.onDestroyed = (boss) => {
@@ -328,9 +329,9 @@ export class FleetEncounter {
     this.chip.textContent =
       result === "victory"
         ? mode === "boss"
-          ? "✓ OS GÊMEOS CAÍRAM — o Sistema Solar respira."
-          : "✓ Batedores repelidos!"
-        : "✖ A frota inimiga venceu — dessa vez.";
+          ? t("fleet.bossVictory")
+          : t("fleet.invasionVictory")
+        : t("fleet.defeat");
     this._chipFade = 7;
     this.onEnd?.(result, mode);
   }
@@ -340,12 +341,12 @@ export class FleetEncounter {
     banner.className = "mission-banner" + (this.mode === "boss" ? " boss" : "");
     banner.innerHTML =
       this.mode === "boss"
-        ? "<small>⚠ AMEAÇA CAPITAL</small>Os Gêmeos do Ocaso"
-        : "<small>INVASÃO</small>Batedores alienígenas";
+        ? `<small>${t("fleet.capitalThreat")}</small>${t("fleet.twinsTitle")}`
+        : `<small>${t("fleet.invasion")}</small>${t("fleet.scoutsTitle")}`;
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 5600);
     this.chip.textContent =
-      this.mode === "boss" ? "◈ Destrua os dois cruzadores capitais" : "◈ Repila os 3 batedores";
+      this.mode === "boss" ? t("fleet.bossObjective") : t("fleet.invasionObjective");
     this.chip.style.display = "";
   }
 
@@ -458,17 +459,17 @@ export class FleetEncounter {
       if (!b.alive) {
         ui.el.classList.add("down");
         ui.fill.style.width = "0%";
-        ui.stage.textContent = "DESTRUÍDO";
+        ui.stage.textContent = t("fleet.destroyed");
         return;
       }
       if (b.shielded) {
         ui.fill.className = "boss-fill shield";
         ui.fill.style.width = `${(b.shieldHp / BOSS_SHIELD_HP) * 100}%`;
-        ui.stage.textContent = "ESCUDO";
+        ui.stage.textContent = t("fleet.shield");
       } else {
         ui.fill.className = "boss-fill hull";
         ui.fill.style.width = `${(b.hullHp / BOSS_HULL_HP) * 100}%`;
-        ui.stage.textContent = "CASCO";
+        ui.stage.textContent = t("fleet.hull");
       }
     });
   }

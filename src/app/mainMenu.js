@@ -18,6 +18,7 @@
 import * as THREE from "three";
 import { radialGlowTexture, starfieldTexture } from "../core/textures.js";
 import { SaveManager, LocalStorageBackend, createPlayerSave } from "../game/saveManager.js";
+import { t } from "../core/i18n.js";
 import { buildCatalog } from "../game/discoveryRegistry.js";
 import { AchievementsScreen } from "../ui/achievementsScreen.js";
 import {
@@ -241,79 +242,79 @@ export function startMainMenu({ onSelect }) {
   const root = document.createElement("div");
   root.className = "mm-root";
   root.innerHTML = `
-    <div class="mm-title">Milky Way</div>
+    <div class="mm-title">${t("menu.milkyWay")}</div>
     <button class="mm-marker" type="button">
       <span class="mm-marker-ring"><span class="mm-marker-dot"></span></span>
-      <span class="mm-marker-label">Solar System</span>
+      <span class="mm-marker-label">${t("menu.solarSystem")}</span>
     </button>
     <div class="mm-panel" hidden>
-      <div class="mm-panel-title">Solar System</div>
-      <div class="mm-panel-sub">Choose your experience</div>
+      <div class="mm-panel-title">${t("menu.solarSystem")}</div>
+      <div class="mm-panel-sub">${t("menu.chooseExperience")}</div>
       <div class="mm-view-modes">
         <button class="mm-option" type="button" data-mode="exploration">
-          <span class="mm-option-name">Exploration</span>
-          <span class="mm-option-desc">Observe the Solar System in realistic scale.</span>
+          <span class="mm-option-name">${t("menu.exploration")}</span>
+          <span class="mm-option-desc">${t("menu.explorationDesc")}</span>
         </button>
         <button class="mm-option" type="button" data-mode="game">
-          <span class="mm-option-name">Game</span>
-          <span class="mm-option-desc">Pilot a spaceship through the Solar System.</span>
+          <span class="mm-option-name">${t("menu.game")}</span>
+          <span class="mm-option-desc">${t("menu.gameDesc")}</span>
         </button>
       </div>
       <div class="mm-view-game">
         <button class="mm-option" type="button" data-game="continue">
-          <span class="mm-option-name">Continuar</span>
-          <span class="mm-option-desc">Volta exatamente de onde você parou.</span>
+          <span class="mm-option-name">${t("menu.continue")}</span>
+          <span class="mm-option-desc">${t("menu.continueDesc")}</span>
         </button>
         <button class="mm-option" type="button" data-game="new">
-          <span class="mm-option-name">Novo Jogo</span>
-          <span class="mm-option-desc">Começa uma exploração do zero.</span>
+          <span class="mm-option-name">${t("menu.newGame")}</span>
+          <span class="mm-option-desc">${t("menu.newGameDesc")}</span>
         </button>
         <div class="mm-save-row">
-          <button class="mm-save-btn" type="button" data-game="import">Importar Save</button>
-          <button class="mm-save-btn" type="button" data-game="export">Exportar Save</button>
-          <button class="mm-save-btn" type="button" data-game="reset-mission">Resetar Missão</button>
+          <button class="mm-save-btn" type="button" data-game="import">${t("menu.importSave")}</button>
+          <button class="mm-save-btn" type="button" data-game="export">${t("menu.exportSave")}</button>
+          <button class="mm-save-btn" type="button" data-game="reset-mission">${t("menu.resetMission")}</button>
         </div>
         <div class="mm-save-note"></div>
-        <button class="mm-save-btn" type="button" data-game="back">◂ Voltar</button>
+        <button class="mm-save-btn" type="button" data-game="back">${t("menu.back")}</button>
       </div>
       <div class="mm-view-name">
-        <div class="mm-panel-title mm-name-title">Nome do jogador</div>
-        <input class="mm-name-input" type="text" maxlength="24" placeholder="Digite um nome…" />
+        <div class="mm-panel-title mm-name-title">${t("menu.playerName")}</div>
+        <input class="mm-name-input" type="text" maxlength="24" placeholder="${t("menu.enterName")}" />
         <div class="mm-save-note mm-name-note"></div>
         <div class="mm-save-row">
-          <button class="mm-save-btn" type="button" data-name="cancel">◂ Voltar</button>
-          <button class="mm-save-btn mm-name-ok" type="button" data-name="ok">Confirmar</button>
+          <button class="mm-save-btn" type="button" data-name="cancel">${t("menu.back")}</button>
+          <button class="mm-save-btn mm-name-ok" type="button" data-name="ok">${t("menu.confirm")}</button>
         </div>
       </div>
       <div class="mm-view-password">
-        <div class="mm-panel-title mm-password-title">Senha do save</div>
-        <input class="mm-password-input" type="password" maxlength="32" placeholder="Digite a senha…" />
+        <div class="mm-panel-title mm-password-title">${t("menu.savePassword")}</div>
+        <input class="mm-password-input" type="password" maxlength="32" placeholder="${t("menu.enterPassword")}" />
         <div class="mm-save-note mm-password-note"></div>
         <div class="mm-save-row">
-          <button class="mm-save-btn" type="button" data-password="cancel">◂ Voltar</button>
-          <button class="mm-save-btn mm-password-ok" type="button" data-password="ok">Confirmar</button>
+          <button class="mm-save-btn" type="button" data-password="cancel">${t("menu.back")}</button>
+          <button class="mm-save-btn mm-password-ok" type="button" data-password="ok">${t("menu.confirm")}</button>
         </div>
       </div>
       <div class="mm-view-players">
-        <div class="mm-panel-title">Continuar com quem?</div>
+        <div class="mm-panel-title">${t("menu.continueWho")}</div>
         <div class="mm-players-list"></div>
         <button class="mm-option" type="button" data-players="other">
-          <span class="mm-option-name">Não estou na lista</span>
-          <span class="mm-option-desc">Digitar um nome e baixar o save da nuvem.</span>
+          <span class="mm-option-name">${t("menu.notInList")}</span>
+          <span class="mm-option-desc">${t("menu.notInListDesc")}</span>
         </button>
-        <button class="mm-save-btn" type="button" data-players="back">◂ Voltar</button>
+        <button class="mm-save-btn" type="button" data-players="back">${t("menu.back")}</button>
       </div>
       <div class="mm-view-profile">
-        <div class="mm-panel-title mm-profile-title">Jogador</div>
+        <div class="mm-panel-title mm-profile-title">${t("menu.player")}</div>
         <button class="mm-option" type="button" data-profile="play">
-          <span class="mm-option-name">Jogar</span>
-          <span class="mm-option-desc">Continuar sua jornada no espaço.</span>
+          <span class="mm-option-name">${t("menu.play")}</span>
+          <span class="mm-option-desc">${t("menu.playDesc")}</span>
         </button>
         <button class="mm-option" type="button" data-profile="achievements">
-          <span class="mm-option-name">Conquistas</span>
-          <span class="mm-option-desc">Ver suas conquistas neste perfil.</span>
+          <span class="mm-option-name">${t("menu.achievements")}</span>
+          <span class="mm-option-desc">${t("menu.achievementsDesc")}</span>
         </button>
-        <button class="mm-save-btn" type="button" data-profile="back">◂ Voltar</button>
+        <button class="mm-save-btn" type="button" data-profile="back">${t("menu.back")}</button>
       </div>
     </div>
     <div class="mm-fade"></div>`;
@@ -347,7 +348,7 @@ export function startMainMenu({ onSelect }) {
       const loading = document.createElement("div");
       loading.id = "loading";
       loading.className = "loading";
-      loading.textContent = "Carregando o sistema solar…";
+      loading.textContent = t("menu.loading");
       document.body.appendChild(loading);
       onSelect(mode, opts);
     }, 700);
@@ -387,7 +388,7 @@ export function startMainMenu({ onSelect }) {
       saveNote.textContent = "";
     }
     if (which === "profile") {
-      root.querySelector(".mm-profile-title").textContent = `Jogador: ${currentPlayerName}`;
+      root.querySelector(".mm-profile-title").textContent = t("menu.profileName", { name: currentPlayerName });
     }
   }
   showScreen("modes");
@@ -405,7 +406,7 @@ export function startMainMenu({ onSelect }) {
   function submitName() {
     const name = normalizeName(nameInput.value);
     if (name.length < 2) {
-      nameNote.textContent = "Escolha um nome com pelo menos 2 letras.";
+      nameNote.textContent = t("menu.nameTooShort");
       return;
     }
     nameConfirm?.(name);
@@ -432,7 +433,7 @@ export function startMainMenu({ onSelect }) {
   function submitPassword() {
     const pwd = passwordInput.value.trim();
     if (pwd.length < 4) {
-      passwordNote.textContent = "A senha deve ter pelo menos 4 caracteres.";
+      passwordNote.textContent = t("menu.passwordTooShort");
       return;
     }
     passwordConfirm?.(pwd);
@@ -503,7 +504,7 @@ export function startMainMenu({ onSelect }) {
                 currentPlayerName = p.name;
                 showScreen("profile");
               } else {
-                passwordNote.textContent = "Senha incorreta!";
+                passwordNote.textContent = t("menu.wrongPassword");
               }
             }, () => showScreen("players"));
           } else {
@@ -527,11 +528,11 @@ export function startMainMenu({ onSelect }) {
 
   // "Não estou na lista": digita o nome e BAIXA o save da nuvem (abra-api)
   views.players.querySelector('[data-players="other"]').addEventListener("click", () => {
-    askName("Carregar da nuvem", "Nome do jogador salvo", async (name) => {
-      nameNote.textContent = "Buscando na nuvem…";
+    askName(t("menu.loadFromCloud"), t("menu.savedPlayerName"), async (name) => {
+      nameNote.textContent = t("menu.searchingCloud");
       const remote = await pullSave(name);
       if (!remote) {
-        nameNote.textContent = `Nenhum save na nuvem para "${name}".`;
+        nameNote.textContent = t("menu.noCloudSave", { name });
         return;
       }
       
@@ -544,7 +545,7 @@ export function startMainMenu({ onSelect }) {
             currentPlayerName = name;
             showScreen("profile");
           } else {
-            passwordNote.textContent = "Senha incorreta!";
+            passwordNote.textContent = t("menu.wrongPassword");
           }
         }, () => showScreen("players"));
       } else {
@@ -594,7 +595,7 @@ export function startMainMenu({ onSelect }) {
   }
   views.game.querySelector('[data-game="export"]').addEventListener("click", () => {
     const sm = new SaveManager(new LocalStorageBackend(currentBackendKey()));
-    saveNote.textContent = sm.exportToFile() ? "Save exportado (JSON)." : "Nenhum save para exportar.";
+    saveNote.textContent = sm.exportToFile() ? t("menu.saveExported") : t("menu.noSaveExport");
   });
   views.game.querySelector('[data-game="import"]').addEventListener("click", () => {
     const input = document.createElement("input");
@@ -606,7 +607,7 @@ export function startMainMenu({ onSelect }) {
       file.text().then((text) => {
         const sm = new SaveManager(new LocalStorageBackend(currentBackendKey()));
         const ok = sm.importFromText(text);
-        saveNote.textContent = ok ? "Save importado! Clique em Continuar." : "Arquivo inválido — nada foi alterado.";
+        saveNote.textContent = ok ? t("menu.saveImported") : t("menu.fileInvalid");
         showScreen("game");
       });
     });
@@ -621,9 +622,9 @@ export function startMainMenu({ onSelect }) {
       if (data && data.missions && data.missions[missionId]) {
         delete data.missions[missionId];
         sm.saveNow();
-        saveNote.textContent = `Missão '${missionId}' resetada!`;
+        saveNote.textContent = t("menu.missionReset", { id: missionId });
       } else {
-        saveNote.textContent = `Missão '${missionId}' não iniciada/encontrada.`;
+        saveNote.textContent = t("menu.missionNotFound", { id: missionId });
       }
       showScreen("game");
     });

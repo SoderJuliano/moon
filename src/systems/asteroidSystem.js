@@ -21,6 +21,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { composition, tintForMaterial } from "./materials.js";
 
 const CELL = 24;
 
@@ -61,6 +62,8 @@ export class AsteroidSystem {
     this._tmp = new THREE.Vector3();
     this._center = new THREE.Vector3();
     this._need = new Set();
+    this._tintMats = new Map(); // "modelKey:material" -> Material tingido (cacheado)
+    this._tintCol = new THREE.Color();
   }
 
   addField(field) {
@@ -300,6 +303,44 @@ export class AsteroidSystem {
     return best;
   }
 
+  // as N rochas ATIVAS mais próximas de um ponto (dentro de maxDist), ordenadas
+  // por distância à superfície. O scanner usa pra "fixar" rótulos nas pedras ao
+  // redor no momento do pulso. Retorna [{ id, center, dist, radius }].
+  rocksNear(pos, maxDist = Infinity, cap = 12) {
+    const out = [];
+    for (const inst of this._active.values()) {
+      const radius = inst.collisionR || 0.1;
+      const d = pos.distanceTo(inst.world) - radius;
+      if (d < maxDist) out.push({ id: inst.desc.id, center: inst.world.clone(), dist: d, radius });
+    }
+    for (const belt of this.belts) {
+      if (!belt.built || !belt.group.visible) continue;
+      const center = belt.getCenter(this.getBody, this._center);
+      if (pos.distanceTo(center) > belt.boundingRadius + maxDist) continue;
+      for (const rock of belt._rocks) {
+        if (belt._destroyed.has(rock.id)) continue;
+        const rockWorld = rock.pos.clone().add(center);
+        const radius = rock.collisionR || 0.1;
+        const d = pos.distanceTo(rockWorld) - radius;
+        if (d < maxDist) out.push({ id: rock.id, center: rockWorld, dist: d, radius });
+      }
+    }
+    out.sort((a, b) => a.dist - b.dist);
+    return out.slice(0, cap);
+  }
+
+  // posição em mundo de uma rocha por id (streaming OU cinturão), recomputada a
+  // cada frame p/ o rótulo do scanner seguir a pedra. null se não existe mais.
+  rockWorld(id, out = new THREE.Vector3()) {
+    const inst = this._active.get(id);
+    if (inst) return out.copy(inst.world);
+    for (const belt of this.belts) {
+      const w = belt.rockWorld(id, this.getBody, out);
+      if (w) return w;
+    }
+    return null;
+  }
+
   // remove um asteroide específico (campo OU cinturão) — despawna/esconde e apaga
   // o descritor. Chamado ao colidir: o asteroide some junto com a nave.
   destroyAsteroid(id) {
@@ -331,10 +372,37 @@ export class AsteroidSystem {
     obj.scale.setScalar(desc.scale);
     obj.quaternion.copy(desc.quat);
     obj.visible = true;
+    this._applyTint(obj, desc.modelKey, desc.id); // tonalidade pela composição
     this.scene.add(obj);
     const inst = { desc, obj, world: new THREE.Vector3(), collisionR: desc.scale * 0.75 };
     this._active.set(desc.id, inst);
     return inst;
+  }
+
+  // tinge o clone conforme o material da rocha. Materiais são clonados UMA vez
+  // por (modelo × material) e reusados — o pool troca de rocha, então o material
+  // é reaplicado a cada spawn. Bounded a ~modelos×materiais materiais.
+  _applyTint(obj, modelKey, id) {
+    const mat = composition(id).material;
+    const key = `${modelKey}:${mat}`;
+    let tinted = this._tintMats.get(key);
+    if (!tinted) {
+      // base = 1º material do proto (mantém mapa/rugosidade); só a cor muda
+      let base = null;
+      this._protos.get(modelKey)?.traverse((o) => {
+        if (!base && o.isMesh) base = Array.isArray(o.material) ? o.material[0] : o.material;
+      });
+      if (!base) return;
+      tinted = base.clone();
+      tinted.color = (base.color ? base.color.clone() : new THREE.Color(0xffffff)).multiply(
+        tintForMaterial(mat, 75, this._tintCol)
+      );
+      this._tintMats.set(key, tinted);
+      this._disposables.push(tinted);
+    }
+    obj.traverse((o) => {
+      if (o.isMesh) o.material = tinted;
+    });
   }
 
   _despawn(inst) {

@@ -17,3 +17,9 @@ android/.gradle/
 android/app/build/
 android/build/
 android/capacitor-cordova-android-plugins/
+
+# segredos de assinatura (Play Store) — NUNCA versionar
+android/keystore.properties
+*.keystore
+*.jks
+play-service-account*.json

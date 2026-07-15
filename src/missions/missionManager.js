@@ -1,4 +1,5 @@
 import { playChime } from "../ui/sfx.js";
+import { t } from "../core/i18n.js";
 // ENGINE DE MISSÕES — biblioteca apartada pra história/secundárias (src/missions).
 //
 // Cada missão é um objeto/instância com ciclo de vida (onAvailable, onStart,
@@ -121,7 +122,7 @@ export class MissionManager {
   // NPC da estação "fala" no canto (agradecimentos, atualizações). Discreto.
   // Chime de HUD acompanha (feedback de interface — não é som de mundo).
   stationSay(text, secs = 5) {
-    this.toast.textContent = `📡 Estação: ${text}`;
+    this.toast.textContent = `📡 ${t("mission.station")}: ${text}`;
     this.toast.style.display = "";
     this._toastT = secs;
     playChime();
@@ -148,11 +149,21 @@ export class MissionManager {
   }
 
   _showAvailable(m) {
-    const tag = m.kind === "secondary" ? "MISSÃO SECUNDÁRIA" : "MISSÃO DISPONÍVEL";
-    this.banner.innerHTML = `<small>${tag}</small><b>${m.title}</b>
+    const tag = m.kind === "secondary" ? t("mission.availSec") : t("mission.availPri");
+    const titles = {
+      "space-rocks": t("mission.rocks.primaryTitle"),
+      "sec-ferro": t("mission.rocks.secIronTitle"),
+      "sec-gelo": t("mission.rocks.secIceTitle"),
+      "strange-objects": t("mission.strange.title"),
+      "neptune-incident": t("mission.neptune.title"),
+      "twins": t("mission.twins.title"),
+      "sec-destrocos": t("mission.debris.title"),
+    };
+    const title = titles[m.id] || m.title;
+    this.banner.innerHTML = `<small>${tag}</small><b>${title}</b>
       <div class="mission-avail-row">
-        <button class="modal-btn yes" data-act="accept">Aceitar</button>
-        <button class="modal-btn" data-act="later">Agora não</button>
+        <button class="modal-btn yes" data-act="accept">${t("mission.accept")}</button>
+        <button class="modal-btn" data-act="later">${t("mission.later")}</button>
       </div>`;
     this.banner.style.display = "";
     this.banner.querySelector('[data-act="accept"]').onclick = (e) => {

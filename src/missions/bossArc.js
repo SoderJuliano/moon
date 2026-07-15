@@ -24,6 +24,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { TowController } from "./towController.js";
 import { emit } from "../game/events.js";
 import { resolveAssetUrl } from "../game/remoteAssets.js";
+import { t } from "../core/i18n.js";
 
 const SCAN_DIST = 30; // u do casco pra "escanear" o cruzador
 const REPORT_DIST = 4; // u da Estação pra reportar
@@ -38,7 +39,7 @@ export function createGhostSignalMission() {
   const _v = new THREE.Vector3();
   return {
     id: "ghost-signal",
-    title: "Eco no Cemitério",
+    title: t("mission.ghost.title"),
     kind: "primary",
     firstPhase: "scan",
     objective: "",
@@ -47,8 +48,8 @@ export function createGhostSignalMission() {
 
     onStart(ctx, restoring) {
       const ph = ctx.mgr.phase(this.id) || "scan";
-      if (ph === "report") this.objective = "Reporte a descoberta na Estação Espacial (Terra)";
-      else this.objective = "Escaneie o casco do cruzador destruído perto de Júpiter (scanner ligado: G)";
+      if (ph === "report") this.objective = t("mission.ghost.objReport");
+      else this.objective = t("mission.ghost.objScan");
       if (restoring && ph === "decode") ctx.mgr.setPhase(this.id, "scan"); // decode não persiste no meio
     },
 
@@ -57,10 +58,10 @@ export function createGhostSignalMission() {
 
       if (ph === "scan") {
         if (!ctx.scanner?.equipped) {
-          this.objective = "Equipe o scanner para investigar o cruzador destruído";
+          this.objective = t("mission.ghost.objEquip");
           return;
         }
-        this.objective = "Escaneie o casco do cruzador destruído perto de Júpiter (scanner ligado: G)";
+        this.objective = t("mission.ghost.objScan");
         const wreckPos = ctx.wreck?.group?.position;
         if (ctx.scanner.active && wreckPos && ctx.ship.ship.position.distanceTo(wreckPos) < SCAN_DIST) {
           this._t = 0;
@@ -74,12 +75,12 @@ export function createGhostSignalMission() {
         // a decodificação roda no lugar: as falas caem em sequência
         this._t += dt;
         const LINES = [
-          [0.5, "Assinatura reconhecida… decodificando o diário de bordo do cruzador."],
-          [4.5, "…não foi acidente. O registro mostra DOIS contatos capitais momentos antes da perda do casco."],
-          [9.0, "O transmissor nunca pediu socorro. Ele TRANSMITE a nossa posição. Há décadas."],
-          [13.5, "Piloto, volte AGORA. Isso precisa chegar ao comando."],
+          [0.5, t("mission.ghost.dec1")],
+          [4.5, t("mission.ghost.dec2")],
+          [9.0, t("mission.ghost.dec3")],
+          [13.5, t("mission.ghost.dec4")],
         ];
-        this.objective = "Decodificando o diário de bordo…";
+        this.objective = t("mission.ghost.objDecoding");
         while (this._line < LINES.length && this._t >= LINES[this._line][0]) {
           ctx.mgr.stationSay(LINES[this._line][1], 4.5);
           this._line += 1;
@@ -89,10 +90,10 @@ export function createGhostSignalMission() {
       }
 
       // report: chegar na Estação
-      this.objective = "Reporte a descoberta na Estação Espacial (Terra)";
+      this.objective = t("mission.ghost.objReport");
       const iss = ctx.station;
       if (iss?.holder && iss.group.visible && ctx.ship.ship.position.distanceTo(iss.holder.position) < REPORT_DIST) {
-        ctx.mgr.stationSay("Entendido. Se o sinal foi ouvido… eles JÁ estão vindo. Prepare a nave.", 6);
+        ctx.mgr.stationSay(t("mission.ghost.reportDialog"), 6);
         ctx.mgr.complete(this.id);
         ctx.mgr.makeAvailable("twins");
       }
@@ -104,7 +105,7 @@ export function createGhostSignalMission() {
 export function createTwinsMission() {
   return {
     id: "twins",
-    title: "Os Gêmeos do Ocaso",
+    title: t("mission.twins.title"),
     kind: "primary",
     firstPhase: "invasion-wait",
     objective: "",
@@ -127,7 +128,7 @@ export function createTwinsMission() {
       const ph = ctx.mgr.phase(this.id) || "invasion-wait";
 
       if (ph === "invasion-wait") {
-        this.objective = "⚠ Assinaturas de salto detectadas — batedores se aproximam…";
+        this.objective = t("mission.twins.objInvasionWait");
         this._cd -= dt;
         if (this._cd <= 0 && !fleet.active) {
           fleet.triggerInvasion();
@@ -137,12 +138,12 @@ export function createTwinsMission() {
       }
 
       if (ph === "invasion") {
-        this.objective = "Repila os batedores alienígenas";
+        this.objective = t("mission.twins.objInvasion");
         // o manager pausa este update durante o combate — se estamos rodando,
         // a luta acabou; o resultado ficou em fleet.lastResult
         if (!fleet.active && fleet.lastResult?.mode === "invasion") {
           if (fleet.lastResult.result === "victory") {
-            ctx.mgr.stationSay("Batedores neutralizados… mas os sensores acusam DUAS assinaturas capitais. São ELES.", 7);
+            ctx.mgr.stationSay(t("mission.twins.invasionVictoryDialog"), 7);
             this._cd = BOSS_DELAY;
             ctx.mgr.setPhase(this.id, "boss-wait");
           } else {
@@ -154,7 +155,7 @@ export function createTwinsMission() {
       }
 
       if (ph === "boss-wait") {
-        this.objective = "⚠ ALERTA MÁXIMO — os Gêmeos do Ocaso entraram no sistema…";
+        this.objective = t("mission.twins.objBossWait");
         this._cd -= dt;
         if (this._cd <= 0 && !fleet.active) {
           fleet.triggerBoss();
@@ -164,7 +165,7 @@ export function createTwinsMission() {
       }
 
       if (ph === "boss") {
-        this.objective = "Destrua os cruzadores ECLIPSE e VÓRTICE";
+        this.objective = t("mission.twins.objBoss");
         if (!fleet.active && fleet.lastResult?.mode === "boss") {
           if (fleet.lastResult.result === "victory") {
             // A VITÓRIA: flag + conquista + escudo + destroços rebocáveis
@@ -176,7 +177,7 @@ export function createTwinsMission() {
               ctx.save.flags.debrisPos = fleet.lastBattlePos.toArray();
               ctx.save.flags.debrisTowed = false;
             }
-            ctx.mgr.stationSay("Você… derrubou os dois?! O sinal do cemitério finalmente silenciou. O sistema é seu, piloto.", 8);
+            ctx.mgr.stationSay(t("mission.twins.bossVictoryDialog"), 8);
             ctx.mgr.complete(this.id);
             ctx.shieldItem?.grant(); // o troféu: Shield Gen SG-01 danificado
             ctx.mgr.makeAvailable("sec-destrocos");
@@ -203,7 +204,7 @@ export function createDebrisChore(scene) {
 
   const btn = document.createElement("button");
   btn.className = "invest-btn";
-  btn.textContent = "⚓ Rebocar destroços";
+  btn.textContent = t("mission.debris.grab");
   btn.style.display = "none";
   document.body.appendChild(btn);
 
@@ -230,7 +231,7 @@ export function createDebrisChore(scene) {
 
   return {
     id: "sec-destrocos",
-    title: "Destroços da batalha",
+    title: t("mission.debris.title"),
     kind: "secondary",
     firstPhase: "fetch",
     objective: "",
@@ -247,23 +248,23 @@ export function createDebrisChore(scene) {
         group.visible = true;
         tow.attach(group);
         tow.state = "tow";
-        this.objective = "Reboque os destroços até a Estação Espacial";
+        this.objective = t("mission.debris.objTow");
         
         ctx.markers.add({
-          id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+          id: "iss-delivery", name: t("mission.strange.issMarker"), color: "#66ccff", kind: "poi",
           getWorldPosition: (v) => {
             if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
             return v.set(0, 0, 0);
           }
         });
       } else {
-        this.objective = "Recolha os destroços dos Gêmeos no local da batalha";
+        this.objective = t("mission.debris.objFetch");
         loadModel(); // aceitou a missão = vai até lá; baixa o GLB original já
         
         if (!this._marked) {
           ctx.markers.add({
             id: "battle-debris",
-            name: "Destroços",
+            name: t("mission.debris.marker"),
             color: "#c9a15a",
             kind: "ship",
             getWorldPosition: (v) => v.copy(group.position),
@@ -276,11 +277,11 @@ export function createDebrisChore(scene) {
         btn.style.display = "none";
         tow.attach(group);
         ctx.mgr.setPhase(this.id, "tow");
-        this.objective = "Reboque os destroços até a Estação Espacial";
+        this.objective = t("mission.debris.objTow");
         
         ctx.markers.remove("battle-debris");
         ctx.markers.add({
-          id: "iss-delivery", name: "Estação Espacial", color: "#66ccff", kind: "poi",
+          id: "iss-delivery", name: t("mission.strange.issMarker"), color: "#66ccff", kind: "poi",
           getWorldPosition: (v) => {
             if (ctx.station && ctx.station.glow) return v.copy(ctx.station.glow.position);
             return v.set(0, 0, 0);
@@ -304,7 +305,7 @@ export function createDebrisChore(scene) {
             ctx.markers.remove("battle-debris");
             ctx.markers.remove("iss-delivery");
             ctx.save.prestige = Math.min(100, (ctx.save.prestige || 0) + 15); // bônus além do padrão
-            ctx.mgr.stationSay("Tecnologia capital intacta?! Isso muda TUDO pra nós. O planeta inteiro te deve uma.", 7);
+            ctx.mgr.stationSay(t("mission.debris.finishDialog"), 7);
             ctx.mgr.complete(this.id);
           }
         }

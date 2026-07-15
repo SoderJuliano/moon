@@ -1107,6 +1107,93 @@ canvas {
 }
 
 /* ==== Scanner de objetos espaciais ==== */
+/* clarão do pulso (tela toda) — animado via WAAPI no scanner.js */
+.scan-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(120, 220, 255, 0.28) 0%, rgba(90, 190, 255, 0.12) 38%, transparent 68%),
+    linear-gradient(rgba(120, 210, 255, 0.06), rgba(120, 210, 255, 0.06));
+  mix-blend-mode: screen;
+}
+
+/* GPS dos cinturões — marcadores nas bordas/tela enquanto o scanner está ligado */
+.scan-gps {
+  position: fixed;
+  inset: 0;
+  z-index: 27;
+  pointer-events: none;
+}
+.scan-gps-item {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+}
+.scan-gps-arrow {
+  font-size: 13px;
+  line-height: 1;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+.scan-gps-name {
+  font-weight: 700;
+}
+.scan-gps-dist {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: #cfe0f2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* rótulos de composição fixados nas rochas (visíveis de longe, o tempo todo) */
+.scan-tag {
+  position: fixed;
+  z-index: 28;
+  transform: translate(-50%, -150%);
+  padding: 3px 8px;
+  border: 1px solid rgba(110, 200, 255, 0.6);
+  border-radius: 7px;
+  background: rgba(6, 14, 26, 0.78);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+  text-align: center;
+  box-shadow: 0 0 10px rgba(80, 180, 255, 0.25);
+}
+.scan-tag-mat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #eaf6ff;
+}
+.scan-tag-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mat, #8fc4e8);
+  box-shadow: 0 0 6px var(--mat, #8fc4e8);
+}
+.scan-tag-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 9.5px;
+  letter-spacing: 0.02em;
+  color: #9fc4e0;
+}
 .scan-label {
   position: fixed;
   z-index: 30;

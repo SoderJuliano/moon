@@ -5,6 +5,7 @@
 // "??????" e "Não descoberto". Abre pelo menu de pausa do Game Mode.
 
 import { CATEGORIES } from "../game/discoveryRegistry.js";
+import { t, getLang } from "../core/i18n.js";
 
 function ballStyle(color) {
   return `background: radial-gradient(circle at 35% 30%, #fff6, ${color} 45%, #000a 130%)`;
@@ -59,29 +60,31 @@ export class AchievementsScreen {
                 : `<span class="ach-icon">${item.icon || "✦"}</span>`
               : `<span class="ach-ball ach-locked-ball"></span>`;
             const when = got ? new Date(got.at) : null;
+            const lang = getLang();
+            const locale = lang === "pt" ? "pt-BR" : "en-US";
             const meta = got
-              ? `${when.toLocaleDateString("pt-BR")} · ${when.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-              : "Não descoberto";
+              ? `${when.toLocaleDateString(locale)} · ${when.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`
+              : t("ach.notDiscovered");
             return `
               <div class="ach-item ${got ? "" : "ach-locked"}">
                 ${thumb}
                 <div class="ach-text">
-                  <div class="ach-name">${got ? item.name : "??????"}</div>
-                  <div class="ach-meta">${cat} · ${meta}</div>
+                  <div class="ach-name">${got ? (t("discovery.name." + item.id) || item.name) : "??????"}</div>
+                  <div class="ach-meta">${t("cat." + cat)} · ${meta}</div>
                 </div>
               </div>`;
           })
           .join("");
-        return `<div class="ach-cat">${cat}</div><div class="ach-grid">${rows}</div>`;
+        return `<div class="ach-cat">${t("cat." + cat)}</div><div class="ach-grid">${rows}</div>`;
       })
       .join("");
 
     return `
       <div class="ach-box">
         <div class="ach-head">
-          <h3>Conquistas</h3>
+          <h3>${t("ach.title")}</h3>
           <span class="ach-count">${unlockedCount}/${this.catalog.size}</span>
-          <button class="modal-btn ach-close" data-act="close">Fechar</button>
+          <button class="modal-btn ach-close" data-act="close">${t("ach.close")}</button>
         </div>
         <div class="ach-body">${sections}</div>
       </div>`;

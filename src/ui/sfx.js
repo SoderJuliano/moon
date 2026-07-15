@@ -137,6 +137,53 @@ export function playPortalRupture() {
   nz.start(tb);
 }
 
+// PING DE SCANNER (UI): pulso de sonar estilo No Man's Sky. Um "wob" senoidal
+// que varre de agudo pra grave com eco realimentado — casa com o clarão do
+// scanner na tela. É feedback de INTERFACE (equipamento da nave "falando" com o
+// piloto), não som de mundo: toca no vácuo por ser diegético do HUD.
+export function playScanPulse() {
+  const c = ctx();
+  if (!c) return;
+  const master = c.createGain();
+  master.gain.value = 0.5;
+  master.connect(c.destination);
+
+  // eco curto pra dar o "rabo" espacial do ping
+  const delay = c.createDelay(0.5);
+  delay.delayTime.value = 0.19;
+  const fb = c.createGain();
+  fb.gain.value = 0.38;
+  delay.connect(fb);
+  fb.connect(delay);
+  const wet = c.createGain();
+  wet.gain.value = 0.35;
+  delay.connect(wet);
+  wet.connect(c.destination);
+  master.connect(delay);
+
+  const t = c.currentTime + 0.02;
+  const o = c.createOscillator();
+  o.type = "sine";
+  o.frequency.setValueAtTime(1320, t);
+  o.frequency.exponentialRampToValueAtTime(360, t + 0.4); // varredura descendente
+  const bp = c.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 900;
+  bp.Q.value = 4;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.6, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  o.connect(bp);
+  bp.connect(g);
+  g.connect(master);
+  o.start(t);
+  o.stop(t + 0.5);
+
+  // "sino" agudo curtíssimo no ataque, dá o clique do disparo
+  bell(c, master, 1760, t, 0.18, 0.12);
+}
+
 // pausa/retoma o contexto dos efeitos junto com o jogo (cauda de jingle
 // tocando no momento do Esc congela e volta de onde parou)
 export function setSfxPaused(on) {

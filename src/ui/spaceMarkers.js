@@ -10,6 +10,7 @@
 // naves, waypoints, objetivos de missão e marcadores personalizados no futuro.
 
 import * as THREE from "three";
+import { t, getLang } from "../core/i18n.js";
 
 const KM_PER_UNIT = 6371; // 1 unidade = 1 raio terrestre (modo real)
 const C_KM_S = 299792.458;
@@ -17,10 +18,12 @@ const C_KM_S = 299792.458;
 // distância legível: km quando perto, minutos/horas-luz quando longe
 export function formatDistance(units) {
   const km = units * KM_PER_UNIT;
-  if (km < 1e6) return `${Math.round(km).toLocaleString("pt-BR")} km`;
+  const lang = getLang();
+  const locale = lang === "pt" ? "pt-BR" : "en-US";
+  if (km < 1e6) return `${Math.round(km).toLocaleString(locale)} km`;
   const lightMin = km / (C_KM_S * 60);
-  if (lightMin < 60) return `${lightMin.toFixed(1)} min-luz`;
-  return `${(lightMin / 60).toFixed(1)} h-luz`;
+  if (lightMin < 60) return t("space.lightMin", { n: lightMin.toFixed(1) });
+  return t("space.lightHours", { n: (lightMin / 60).toFixed(1) });
 }
 
 // peso de relevância por tipo de alvo (waypoint/objetivo vence corpos naturais;

@@ -1,6 +1,8 @@
 // HUD discreta no canto: toggle Fantasia/Real, botão de visão panorâmica,
 // controle de velocidade do tempo e a data simulada.
 
+import { t, getLang } from "../core/i18n.js";
+
 export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMode = "fantasy" }) {
   const root = document.createElement("div");
   root.className = "hud";
@@ -13,8 +15,8 @@ export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMod
     toggle.dataset.mode = mode;
     toggle.innerHTML =
       mode === "fantasy"
-        ? '<span class="dot"></span> Escala: <b>Aproximada</b>'
-        : '<span class="dot real"></span> Escala: <b>Real</b>';
+        ? `<span class="dot"></span> ${t("hud.scale")}: <b>${t("hud.approximate")}</b>`
+        : `<span class="dot real"></span> ${t("hud.scale")}: <b>${t("hud.real")}</b>`;
   };
   toggle.addEventListener("click", () => {
     mode = mode === "fantasy" ? "real" : "fantasy";
@@ -26,7 +28,7 @@ export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMod
   // --- Botão panorâmico --------------------------------------------------
   const pano = document.createElement("button");
   pano.className = "hud-btn";
-  pano.innerHTML = "⤢ Visão panorâmica";
+  pano.innerHTML = t("hud.panoramic");
   let panoActive = false;
   pano.addEventListener("click", () => {
     panoActive = !panoActive;
@@ -36,25 +38,25 @@ export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMod
 
   // --- Velocidade do tempo (passos discretos: 4h ... 8 dias por segundo) --
   const SPEED_STEPS = [
-    { d: 1 / 24, label: "1 h/s" },
-    { d: 2 / 24, label: "2 h/s" },
-    { d: 4 / 24, label: "4 h/s" },
-    { d: 8 / 24, label: "8 h/s" },
-    { d: 12 / 24, label: "12 h/s" },
-    { d: 16 / 24, label: "16 h/s" },
-    { d: 1, label: "24 h/s" },
-    { d: 2, label: "2 d/s" },
-    { d: 3, label: "3 d/s" },
-    { d: 4, label: "4 d/s" },
-    { d: 5, label: "5 d/s" },
-    { d: 6, label: "6 d/s" },
-    { d: 7, label: "7 d/s" },
-    { d: 8, label: "8 d/s" },
+    { d: 1 / 24, h: 1 },
+    { d: 2 / 24, h: 2 },
+    { d: 4 / 24, h: 4 },
+    { d: 8 / 24, h: 8 },
+    { d: 12 / 24, h: 12 },
+    { d: 16 / 24, h: 16 },
+    { d: 1, h: 24 },
+    { d: 2, ds: 2 },
+    { d: 3, ds: 3 },
+    { d: 4, ds: 4 },
+    { d: 5, ds: 5 },
+    { d: 6, ds: 6 },
+    { d: 7, ds: 7 },
+    { d: 8, ds: 8 },
   ];
   const speedWrap = document.createElement("div");
   speedWrap.className = "hud-speed";
   const speedLabel = document.createElement("span");
-  speedLabel.textContent = "Velocidade";
+  speedLabel.textContent = t("hud.speed");
   const speed = document.createElement("input");
   speed.type = "range";
   speed.min = "0";
@@ -65,7 +67,7 @@ export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMod
   speedVal.className = "hud-speed-val";
   const updateSpeed = () => {
     const step = SPEED_STEPS[Number(speed.value)];
-    speedVal.textContent = step.label;
+    speedVal.textContent = step.h ? t("hud.hoursPerSec", { n: step.h }) : t("hud.daysPerSec", { n: step.ds });
     onSpeedChange(step.d);
   };
   speed.addEventListener("input", updateSpeed);
@@ -81,8 +83,7 @@ export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMod
   // dica de navegação por teclado (mostrada no modo real)
   const navHint = document.createElement("div");
   navHint.className = "nav-hint";
-  navHint.innerHTML =
-    "<b>W</b>/↑ acelera &nbsp;·&nbsp; <b>S</b>/↓ ré &nbsp;·&nbsp; <b>A/D</b> (←→) vira &nbsp;·&nbsp; <b>X</b> sobe &nbsp;·&nbsp; <b>Z</b> desce &nbsp;·&nbsp; <b>Shift+W</b> turbo &nbsp;·&nbsp; <b>Esc</b> sai";
+  navHint.innerHTML = t("hud.navHint");
   navHint.style.display = "none";
   document.body.appendChild(navHint);
 
@@ -90,7 +91,8 @@ export function createHud({ onModeChange, onPanoramic, onSpeedChange, initialMod
 
   return {
     setDate(d) {
-      date.textContent = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+      const locale = getLang() === "pt" ? "pt-BR" : "en-US";
+      date.textContent = d.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
     },
     // mantém o botão panorâmico em sincronia se desligado por outra ação
     setPanoramic(active) {

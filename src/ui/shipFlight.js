@@ -20,6 +20,7 @@
 // espacial suave). O movimento segue sempre o vetor forward local atual.
 
 import * as THREE from "three";
+import { t, getLang } from "../core/i18n.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture, warpRingTexture } from "../core/textures.js";
 
@@ -49,15 +50,19 @@ function easeInOut(t) {
 // velocidade legível: % da luz + km/s (a medida interna em u/s não diz nada)
 function formatSpeed(unitsPerSec) {
   const kms = Math.abs(unitsPerSec) * KM_PER_UNIT;
-  const kmsFmt = Math.round(kms).toLocaleString("pt-BR");
+  const lang = getLang();
+  const locale = lang === "pt" ? "pt-BR" : "en-US";
+  const kmsFmt = Math.round(kms).toLocaleString(locale);
   const pctC = (kms / C_KM_S) * 100;
-  if (pctC >= 0.05) return `${pctC.toFixed(1)}% da luz · ${kmsFmt} km/s`;
+  if (pctC >= 0.05) return t("ship.speedOfLight", { pct: pctC.toFixed(1), kms: kmsFmt });
   return `${kmsFmt} km/s`;
 }
 
 function formatSpeedForwardOnly(unitsPerSec) {
   const kms = Math.abs(unitsPerSec) * KM_PER_UNIT;
-  const kmsFmt = Math.round(kms).toLocaleString("pt-BR");
+  const lang = getLang();
+  const locale = lang === "pt" ? "pt-BR" : "en-US";
+  const kmsFmt = Math.round(kms).toLocaleString(locale);
   const pctC = (kms / C_KM_S) * 100;
   if (unitsPerSec <= 0 || pctC < REVERSE_REL_SPEED_FOR_LIGHT) return `${kmsFmt} km/s`;
   return formatSpeed(unitsPerSec);
@@ -863,7 +868,7 @@ export class ShipFlight {
     this.controls.target.lerpVectors(intro.fromTgt, this._tmp3, k);
     this.camera.lookAt(this.controls.target);
 
-    this.readout.textContent = "aproximando…";
+    this.readout.textContent = t("ship.approaching");
 
     if (intro.t >= 1) {
       // entrega o controle sem solavanco: já segue em frente na velocidade de cruzeiro
@@ -1158,13 +1163,13 @@ export class ShipFlight {
 
     // velocidade legível (% da luz + km/s) e estado orbital
       if (ctrlHeld && sp > 0.01) {
-        this.readout.textContent = `FREIO INERCIAL · ${formatSpeedForwardOnly(this.speed)}`;
+        this.readout.textContent = t("ship.inertialBrake", { speed: formatSpeedForwardOnly(this.speed) });
       } else if (this._braking) {
-        this.readout.textContent = `⚠ FRENAGEM AUTOMÁTICA · ${formatSpeedForwardOnly(this.speed)}`;
+        this.readout.textContent = t("ship.autoBrake", { speed: formatSpeedForwardOnly(this.speed) });
       } else if (supercruising) {
-        this.readout.textContent = `SUPERCRUISE · ${formatSpeedForwardOnly(this.speed)}`;
+        this.readout.textContent = t("ship.supercruise", { speed: formatSpeedForwardOnly(this.speed) });
       } else if (this.referenceBody) {
-        const status = sp > escapeSpeed ? "FUGA" : "EM ÓRBITA";
+        const status = sp > escapeSpeed ? t("ship.escape") : t("ship.inOrbit");
         this.readout.textContent = `${formatSpeedForwardOnly(this.speed)} · ${status}`;
       } else {
         this.readout.textContent = formatSpeedForwardOnly(this.speed);
