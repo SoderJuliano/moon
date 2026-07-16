@@ -1,0 +1,12 @@
+{
+  "appId": "com.moon.solarsystem",
+  "appName": "Moon",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "backgroundColor": "#000000"
+}

@@ -37,6 +37,11 @@ export function orbitRadius(aAU, mode) {
 //  • real: distância verdadeira (km do planeta / raio terrestre)
 //  • fantasia: múltiplo do raio (comprimido) do planeta, pra ficar visível perto
 export function moonOrbitRadius(planetFantasyRadius, moonDistanceKm, mode) {
-  if (mode === "real") return moonDistanceKm / EARTH_RADIUS_KM;
+  if (mode === "real") {
+    if (typeof window !== "undefined" && window.isGameMode) {
+      return (moonDistanceKm / EARTH_RADIUS_KM) * 5;
+    }
+    return moonDistanceKm / EARTH_RADIUS_KM;
+  }
   return planetFantasyRadius * 4.5;
 }

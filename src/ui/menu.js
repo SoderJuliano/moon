@@ -3,6 +3,7 @@
 // um planeta com luas (Terra), as luas aparecem como sub-miniaturas.
 
 import { MENU_ORDER, MOONS } from "../bodies/index.js";
+import { t } from "../core/i18n.js";
 
 export function createMenu({ onSelect }) {
   const root = document.createElement("div");
@@ -26,7 +27,7 @@ export function createMenu({ onSelect }) {
   function makeThumb(desc, variant = "") {
     const btn = document.createElement("button");
     btn.className = "thumb" + (variant ? " thumb-" + variant : "");
-    btn.title = desc.name;
+    btn.title = t("body." + desc.id) || desc.name;
     btn.dataset.id = desc.id;
     const ball = document.createElement("span");
     ball.className = "thumb-ball";
@@ -34,7 +35,7 @@ export function createMenu({ onSelect }) {
     ball.style.background = `radial-gradient(circle at 35% 30%, #fff6, ${desc.menuColor} 45%, #000a 130%)`;
     const label = document.createElement("span");
     label.className = "thumb-label";
-    label.textContent = desc.name;
+    label.textContent = t("body." + desc.id) || desc.name;
     btn.append(ball, label);
     btn.addEventListener("click", () => select(desc.id));
     return btn;
@@ -43,7 +44,7 @@ export function createMenu({ onSelect }) {
   // distribui por tipo: anões na linha de baixo, o resto na de cima
   const dwarfTip = document.createElement("span");
   dwarfTip.className = "menu-moons-tip";
-  dwarfTip.textContent = "Anões:";
+  dwarfTip.textContent = t("menu.dwarfLabel");
   dwarfStrip.appendChild(dwarfTip);
   for (const desc of MENU_ORDER) {
     if (desc.type === "dwarf") dwarfStrip.appendChild(makeThumb(desc, "dwarf"));
@@ -63,15 +64,27 @@ export function createMenu({ onSelect }) {
     }
     const tip = document.createElement("span");
     tip.className = "menu-moons-tip";
-    tip.textContent = "Luas:";
+    tip.textContent = t("menu.moonLabel");
     moonStrip.appendChild(tip);
     for (const m of moons) moonStrip.appendChild(makeThumb(m, "moon"));
     moonStrip.classList.add("visible");
   }
 
+  function getParentPlanetId(id) {
+    for (const [planetId, moons] of Object.entries(MOONS)) {
+      if (moons.some((m) => m.id === id)) return planetId;
+    }
+    return null;
+  }
+
   function select(id) {
+    const parentId = getParentPlanetId(id);
+    if (parentId) {
+      showMoons(parentId);
+    } else {
+      showMoons(id);
+    }
     highlight(id);
-    showMoons(id);
     onSelect(id);
   }
 

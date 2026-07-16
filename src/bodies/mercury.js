@@ -12,6 +12,7 @@ export default {
   axialTilt: 0.03,
   rotDays: 58.65,
   menuColor: "#9c8b7d",
+  hiresTextureUrl: "textures/2k_mercury.jpg", // carregada só de perto (LOD por distância)
   makeTexture() {
     return rockyTexture({ base: "#9c8b7d", dark: "#5b5046", light: "#cbb9a6", seed: 11, craters: 70 });
   },

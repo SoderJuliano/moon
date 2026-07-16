@@ -13,7 +13,8 @@ export default {
   rotDays: 0.414, // dia mais curto do sistema solar (~10h)
   roughness: 0.62,
   menuColor: "#c8a17a",
-  realTextureUrl: "textures/2k_jupiter.jpg", // NASA/SolarSystemScope (só no modo real)
+  realTextureUrl: "textures/2k_jupiter.jpg", // modo real: textura sempre, mesmo de longe
+  hiresTextureUrl: "textures/2k_jupiter.jpg", // outros modos: carrega por LOD na aproximação
   makeTexture() {
     return gasGiantTexture({
       bands: ["#d8c0a0", "#b88a5e", "#e3d2b6", "#a9744d", "#cdb293", "#9c6743"],

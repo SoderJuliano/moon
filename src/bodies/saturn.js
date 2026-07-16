@@ -13,7 +13,8 @@ export default {
   rotDays: 0.446,
   roughness: 0.62,
   menuColor: "#e3c88f",
-  realTextureUrl: "textures/2k_saturn.jpg", // NASA/SolarSystemScope (só no modo real)
+  realTextureUrl: "textures/2k_saturn.jpg", // modo real: textura sempre, mesmo de longe
+  hiresTextureUrl: "textures/2k_saturn.jpg", // outros modos: carrega por LOD na aproximação
   ring: {
     inner: 1.2,
     outer: 2.3,

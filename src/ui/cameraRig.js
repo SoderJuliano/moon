@@ -22,16 +22,20 @@ export class CameraRig {
     return this.tween !== null;
   }
 
-  // Solta o corpo seguido (usado quando o usuário assume o controle pelo teclado).
+  // Solta o corpo seguido e ABORTA qualquer tween em voo (usado quando o usuário
+  // assume o controle — ex.: W entra na nave no meio do voo da câmera; sem isso o
+  // tween continua até ~4 raios do tamanho ANTIGO e o planeta, inflando pra escala
+  // gigante, engole a câmera).
   stopFollow() {
     this.followBody = null;
+    this.tween = null;
   }
 
   // Voa até um corpo e passa a segui-lo. A direção de aproximação é fixada no
   // início; o ALVO continua sendo recalculado a cada frame (o corpo se move).
   flyToBody(body, distanceMul = 4) {
     body.worldPosition(this._tmp);
-    const dist = body.radius * distanceMul + 4;
+    const dist = Math.max(0.06, body.radius * distanceMul);
     const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
     if (dir.lengthSq() < 1e-4) dir.set(0, 0.45, 1);
     dir.normalize();

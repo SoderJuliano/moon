@@ -16,6 +16,15 @@ import haumea from "./haumea.js";
 import makemake from "./makemake.js";
 import eris from "./eris.js";
 import moon from "./moon.js";
+import io from "./io.js";
+import europa from "./europa.js";
+import ganymede from "./ganymede.js";
+import enceladus from "./enceladus.js";
+import rhea from "./rhea.js";
+import titan from "./titan.js";
+
+import phobos from "./phobos.js";
+import deimos from "./deimos.js";
 
 // Ordem do Sol para fora (planetas + anões intercalados pela distância).
 export const ORBITERS = [
@@ -36,9 +45,13 @@ export const ORBITERS = [
 
 export const SUN = sun;
 
-// Luas por planeta (por ora, só a da Terra).
+// Luas por planeta (as mais famosas — arredondadas por equilíbrio hidrostático).
+// Ordenadas por distância crescente ao planeta (o índice espalha as órbitas).
 export const MOONS = {
   earth: [moon],
+  mars: [phobos, deimos],
+  jupiter: [io, europa, ganymede],
+  saturn: [enceladus, rhea, titan],
 };
 
 // Tudo que aparece no menu (Sol + orbitadores), na ordem de exibição.

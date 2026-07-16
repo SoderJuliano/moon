@@ -12,6 +12,7 @@ export default {
   axialTilt: 4,
   rotDays: 0.378,
   menuColor: "#8a8175",
+  hiresTextureUrl: "textures/2k_ceres.jpg", // SolarSystemScope (LOD na aproximação)
   makeTexture() {
     return rockyTexture({ base: "#8a8175", dark: "#544c43", light: "#b3a896", seed: 91, craters: 80 });
   },

@@ -259,6 +259,27 @@ export function starTexture({ core = "#fff6d0", mid = "#ffcc55", edge = "#ff8a2b
   return finish(c);
 }
 
+// --- Ponto de estrela p/ o domo (THREE.Points) ------------------------------
+// Disco com falloff suave ASSADO NO RGB (fundo preto): com blending aditivo não
+// precisa de canal alfa nem de transparent:true — transparent jogaria as
+// estrelas pra fila TRANSPARENTE, desenhada depois dos objetos, e com o depth
+// desligado elas voltariam a aparecer "na frente" de tudo.
+export function starDotTexture() {
+  const size = 32;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "#ffffff");
+  g.addColorStop(0.35, "#909090");
+  g.addColorStop(1, "#000000");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // --- Glow radial (sprite do Sol e brilho de seleção) -----------------------
 export function radialGlowTexture(color = "#ffdd88") {
   const size = 256;
@@ -271,6 +292,73 @@ export function radialGlowTexture(color = "#ffdd88") {
   g.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// --- Chama/proeminência: língua de fogo (base larga e quente embaixo, afina e
+// esfria pra cima). Usada nas labaredas do Sol pra NÃO parecerem discos. -----
+export function flameTexture() {
+  const w = 128;
+  const h = 256;
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+  // gradiente vertical: base branco-amarelada quente -> topo laranja-vermelho -> transparente
+  for (let y = 0; y < h; y++) {
+    const t = y / h; // 0 base, 1 topo
+    // largura afunila pra cima
+    const halfW = (w / 2) * (1 - t) * (0.85 + 0.15 * Math.sin(t * 9));
+    const cx = w / 2 + Math.sin(t * 6) * (w * 0.06); // leve ondulação
+    const r = Math.round(255);
+    const g = Math.round(230 - t * 150);
+    const b = Math.round(150 - t * 150);
+    const alpha = (1 - t) * (1 - t); // some no topo
+    const grad = ctx.createLinearGradient(cx - halfW, 0, cx + halfW, 0);
+    grad.addColorStop(0, "rgba(0,0,0,0)");
+    grad.addColorStop(0.5, `rgba(${r},${g},${Math.max(b, 0)},${alpha})`);
+    grad.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, h - 1 - y, w, 1); // base no rodapé do canvas
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// --- Anel de dobra (supercruise): filete de luz circular com halo violeta —
+// o "vinco" que a bolha de dobra deixa no espaço. Centro transparente (a nave
+// passa por dentro) + nós de energia assimétricos pra rotação ficar visível. --
+export function warpRingTexture() {
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0.0, "rgba(0,0,0,0)");
+  g.addColorStop(0.52, "rgba(0,0,0,0)");
+  g.addColorStop(0.62, "rgba(110,70,230,0.22)"); // halo violeta interno
+  g.addColorStop(0.7, "rgba(190,235,255,0.95)"); // filete claro (o vinco em si)
+  g.addColorStop(0.78, "rgba(110,70,230,0.22)"); // halo violeta externo
+  g.addColorStop(1.0, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  // nós de energia: arcos mais brilhantes espalhados no filete
+  const rng = mulberry32(41);
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i++) {
+    const a0 = rng() * Math.PI * 2;
+    ctx.strokeStyle = "rgba(225,245,255,0.85)";
+    ctx.globalAlpha = 0.35 + rng() * 0.4;
+    ctx.lineWidth = 4 + rng() * 5;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.35, a0, a0 + 0.4 + rng() * 0.9);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;

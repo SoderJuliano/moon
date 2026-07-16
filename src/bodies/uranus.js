@@ -14,6 +14,7 @@ export default {
   ring: { inner: 1.4, outer: 1.9, colors: { inner: "#8fbfc7", outer: "#5f8a92" } },
   roughness: 0.7,
   menuColor: "#9fe0e0",
+  hiresTextureUrl: "textures/2k_uranus.jpg", // carregada só de perto (LOD por distância)
   makeTexture() {
     return gasGiantTexture({
       bands: ["#bdeaea", "#9fe0e0", "#aee6e6", "#8fd6d6", "#b4e8e8"],

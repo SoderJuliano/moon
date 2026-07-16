@@ -13,6 +13,7 @@ export default {
   axialTilt: 20,
   rotDays: 0.937,
   menuColor: "#b07a5a",
+  hiresTextureUrl: "textures/2k_makemake.jpg", // SolarSystemScope (LOD na aproximação)
   makeTexture() {
     return icyTexture({ base: "#b07a5a", dark: "#6e4630", light: "#d8a787", seed: 121 });
   },

@@ -3,11 +3,76 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { radialGlowTexture, starfieldTexture } from "./textures.js";
+import { radialGlowTexture, starDotTexture } from "./textures.js";
+
+// --- Fundo estelar PRESO AO MUNDO (não à tela) -------------------------------
+// scene.background com textura 2D é desenhado como um quad FIXO NA TELA: girar
+// a câmera não movia as estrelas — pareciam coladas à nave e "na frente" dos
+// objetos (dava enjoo). O domo é um céu de THREE.Points que segue a POSIÇÃO da
+// câmera a cada frame (fundo no infinito: andar não gera paralaxe — correto),
+// mas NÃO a rotação — virar o nariz move o céu como deve.
+//
+// Camadas de profundidade falsa (muitas fracas + poucas brilhantes) e cores de
+// estrela reais (branco, azulada, alaranjada). Pipeline anti-"na frente":
+// fila OPACA (transparent:false) + depthTest/Write off + renderOrder -1 =
+// desenhadas ANTES de tudo; qualquer asteroide/planeta pinta por cima.
+function makeStarDome() {
+  const dome = new THREE.Group();
+  const R = 1000; // sem depth e sem paralaxe o raio é indiferente; só não pode passar do far
+  const layers = [
+    { count: 2600, size: 1.6, bright: 0.5 }, // poeira fraca (maioria)
+    { count: 700, size: 2.3, bright: 0.75 },
+    { count: 130, size: 3.2, bright: 1 }, // destaques
+  ];
+  const sprite = starDotTexture();
+  for (const { count, size, bright } of layers) {
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      // ponto uniforme na esfera (z uniforme + ângulo)
+      const z = Math.random() * 2 - 1;
+      const a = Math.random() * Math.PI * 2;
+      const s = Math.sqrt(1 - z * z);
+      pos[i * 3] = s * Math.cos(a) * R;
+      pos[i * 3 + 1] = z * R;
+      pos[i * 3 + 2] = s * Math.sin(a) * R;
+
+      let r = 1, g = 1, b = 1; // branca
+      const t = Math.random();
+      if (t < 0.14) { r = 0.72; g = 0.84; } // azulada
+      else if (t < 0.24) { g = 0.88; b = 0.7; } // alaranjada
+      const v = bright * (0.5 + Math.random() * 0.5);
+      col[i * 3] = r * v;
+      col[i * 3 + 1] = g * v;
+      col[i * 3 + 2] = b * v;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    const pts = new THREE.Points(
+      geo,
+      new THREE.PointsMaterial({
+        map: sprite, size, sizeAttenuation: false, vertexColors: true,
+        blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
+      })
+    );
+    pts.renderOrder = -1;
+    pts.frustumCulled = false; // metade do domo está sempre "atrás" da câmera
+    // segue a posição da câmera ANTES do draw (onBeforeRender roda antes do
+    // cálculo do modelViewMatrix) — funciona em qualquer modo, sem tocar nos loops
+    pts.onBeforeRender = (renderer, sc, camera) => {
+      pts.position.copy(camera.position);
+      pts.updateMatrixWorld();
+    };
+    dome.add(pts);
+  }
+  return dome;
+}
 
 export function createScene() {
   const scene = new THREE.Scene();
-  scene.background = starfieldTexture();
+  scene.background = new THREE.Color(0x000005); // mesmo tom de fundo da textura antiga
+  scene.add(makeStarDome());
 
   // Faixa de distância enorme no modo real (Éris > 1,5 milhão de unidades).
   const camera = new THREE.PerspectiveCamera(

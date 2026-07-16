@@ -14,6 +14,7 @@ export default {
   L0: 318, // fase aproximada em Jan 2026
   rotDays: 27.32, // travada por maré (gira junto com a órbita)
   menuColor: "#b8b8b8",
+  hiresTextureUrl: "textures/2k_moon.jpg", // textura real, carregada só de perto (LOD)
   makeTexture() {
     return rockyTexture({ base: "#b0b0b0", dark: "#6f6f6f", light: "#e2e2e2", seed: 33, craters: 90 });
   },
