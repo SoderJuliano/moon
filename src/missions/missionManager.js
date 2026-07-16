@@ -42,16 +42,37 @@ export class MissionManager {
     this.banner.style.display = "none";
     document.body.appendChild(this.banner);
 
+    // container lateral para missões
+    this.container = document.createElement("div");
+    this.container.className = "mission-container";
+    document.body.appendChild(this.container);
+
     // chip PRIMÁRIO (destaque) e SECUNDÁRIO (discreto)
+    const toggleHtml = `<button class="toggle" title="Recolher"><svg class="toggle-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 12px; height: 12px; display: inline-block; transition: transform 0.3s ease;"><polyline points="15 18 9 12 15 6"></polyline></svg></button>`;
+
     this.chipPrimary = document.createElement("div");
-    this.chipPrimary.className = "mission-chip";
+    this.chipPrimary.className = "mission-chip-item primary";
     this.chipPrimary.style.display = "none";
-    document.body.appendChild(this.chipPrimary);
+    this.chipPrimary.innerHTML = `<span class="txt"></span>${toggleHtml}`;
+    this.container.appendChild(this.chipPrimary);
 
     this.chipSecondary = document.createElement("div");
-    this.chipSecondary.className = "mission-chip mission-chip-sec";
+    this.chipSecondary.className = "mission-chip-item secondary";
     this.chipSecondary.style.display = "none";
-    document.body.appendChild(this.chipSecondary);
+    this.chipSecondary.innerHTML = `<span class="txt"></span>${toggleHtml}`;
+    this.container.appendChild(this.chipSecondary);
+
+    const setupToggle = (chip) => {
+      const btn = chip.querySelector(".toggle");
+      const txt = chip.querySelector(".txt");
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const collapsed = chip.classList.toggle("collapsed");
+        txt.style.display = collapsed ? "none" : "";
+      };
+    };
+    setupToggle(this.chipPrimary);
+    setupToggle(this.chipSecondary);
 
     // toast de NPC da estação (canto, discreto, some sozinho) — reaproveitável
     this.toast = document.createElement("div");
@@ -178,12 +199,14 @@ export class MissionManager {
 
   _updateChips() {
     const pt = this._activePrimary?.objective || "";
-    this.chipPrimary.textContent = pt ? "◈ " + pt : "";
+    const txtPri = this.chipPrimary.querySelector(".txt");
+    if (txtPri) txtPri.textContent = pt ? "◈ " + pt : "";
     this.chipPrimary.style.display = pt ? "" : "none";
 
     const showSec = this.save.settings?.showSecondaryHud !== false;
     const st = this._activeSecondary?.objective || "";
-    this.chipSecondary.textContent = st ? "› " + st : "";
+    const txtSec = this.chipSecondary.querySelector(".txt");
+    if (txtSec) txtSec.textContent = st ? "› " + st : "";
     this.chipSecondary.style.display = st && showSec ? "" : "none";
   }
 

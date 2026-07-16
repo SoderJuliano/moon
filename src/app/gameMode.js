@@ -404,7 +404,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   });
 
   // CONTINUAR: a arma volta instalada sem refazer a missão do destroço
-  if (isResume && save.ship.weapons.plasmaCannon) {
+  if (save.ship.weapons.plasmaCannon) {
     cannon.setEnabled(true);
     mission.skipToDone();
     keyList.insertAdjacentHTML(

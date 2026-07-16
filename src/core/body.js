@@ -36,6 +36,40 @@ function makeMesh(descriptor, isSun) {
         metalness: 0,
       });
   const geometry = new THREE.SphereGeometry(1, SEGMENTS, SEGMENTS);
+  if (descriptor.lumpy) {
+    const pos = geometry.attributes.position;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      const dir = v.clone().normalize();
+      
+      // Ruído senoidal tridimensional determinístico baseado na direção
+      const f1 = Math.sin(dir.x * 2.5) * Math.cos(dir.y * 2.5) * Math.sin(dir.z * 2.5);
+      const f2 = Math.cos(dir.x * 5.0) * Math.sin(dir.y * 5.0) * Math.cos(dir.z * 5.0) * 0.4;
+      
+      // Cratera de Stickney (afunda vértices em uma direção para Phobos)
+      let crater = 0;
+      if (descriptor.id === "phobos") {
+        const craterDir = new THREE.Vector3(0.6, 0.4, 0.6).normalize();
+        const dot = dir.dot(craterDir);
+        if (dot > 0.55) {
+          crater = -Math.pow((dot - 0.55) / 0.45, 2) * 0.28;
+        }
+      } else if (descriptor.id === "deimos") {
+        // Deimos também tem crateras/depressões suaves
+        const craterDir = new THREE.Vector3(-0.5, 0.5, -0.5).normalize();
+        const dot = dir.dot(craterDir);
+        if (dot > 0.65) {
+          crater = -Math.pow((dot - 0.65) / 0.35, 2) * 0.18;
+        }
+      }
+      
+      const noise = (f1 + f2) * 0.14 + crater;
+      v.addScaledVector(dir, noise);
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    geometry.computeVertexNormals();
+  }
   // Corpos não-esféricos (ex.: Haumea): proporção assada na GEOMETRIA, pra
   // mesh.scale continuar uniforme (as animações de escala dependem disso).
   // Componentes devem ser ≤1 (colisão/aproximação tratam o corpo como esfera

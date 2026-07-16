@@ -515,24 +515,70 @@ canvas {
 }
 
 /* chip persistente do objetivo (canto superior esquerdo) */
-.mission-chip {
+.mission-container {
   position: fixed;
   top: 12px;
   left: 12px;
   z-index: 25;
-  font-size: 12px;
-  color: #cfe0ff;
-  background: rgba(10, 16, 28, 0.7);
-  border: 1px solid var(--panel-border);
-  border-radius: 999px;
-  padding: 6px 12px;
-  backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   pointer-events: none;
   max-width: min(70vw, 420px);
 }
-.mission-chip.done {
+
+.mission-chip,
+.mission-chip-item {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #cfe0ff;
+  background: rgba(10, 16, 28, 0.75);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  backdrop-filter: blur(6px);
+  max-width: min(70vw, 420px);
+  transition: all 0.2s ease;
+}
+
+.mission-chip.done,
+.mission-chip-item.done {
   color: #a9f0c0;
   border-color: rgba(120, 230, 160, 0.4);
+}
+
+.mission-chip-item.collapsed {
+  padding: 4px 6px;
+}
+
+.mission-chip-item.collapsed .toggle-svg {
+  transform: rotate(180deg);
+}
+
+.mission-chip-item .toggle {
+  appearance: none;
+  background: none;
+  border: none;
+  color: #6ea8ff;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: color 0.2s ease;
+}
+
+.mission-chip-item.secondary .toggle {
+  color: #4c7abf;
+}
+
+.mission-chip-item .toggle:hover {
+  color: #fff;
 }
 
 /* botão "Investigar" projetado sobre o destroço */
@@ -1266,8 +1312,8 @@ canvas {
 /* ==== Missão secundária: chip discreto + toast do NPC da estação ==== */
 /* o chip primário já existe (.mission-chip). O secundário fica ABAIXO, menor
    e mais apagado — menos ênfase que a missão principal. */
+.mission-chip-item.secondary,
 .mission-chip-sec {
-  top: 44px;
   font-size: 11px;
   padding: 4px 10px;
   color: #8f9bb0;

@@ -46,6 +46,7 @@ export const pt = {
   "menu.loadFromCloud": "Carregar da nuvem",
   "menu.savedPlayerName": "Nome do jogador salvo",
   "menu.langLabel": "Idioma",
+  "menu.syncingSave": "Sincronizando...",
 
   // ---- Bloco UI: Achievements & Discovery ----
   "ach.title": "Conquistas",
@@ -78,12 +79,16 @@ export const pt = {
   "body.enceladus": "Encélado",
   "body.rhea": "Reia",
   "body.titan": "Titã",
+  "body.phobos": "Fobos",
+  "body.deimos": "Deimos",
   "discovery.name.body:io": "Io",
   "discovery.name.body:europa": "Europa",
   "discovery.name.body:ganymede": "Ganimedes",
   "discovery.name.body:enceladus": "Encélado",
   "discovery.name.body:rhea": "Reia",
   "discovery.name.body:titan": "Titã",
+  "discovery.name.body:phobos": "Fobos",
+  "discovery.name.body:deimos": "Deimos",
   "discovery.firstVisit": "Primeira visita",
 
   // ---- Descobertas (POIs e Marcos) ----

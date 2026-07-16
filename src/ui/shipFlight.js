@@ -68,7 +68,7 @@ function formatSpeedForwardOnly(unitsPerSec) {
   return formatSpeed(unitsPerSec);
 }
 
-function buildShipModel() {
+export function buildShipModel() {
   const g = new THREE.Group();
   const hull = new THREE.MeshStandardMaterial({ color: 0xaeb9c6, metalness: 0.6, roughness: 0.35 });
   const accent = new THREE.MeshStandardMaterial({
@@ -984,6 +984,14 @@ export class ShipFlight {
     if (this.getBodies) {
       for (const b of this.getBodies()) {
         if (b.mesh && !b.mesh.visible) continue; // pula luas escondidas (estão "dentro" do gigante)
+        
+        // Se o corpo focado/referência atual for uma lua, não deixa o planeta pai dela inflar e engolir tudo
+        if (this.referenceBody && this.referenceBody.descriptor && this.referenceBody.descriptor.type === "moon") {
+          if (b.id === this.referenceBody.descriptor.parent) {
+            continue;
+          }
+        }
+
         b.worldPosition(this._tmp2);
         const c = this._tmp2.distanceTo(this.ship.position);
         const d = c - b.radius;

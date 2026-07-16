@@ -568,9 +568,36 @@ export function startMainMenu({ onSelect }) {
   });
 
   // BOTOES DE PERFIL (JOGAR / CONQUISTAS)
-  views.profile.querySelector('[data-profile="play"]').addEventListener("click", () => {
+  views.profile.querySelector('[data-profile="play"]').addEventListener("click", async (e) => {
     if (currentPlayerName) {
-      launch("game", { resume: true, playerName: currentPlayerName });
+      const name = currentPlayerName;
+      const btn = e.currentTarget;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = t("menu.syncingSave");
+
+      try {
+        const remote = await pullSave(name);
+        if (remote && remote.save) {
+          const localBackend = new LocalStorageBackend(saveKeyFor(name));
+          const localText = localBackend.read();
+          let localSave = null;
+          try { localSave = localText ? JSON.parse(localText) : null; } catch (err) {}
+
+          const remoteUpdate = remote.save.meta?.updatedAt;
+          const localUpdate = localSave?.meta?.updatedAt;
+
+          if (remoteUpdate && (!localUpdate || new Date(remoteUpdate) > new Date(localUpdate))) {
+            localBackend.write(JSON.stringify(remote.save, null, 2));
+          }
+        }
+      } catch (err) {
+        console.warn("Erro ao sincronizar com a nuvem ao iniciar jogo:", err);
+      }
+
+      btn.textContent = originalText;
+      btn.disabled = false;
+      launch("game", { resume: true, playerName: name });
     }
   });
 

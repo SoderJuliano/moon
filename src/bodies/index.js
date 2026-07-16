@@ -23,6 +23,9 @@ import enceladus from "./enceladus.js";
 import rhea from "./rhea.js";
 import titan from "./titan.js";
 
+import phobos from "./phobos.js";
+import deimos from "./deimos.js";
+
 // Ordem do Sol para fora (planetas + anões intercalados pela distância).
 export const ORBITERS = [
   mercury,
@@ -46,6 +49,7 @@ export const SUN = sun;
 // Ordenadas por distância crescente ao planeta (o índice espalha as órbitas).
 export const MOONS = {
   earth: [moon],
+  mars: [phobos, deimos],
   jupiter: [io, europa, ganymede],
   saturn: [enceladus, rhea, titan],
 };

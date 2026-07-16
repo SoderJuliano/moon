@@ -45,6 +45,7 @@ export const en = {
   "menu.loadFromCloud": "Load from cloud",
   "menu.savedPlayerName": "Saved player name",
   "menu.langLabel": "Language",
+  "menu.syncingSave": "Syncing...",
 
   // ---- UI Block: Achievements & Discovery ----
   "ach.title": "Achievements",
@@ -77,12 +78,16 @@ export const en = {
   "body.enceladus": "Enceladus",
   "body.rhea": "Rhea",
   "body.titan": "Titan",
+  "body.phobos": "Phobos",
+  "body.deimos": "Deimos",
   "discovery.name.body:io": "Io",
   "discovery.name.body:europa": "Europa",
   "discovery.name.body:ganymede": "Ganymede",
   "discovery.name.body:enceladus": "Enceladus",
   "discovery.name.body:rhea": "Rhea",
   "discovery.name.body:titan": "Titan",
+  "discovery.name.body:phobos": "Phobos",
+  "discovery.name.body:deimos": "Deimos",
   "discovery.firstVisit": "First visit",
 
   // ---- Discoveries (POIs and Milestones) ----
