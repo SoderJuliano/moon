@@ -42,7 +42,9 @@ import { createSpaceRocksMission, createRockChores } from "../missions/spaceRock
 import { createNeptuneIncident } from "../missions/neptuneIncident.js";
 import { createGhostSignalMission, createTwinsMission, createDebrisChore } from "../missions/bossArc.js";
 import { ScannerSystem } from "../systems/scanner.js";
+import { input } from "../input/InputManager.js";
 import { AchievementsScreen } from "../ui/achievementsScreen.js";
+import { ShipMenu } from "../ui/ship/ShipMenu.js";
 import { buildSolarSystem, createAmbientAudio } from "./world.js";
 import { t, getLang } from "../core/i18n.js";
 
@@ -96,6 +98,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   const popup = new DiscoveryPopup();
   const achievements = new AchievementSystem({ save: saveManager, popup });
   const achScreen = new AchievementsScreen({ save: saveManager, catalog: achievements.catalog });
+  const shipMenu = new ShipMenu(save, saveManager);
 
   // Cemitério atrás de Júpiter (conteúdo SÓ do jogo): nuvem ~4× o cinturão
   // principal + cruzador destruído preso à órbita no meio dela. O marcador
@@ -243,7 +246,21 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   });
   // …ou com a tecla G
   window.addEventListener("keydown", (e) => {
-    if (e.code === "KeyG" && e.target?.tagName !== "INPUT") scanner.toggle();
+    if (e.code === "KeyG" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") scanner.toggle();
+  });
+
+  // Hangar/Ship Menu: abre/fecha com a tecla C
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "KeyC" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") {
+      const hasPlasma = !!save.ship?.weapons?.plasmaCannon;
+      if (hasPlasma) {
+        if (shipMenu.isOpen) {
+          shipMenu.close();
+        } else if (!paused && !achScreen.isOpen) {
+          shipMenu.open();
+        }
+      }
+    }
   });
 
   // Primeira missão: investigar o sinal de socorro perto de Júpiter
@@ -259,6 +276,10 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       keyList.insertAdjacentHTML(
         "beforeend",
         t("game.cannonHint")
+      );
+      keyList.insertAdjacentHTML(
+        "beforeend",
+        t("game.shipMenuHint")
       );
     },
   });
@@ -281,6 +302,18 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // Os comandos da nave vivem AQUI (seção "Teclado"), não num quadro flutuante:
   // a tela de voo fica limpa pra HUD/missão e o jogador consulta no Esc.
   let paused = false;
+  window.setGamePaused = (on) => {
+    paused = on;
+    if (on) {
+      ship.keys.clear();
+    }
+    if (audio.ctx) {
+      const p = on ? audio.ctx.suspend() : audio.ctx.resume();
+      p.catch(() => {});
+    }
+    setSfxPaused(on);
+    setBattleSfxPaused(on);
+  };
   const pauseOverlay = document.createElement("div");
   pauseOverlay.className = "modal-overlay";
   pauseOverlay.style.display = "none";
@@ -399,8 +432,14 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   });
   window.addEventListener("keydown", (e) => {
     if (e.code !== "Escape") return;
-    if (achScreen.isOpen) achScreen.close(); // Esc fecha conquistas primeiro
-    else setPaused(!paused);
+    if (shipMenu.isOpen) {
+      shipMenu.close();
+      e.stopPropagation();
+    } else if (achScreen.isOpen) {
+      achScreen.close(); // Esc fecha conquistas primeiro
+    } else {
+      setPaused(!paused);
+    }
   });
 
   // CONTINUAR: a arma volta instalada sem refazer a missão do destroço
@@ -410,6 +449,10 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     keyList.insertAdjacentHTML(
       "beforeend",
       t("game.cannonHint")
+    );
+    keyList.insertAdjacentHTML(
+      "beforeend",
+      t("game.shipMenuHint")
     );
     // a nave alien insiste a cada sessão até ser derrotada de vez
     if (!save.flags?.alienDefeated) combatCountdown = 30;
@@ -446,6 +489,11 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // nada é criado — teclado/mouse seguem sendo o input. Os botões disparam
   // eventos de teclado sintéticos, então nenhum sistema de voo/combate muda.
   createTouchControls();
+  // Gamepad (Xbox/DualShock/Steam Deck etc. via Gamepad API): botões viram os
+  // mesmos eventos sintéticos do touch; os analógicos entram na ShipFlight via
+  // input.getPitch()/getYaw(). Polling em rAF próprio — Start despausa mesmo
+  // com a física congelada.
+  input.start();
   // no app Android baixa os modelos pesados (fora do APK) do Drive na 1ª vez;
   // na web é no-op. Em background — o jogo já é jogável perto da Terra.
   startBackgroundInstall();

@@ -11,6 +11,10 @@
 // Atalho de desenvolvimento: ?mode=exploration ou ?mode=game pula o menu.
 
 import { startMainMenu } from "./app/mainMenu.js";
+import { input } from "./input/InputManager.js";
+
+// Inicializa o gerenciador de entrada globalmente para suportar controle no menu inicial
+input.start();
 
 async function startMode(mode, opts) {
   if (mode === "game") {

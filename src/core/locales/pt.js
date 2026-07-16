@@ -167,6 +167,7 @@ export const pt = {
   "exp.mainMenu": "Menu principal",
 
   "game.cannonHint": "<div><span class=\"key\">Espaço</span> dispara o canhão</div>",
+  "game.shipMenuHint": "<div><span class=\"key\">C</span> abre painel da nave</div>",
   "pause.title": "Pausado",
   "pause.desc": "A nave fica parada no espaço enquanto você decide.",
   "pause.key.w": "acelera",
@@ -317,4 +318,8 @@ export const pt = {
   "scanner.equipTitle": "Equipar na nave",
   "scanner.rewardDesc": "Clique no item para equipar. Ligue com <b>G</b> ou o <b>botão do meio</b> do mouse.",
   "scanner.traces": "traços de",
+
+  // ---- Bloco Input: gamepad ----
+  "input.gamepadConnected": "Controle conectado",
+  "input.gamepadDisconnected": "Controle desconectado",
 };

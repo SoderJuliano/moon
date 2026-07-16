@@ -166,6 +166,7 @@ export const en = {
   "exp.mainMenu": "Main menu",
 
   "game.cannonHint": "<div><span class=\"key\">Space</span> fires the cannon</div>",
+  "game.shipMenuHint": "<div><span class=\"key\">C</span> opens ship panel</div>",
   "pause.title": "Paused",
   "pause.desc": "The ship remains stationary in space while you decide.",
   "pause.key.w": "accelerate",
@@ -316,4 +317,8 @@ export const en = {
   "scanner.equipTitle": "Equip on ship",
   "scanner.rewardDesc": "Click the item to equip. Turn on with <b>G</b> or <b>middle mouse button</b>.",
   "scanner.traces": "traces of",
+
+  // ---- Input Block: gamepad ----
+  "input.gamepadConnected": "Gamepad Connected",
+  "input.gamepadDisconnected": "Gamepad Disconnected",
 };

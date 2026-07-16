@@ -1609,3 +1609,516 @@ canvas {
     pointer-events: auto;
   }
 }
+
+/* ==========================================================================
+   PAINEL DE EQUIPAMENTOS DA NAVE (HANGAR / COMPUTER TERMINAL)
+   ========================================================================== */
+
+.ship-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(2, 4, 8, 0.85);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #c9d5e8;
+  user-select: none;
+}
+
+.ship-menu-container {
+  width: 95vw;
+  height: 90vh;
+  max-width: 1400px;
+  max-height: 850px;
+  background: rgba(8, 12, 22, 0.95);
+  border: 1px solid rgba(48, 76, 120, 0.35);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(76, 120, 191, 0.05);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.ship-menu-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #1d3354, #4c7abf, #1d3354);
+}
+
+.ship-menu-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(48, 76, 120, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ship-menu-header .system-tag {
+  font-family: monospace;
+  font-size: 10px;
+  color: #4c7abf;
+  letter-spacing: 2px;
+}
+
+.ship-menu-header h2 {
+  margin: 4px 0 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e2ecfc;
+  letter-spacing: 0.5px;
+}
+
+.ship-menu-header .close-btn {
+  background: none;
+  border: 1px solid rgba(48, 76, 120, 0.3);
+  color: #8fa0c0;
+  font-size: 16px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.ship-menu-header .close-btn:hover {
+  background: rgba(220, 70, 70, 0.15);
+  border-color: rgba(220, 70, 70, 0.4);
+  color: #ff8888;
+}
+
+.ship-menu-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Painéis */
+.panel-left {
+  width: 24%;
+  border-right: 1px solid rgba(48, 76, 120, 0.2);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.panel-center {
+  width: 44%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.panel-right {
+  width: 32%;
+  border-left: 1px solid rgba(48, 76, 120, 0.2);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  gap: 16px;
+}
+
+.panel-section-title {
+  font-family: monospace;
+  font-size: 11px;
+  color: #4c7abf;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed rgba(48, 76, 120, 0.2);
+  padding-bottom: 4px;
+}
+
+/* Status da Nave */
+.ship-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ship-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(48, 76, 120, 0.1);
+  font-size: 13px;
+}
+
+.ship-stat-row .stat-name {
+  color: #8fa0c0;
+}
+
+.ship-stat-row .stat-value {
+  font-family: monospace;
+  color: #e2ecfc;
+  font-weight: 500;
+}
+
+/* Renderizador 3D */
+.ship-title-container {
+  padding: 20px 24px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.ship-model-label {
+  font-family: monospace;
+  font-size: 11px;
+  color: #4c7abf;
+  letter-spacing: 1px;
+}
+
+.ship-display-name {
+  margin: 4px 0 0 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.15);
+}
+
+.ship-canvas-container {
+  flex: 1;
+  width: 100%;
+  cursor: grab;
+}
+
+.ship-canvas-container:active {
+  cursor: grabbing;
+}
+
+.ship-render-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  font-family: monospace;
+  font-size: 10px;
+  color: #556c96;
+  pointer-events: none;
+}
+
+/* Slots de Equipamento */
+.ship-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.ship-slot-card {
+  background: rgba(14, 22, 38, 0.6);
+  border: 1px solid rgba(48, 76, 120, 0.25);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ship-slot-card.empty {
+  border: 1px dashed rgba(48, 76, 120, 0.25);
+  background: rgba(14, 22, 38, 0.25);
+}
+
+.ship-slot-card.empty .slot-name {
+  color: #556c96;
+}
+
+.ship-slot-card.empty .slot-status {
+  color: #486088;
+}
+
+.ship-slot-card:hover {
+  background: rgba(22, 35, 59, 0.8);
+  border-color: rgba(76, 120, 191, 0.45);
+  box-shadow: 0 0 10px rgba(76, 120, 191, 0.1);
+  transform: translateY(-1px);
+}
+
+.ship-slot-card.empty:hover {
+  background: rgba(14, 22, 38, 0.35);
+  border-color: rgba(76, 120, 191, 0.35);
+}
+
+.slot-thumb-container {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #020408;
+  border: 1px solid rgba(48, 76, 120, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.slot-thumb-container.empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.slot-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.85;
+}
+
+.empty-icon {
+  font-size: 14px;
+  color: #486088;
+  opacity: 0.5;
+}
+
+.ship-slot-card.selected {
+  background: rgba(26, 47, 84, 0.9);
+  border-color: #4c7abf;
+  box-shadow: 0 0 12px rgba(76, 120, 191, 0.25);
+}
+
+.ship-slot-card .slot-icon {
+  font-size: 20px;
+  opacity: 0.8;
+}
+
+.ship-slot-card .slot-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ship-slot-card .slot-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2ecfc;
+}
+
+.ship-slot-card .slot-status {
+  font-size: 10px;
+  font-family: monospace;
+  color: #556c96;
+  margin-top: 2px;
+}
+
+.ship-slot-card.selected .slot-status {
+  color: #a0c4ff;
+}
+
+/* Detalhes do Equipamento */
+.detail-panel {
+  flex: 1;
+  background: rgba(6, 10, 18, 0.8);
+  border: 1px solid rgba(48, 76, 120, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.detail-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 13px;
+  color: #556c96;
+  font-style: italic;
+  padding: 20px;
+}
+
+.detail-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.detail-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.detail-status-badge {
+  font-family: monospace;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.detail-status-badge.not-equipped {
+  background: rgba(220, 70, 70, 0.15);
+  border: 1px solid rgba(220, 70, 70, 0.3);
+  color: #ff8888;
+}
+
+.detail-status-badge.equipped {
+  background: rgba(76, 120, 191, 0.15);
+  border: 1px solid rgba(76, 120, 191, 0.3);
+  color: #a0c4ff;
+}
+
+.detail-image-container {
+  width: 100%;
+  height: 140px;
+  border: 1px solid rgba(48, 76, 120, 0.15);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #020408;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
+  opacity: 0.95;
+}
+
+.detail-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cfe0ff;
+}
+
+.detail-lore {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #556c96;
+  font-style: italic;
+}
+
+.detail-stats {
+  border-top: 1px solid rgba(48, 76, 120, 0.15);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.detail-stat-row .stat-lbl {
+  color: #556c96;
+  font-family: monospace;
+}
+
+.detail-stat-row .stat-val {
+  color: #a0c4ff;
+  font-family: monospace;
+}
+
+/* Legenda de Tradução */
+.detail-en-legend {
+  border-top: 1px dashed rgba(76, 120, 191, 0.25);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.detail-en-legend .legend-title {
+  font-size: 10px;
+  font-family: monospace;
+  color: #4c7abf;
+  margin-bottom: 4px;
+}
+
+.detail-en-legend .legend-content {
+  font-size: 11px;
+  color: #8fa0c0;
+  line-height: 1.4;
+}
+
+
+/* ---- Gamepad: aviso discreto de conexão (InputManager) ---- */
+.gamepad-toast {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: rgba(10, 16, 28, 0.88);
+  border: 1px solid rgba(120, 160, 220, 0.25);
+  border-radius: 8px;
+  color: #cdd8ec;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 4000;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+}
+
+.gamepad-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.gamepad-toast-icon {
+  font-size: 18px;
+}
+
+.gamepad-toast strong {
+  display: block;
+  font-size: 12px;
+  color: #e8eefb;
+}
+
+.gamepad-toast small {
+  display: block;
+  font-size: 10px;
+  color: #8fa0c0;
+}
+
+/* ---- Gamepad: anel de foco nos menus (MenuNavigator) ---- */
+.gp-focus {
+  outline: 2px solid #a0c4ff !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 15px rgba(160, 196, 255, 0.65) !important;
+  background: rgba(48, 76, 120, 0.45) !important;
+  transform: translateY(-2px) scale(1.02);
+}
+
+.ship-slot-card.gp-focus {
+  border-color: #a0c4ff !important;
+  background: rgba(48, 76, 120, 0.45) !important;
+}

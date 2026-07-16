@@ -23,6 +23,7 @@ import * as THREE from "three";
 import { t, getLang } from "../core/i18n.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture, warpRingTexture } from "../core/textures.js";
+import { input } from "../input/InputManager.js";
 
 const NAV_KEYS = new Set([
   "KeyW", "KeyS", "KeyA", "KeyD", "KeyX", "KeyZ", "KeyQ", "KeyE",
@@ -922,6 +923,12 @@ export class ShipFlight {
     if (k.has("KeyD") || k.has("ArrowRight")) yawIn -= 1;  // guina à direita
     if (k.has("KeyQ")) rollIn += 1;  // rola asas (sentido anti-horário visto de trás)
     if (k.has("KeyE")) rollIn -= 1;  // rola asas (sentido horário) — caça vira de ponta-cabeça
+
+    // analógico esquerdo do gamepad (contínuo, já com deadzone) soma às teclas;
+    // sem gamepad os eixos são 0 e nada muda
+    pitchIn = Math.max(-1, Math.min(1, pitchIn + input.getPitch()));
+    yawIn = Math.max(-1, Math.min(1, yawIn + input.getYaw()));
+    rollIn = Math.max(-1, Math.min(1, rollIn + input.getRoll()));
 
       const steerMag = Math.max(Math.abs(pitchIn), Math.abs(yawIn), Math.abs(rollIn));
       if (this.objectLock) {
