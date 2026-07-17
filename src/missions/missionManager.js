@@ -142,8 +142,9 @@ export class MissionManager {
 
   // NPC da estação "fala" no canto (agradecimentos, atualizações). Discreto.
   // Chime de HUD acompanha (feedback de interface — não é som de mundo).
-  stationSay(text, secs = 5) {
-    this.toast.textContent = `📡 ${t("mission.station")}: ${text}`;
+  // speaker opcional troca o remetente (ex.: o astronauta da caçada).
+  stationSay(text, secs = 5, speaker = null) {
+    this.toast.textContent = speaker ? `${speaker}: ${text}` : `📡 ${t("mission.station")}: ${text}`;
     this.toast.style.display = "";
     this._toastT = secs;
     playChime();
@@ -179,6 +180,7 @@ export class MissionManager {
       "neptune-incident": t("mission.neptune.title"),
       "twins": t("mission.twins.title"),
       "sec-destrocos": t("mission.debris.title"),
+      "sat-hunt": t("mission.hunt.title"),
     };
     const title = titles[m.id] || m.title;
     this.banner.innerHTML = `<small>${tag}</small><b>${title}</b>

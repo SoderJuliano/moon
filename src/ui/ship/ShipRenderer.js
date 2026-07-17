@@ -19,7 +19,8 @@ export class ShipRenderer {
     this.zoom = 1.0;
   }
 
-  init() {
+  // def opcional: { modelPath, yaw } — sem def carrega a nave padrão (XR-07)
+  init(def = null) {
     const width = this.container.clientWidth || 400;
     const height = this.container.clientHeight || 300;
 
@@ -57,14 +58,35 @@ export class ShipRenderer {
     this.ship = new THREE.Group();
     this.scene.add(this.ship);
 
-    const fallback = buildShipModel();
-    fallback.scale.setScalar(1.5);
-    this.ship.add(fallback);
+    this._fallback = buildShipModel();
+    this._fallback.scale.setScalar(1.5);
+    this.ship.add(this._fallback);
+    this._currentFix = null;
+    this._modelReq = null;
 
-    // Load actual GLB ship model
+    this.setModel(def?.modelPath || "models/Spaceship.glb", def?.yaw ?? Math.PI, def?.pitch ?? 0);
+
+    // Grid Floor
+    const grid = new THREE.GridHelper(6, 30, 0x1d294a, 0x0c1328);
+    grid.position.y = -0.7;
+    this.scene.add(grid);
+
+    this._setupControls();
+    this._startLoop();
+
+    // Resize observer
+    this.resizeObserver = new ResizeObserver(() => this.resize());
+    this.resizeObserver.observe(this.container);
+  }
+
+  // troca a nave exibida (carrossel do hangar). Última chamada vence.
+  setModel(url, yaw = Math.PI, pitch = 0) {
+    if (!this.ship) return;
+    this._modelReq = url;
     new GLTFLoader().load(
-      "models/Spaceship.glb",
+      url,
       (gltf) => {
+        if (this._modelReq !== url || !this.ship) return;
         const s = gltf.scene;
         const box = new THREE.Box3().setFromObject(s);
         const center = new THREE.Vector3();
@@ -80,29 +102,18 @@ export class ShipRenderer {
         });
         const fix = new THREE.Group();
         fix.add(s);
-        fix.rotation.y = Math.PI; // Nose should point in the correct direction
+        fix.rotation.set(pitch, yaw, 0); // Nose should point in the correct direction
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
         fix.scale.setScalar((1.6 / maxDim) * 1.5);
-        this.ship.remove(fallback);
+        this.ship.remove(this._currentFix || this._fallback);
+        this._currentFix = fix;
         this.ship.add(fix);
       },
       undefined,
       (err) => {
-        console.warn("Failed to load Spaceship.glb in ShipRenderer, using fallback:", err);
+        console.warn(`Failed to load ${url} in ShipRenderer, keeping current model:`, err);
       }
     );
-
-    // Grid Floor
-    const grid = new THREE.GridHelper(6, 30, 0x1d294a, 0x0c1328);
-    grid.position.y = -0.7;
-    this.scene.add(grid);
-
-    this._setupControls();
-    this._startLoop();
-
-    // Resize observer
-    this.resizeObserver = new ResizeObserver(() => this.resize());
-    this.resizeObserver.observe(this.container);
   }
 
   _setupControls() {

@@ -181,6 +181,8 @@ export function createTwinsMission() {
             ctx.mgr.complete(this.id);
             ctx.shieldItem?.grant(); // o troféu: Shield Gen SG-01 danificado
             ctx.mgr.makeAvailable("sec-destrocos");
+            ctx.mgr.makeAvailable("sat-hunt"); // o astronauta quer conversar
+
           } else {
             this._cd = BOSS_DELAY; // caiu: eles continuam no sistema — revanche
             ctx.mgr.setPhase(this.id, "boss-wait");

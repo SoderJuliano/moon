@@ -41,6 +41,8 @@ import { createStrangeObjectsMission } from "../missions/strangeObjects.js";
 import { createSpaceRocksMission, createRockChores } from "../missions/spaceRocks.js";
 import { createNeptuneIncident } from "../missions/neptuneIncident.js";
 import { createGhostSignalMission, createTwinsMission, createDebrisChore } from "../missions/bossArc.js";
+import { createSatelliteHuntMission } from "../missions/satelliteHunt.js";
+import { ensureHangar, activeShipDef } from "../game/hangar.js";
 import { ScannerSystem } from "../systems/scanner.js";
 import { input } from "../input/InputManager.js";
 import { AchievementsScreen } from "../ui/achievementsScreen.js";
@@ -98,7 +100,12 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   const popup = new DiscoveryPopup();
   const achievements = new AchievementSystem({ save: saveManager, popup });
   const achScreen = new AchievementsScreen({ save: saveManager, catalog: achievements.catalog });
-  const shipMenu = new ShipMenu(save, saveManager);
+  ensureHangar(save); // migra saves antigos pro formato de hangar (naves + install)
+  // hooks rodam só depois do boot (menu aberto pelo jogador) — ship/cannon já existem
+  const shipMenu = new ShipMenu(save, saveManager, {
+    onLoadoutChanged: () => cannon.setEnabled(!!save.ship.weapons.plasmaCannon),
+    onActiveShipChanged: (def) => ship.setModelUrl(def.modelPath, def.yaw, def.pitch),
+  });
 
   // Cemitério atrás de Júpiter (conteúdo SÓ do jogo): nuvem ~4× o cinturão
   // principal + cruzador destruído preso à órbita no meio dela. O marcador
@@ -119,6 +126,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     getEntryInfo: (id) => ENTRY_OVERRIDES[id],
   });
   ship.setEnabled(true);
+  // nave ativa do hangar (a XR-07 já é o modelo padrão do construtor)
+  const activeDef = activeShipDef(save);
+  if (activeDef.id !== "xr07") ship.setModelUrl(activeDef.modelPath, activeDef.yaw, activeDef.pitch);
 
   // Canhão de plasma: nasce DESABILITADO — a missão do sinal de socorro é quem
   // desbloqueia (a tecnologia é recuperada do cruzador destruído).
@@ -192,6 +202,10 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   const rockChores = createRockChores(scene); // série secundária (Ferro, Gelo)
   const neptune = createNeptuneIncident(scene); // ramo do satélite destruído
   cannon.addTargetSystem(neptune.swarm); // 5 tiros por slime
+  // CAÇADA: satélites espiões nas luas de Júpiter/Saturno + guardas (pós-Gêmeos)
+  const hunt = createSatelliteHuntMission(scene);
+  cannon.addTargetSystem(hunt.targets);
+  missions.ctx.shipMenu = shipMenu; // a recompensa abre o hangar
   missions.register(strange);
   missions.register(spaceRocks);
   missions.register(neptune);
@@ -200,6 +214,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   missions.register(createGhostSignalMission());
   missions.register(createTwinsMission());
   missions.register(createDebrisChore(scene));
+  missions.register(hunt);
 
   // já derrotou a 1ª nave num save anterior? a secundária já pode aparecer
   if (save.flags.alienDefeated && missions.status("strange-objects") === MISSION.LOCKED) {
@@ -226,6 +241,8 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   if (done("twins") && locked("sec-destrocos") && save.flags.debrisPos && !save.flags.debrisTowed) {
     missions.makeAvailable("sec-destrocos");
   }
+  // pós-Gêmeos: o astronauta da Estação quer conversar (caçada aos satélites)
+  if (done("twins") && locked("sat-hunt")) missions.makeAvailable("sat-hunt");
   // troféu ganho mas ainda não instalado (fechou o jogo antes)? reoferece
   if (save.inventory.shield?.owned && !save.inventory.shield.equipped) playerShield.grant();
 
@@ -252,7 +269,8 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // Hangar/Ship Menu: abre/fecha com a tecla C
   window.addEventListener("keydown", (e) => {
     if (e.code === "KeyC" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") {
-      const hasPlasma = !!save.ship?.weapons?.plasmaCannon;
+      // POSSE (não instalação): mesmo com o canhão em outra nave o hangar abre
+      const hasPlasma = !!(save.ship?.weapons?.plasmaCannonOwned || save.ship?.weapons?.plasmaCannon);
       if (hasPlasma) {
         if (shipMenu.isOpen) {
           shipMenu.close();
@@ -270,6 +288,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     onUnlock: () => {
       cannon.setEnabled(true);
       save.ship.weapons.plasmaCannon = true; // antes do emit: o marco auto-salva
+      save.ship.weapons.plasmaCannonOwned = true; // posse (o hangar instala na ativa)
       emit("milestone", { id: "weapon-unlocked" });
       combatCountdown = 30; // …e 30s depois, a emboscada alien
       // o atalho novo entra na seção Teclado do menu de pausa
@@ -442,9 +461,10 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     }
   });
 
-  // CONTINUAR: a arma volta instalada sem refazer a missão do destroço
-  if (save.ship.weapons.plasmaCannon) {
-    cannon.setEnabled(true);
+  // CONTINUAR: a arma volta sem refazer a missão do destroço (POSSE decide a
+  // missão; o canhão só ATIRA se está instalado na nave ativa do hangar)
+  if (save.ship.weapons.plasmaCannon || save.ship.weapons.plasmaCannonOwned) {
+    cannon.setEnabled(!!save.ship.weapons.plasmaCannon);
     mission.skipToDone();
     keyList.insertAdjacentHTML(
       "beforeend",

@@ -1,28 +1,43 @@
 import { t } from "./ShipLocalization.js";
+import { ownsItem, itemShip } from "../../game/hangar.js";
+
+// atributos base por nave (sabor/ficção — o voo real é o mesmo motor)
+const BASE = {
+  xr07: {
+    hull: "1200 / 1200 HP", speed: "3.3 c-units/s", accel: "3.2 c-units/s²",
+    rotSpeed: "1.6 rad/s", cargo: "80 Tons", energy: "120 MW", heat: "40°C", mass: "48.2 Tons",
+  },
+  shuttle: {
+    hull: "1800 / 1800 HP", speed: "3.3 c-units/s", accel: "2.9 c-units/s²",
+    rotSpeed: "1.3 rad/s", cargo: "220 Tons", energy: "140 MW", heat: "55°C", mass: "112.6 Tons",
+  },
+};
 
 export class ShipStats {
   constructor(container) {
     this.container = container;
   }
 
-  render(save) {
-    const hasPlasma = !!save.ship?.weapons?.plasmaCannon;
-    const hasShield = !!save.inventory?.shield?.equipped;
-    const hasScanner = !!save.inventory?.scanner?.equipped;
-    
+  render(save, shipId = "xr07") {
+    const here = (id) => ownsItem(save, id) && itemShip(save, id) === shipId;
+    const hasPlasma = here("plasmaCannon");
+    const hasShield = here("shieldGen");
+    const hasScanner = here("scanner");
+    const base = BASE[shipId] || BASE.xr07;
+
     // Calculate stats dynamically based on save state (e.g. upgrades/equipment)
     const statsList = [
-      { key: "hull", value: "1200 / 1200 HP" },
+      { key: "hull", value: base.hull },
       { key: "shield", value: hasShield ? "600 / 600 SP" : "0 / 0 SP (" + t("notEquipped") + ")" },
-      { key: "speed", value: "3.3 c-units/s" },
-      { key: "accel", value: "3.2 c-units/s²" },
-      { key: "rotSpeed", value: "1.6 rad/s" },
+      { key: "speed", value: base.speed },
+      { key: "accel", value: base.accel },
+      { key: "rotSpeed", value: base.rotSpeed },
       { key: "scanRange", value: hasScanner ? "35 c-units" : "18 c-units" },
-      { key: "cargo", value: "80 Tons" },
+      { key: "cargo", value: base.cargo },
       { key: "weapons", value: hasPlasma ? "1 / 2 Slots" : "0 / 2 Slots" },
-      { key: "energy", value: "120 MW" },
-      { key: "heat", value: "40°C" },
-      { key: "mass", value: "48.2 Tons" },
+      { key: "energy", value: base.energy },
+      { key: "heat", value: base.heat },
+      { key: "mass", value: base.mass },
     ];
 
     let html = `<div class="ship-stats-list">`;

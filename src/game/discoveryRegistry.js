@@ -69,7 +69,8 @@ export function buildCatalog() {
     { id: "mark:space-tow", name: "Reboque Espacial", category: CATEGORIES.MARKS, icon: "🪝", subtitle: "Rebocou 5 rochas para análise na estação" },
     { id: "mark:space-worker", name: "Trabalhador Espacial", category: CATEGORIES.MARKS, icon: "👷", subtitle: "Concluiu todas as coletas secundárias" },
     { id: "mark:neptune-cleared", name: "Sentinela de Netuno", category: CATEGORIES.MARKS, icon: "🌊", subtitle: "Eliminou as criaturas na órbita de Netuno" },
-    { id: "mark:twins-defeated", name: "Caçador de Gigantes", category: CATEGORIES.MARKS, icon: "🏆", subtitle: "Derrubou os Gêmeos do Ocaso — Eclipse e Vórtice" }
+    { id: "mark:twins-defeated", name: "Caçador de Gigantes", category: CATEGORIES.MARKS, icon: "🏆", subtitle: "Derrubou os Gêmeos do Ocaso — Eclipse e Vórtice" },
+    { id: "mark:spy-network-cleared", name: "Céu Limpo", category: CATEGORIES.MARKS, icon: "🛰️", subtitle: "Derrubou a rede de satélites espiões" }
   );
 
   return items.map((item) => {

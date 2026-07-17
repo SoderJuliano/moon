@@ -2,16 +2,22 @@ import { getLocale, t } from "./ShipLocalization.js";
 import { ShipRenderer } from "./ShipRenderer.js";
 import { ShipEquipmentSlots } from "./ShipEquipmentSlots.js";
 import { ShipStats } from "./ShipStats.js";
+import { SHIP_CATALOG, shipDef, ensureHangar, setActiveShip, moveItem, ownsItem, itemShip, MOVABLE_ITEMS } from "../../game/hangar.js";
 
 export class ShipMenu {
-  constructor(save, saveManager) {
+  // hooks (opcionais, ligados pelo gameMode):
+  //   onLoadoutChanged()          — equipamento mudou de nave (recarregar canhão etc.)
+  //   onActiveShipChanged(def)    — o jogador trocou de nave (trocar o modelo em voo)
+  constructor(save, saveManager, hooks = {}) {
     this.save = save;
     this.saveManager = saveManager;
+    this.hooks = hooks;
     this.isOpen = false;
     this.renderer = null;
     this.slots = null;
     this.stats = null;
     this.selectedEquipmentId = null;
+    this.viewShipId = "xr07"; // nave em exibição (não necessariamente a ativa)
 
     // Create the overlay container
     this.overlay = document.createElement("div");
@@ -45,21 +51,25 @@ export class ShipMenu {
           <!-- Center Panel: 3D Ship Renderer -->
           <div class="panel-center">
             <div class="ship-title-container">
-              <span class="ship-model-label">REGISTRY // XR-07</span>
-              <h1 class="ship-display-name">${t("shipName")}</h1>
+              <span class="ship-model-label"></span>
+              <h1 class="ship-display-name"></h1>
+              <p class="ship-story"></p>
             </div>
             <div class="ship-canvas-container"></div>
             <div class="ship-render-hint">
               <span>🖱️ Drag to Rotate</span>
               <span>🔍 Scroll to Zoom</span>
             </div>
+            <div class="ship-activate-row"></div>
+            <div class="panel-section-title ships-title">${t("sectionShips")}</div>
+            <div class="ship-carousel"></div>
           </div>
 
           <!-- Right Panel: Equipment Slots & Details -->
           <div class="panel-right">
             <div class="panel-section-title">${t("sectionSlots")}</div>
             <div class="slots-container"></div>
-            
+
             <div class="detail-panel">
               <div class="detail-placeholder">${t("selectPrompt")}</div>
               <div class="detail-content" style="display: none;">
@@ -72,7 +82,7 @@ export class ShipMenu {
                 </div>
                 <p class="detail-desc"></p>
                 <p class="detail-lore"></p>
-                
+
                 <!-- English fallback legend for non-Portuguese players -->
                 <div class="detail-en-legend" style="display: none;">
                   <div class="legend-title">${t("enTranslationLegend")}</div>
@@ -80,6 +90,7 @@ export class ShipMenu {
                 </div>
 
                 <div class="detail-stats"></div>
+                <div class="detail-actions"></div>
               </div>
             </div>
           </div>
@@ -91,7 +102,7 @@ export class ShipMenu {
     this.shipRenderer = new ShipRenderer(canvasContainer);
 
     const slotsContainer = this.overlay.querySelector(".slots-container");
-    this.slots = new ShipEquipmentSlots(slotsContainer, (id, equipped) => this.selectEquipment(id, equipped));
+    this.slots = new ShipEquipmentSlots(slotsContainer, (id, state) => this.selectEquipment(id, state));
 
     const statsContainer = this.overlay.querySelector(".stats-container");
     this.stats = new ShipStats(statsContainer);
@@ -101,14 +112,101 @@ export class ShipMenu {
     this.overlay.querySelector(".close-btn").onclick = () => this.close();
   }
 
-  selectEquipment(id, isEquipped = true) {
+  // ---- naves (carrossel + ativação) -----------------------------------------
+
+  _renderShips() {
+    const hangar = ensureHangar(this.save);
+    const bar = this.overlay.querySelector(".ship-carousel");
+    let html = "";
+    for (const def of SHIP_CATALOG) {
+      if (!hangar.unlocked.includes(def.id)) continue; // só o que o jogador possui
+      const info = t(def.id, "ships");
+      const active = hangar.active === def.id;
+      const viewing = this.viewShipId === def.id;
+      html += `
+        <div class="ship-car-card ${viewing ? "selected" : ""} ${active ? "active" : ""}" data-id="${def.id}">
+          <span class="ship-car-name">${info.name}</span>
+          <span class="ship-car-reg">${info.registry}</span>
+          ${active ? `<span class="ship-car-badge">${t("activeShip")}</span>` : ""}
+        </div>`;
+    }
+    bar.innerHTML = html;
+    for (const card of bar.querySelectorAll(".ship-car-card")) {
+      card.onclick = () => this._viewShip(card.dataset.id);
+    }
+    this._renderActivateRow();
+  }
+
+  _renderActivateRow() {
+    const hangar = ensureHangar(this.save);
+    const row = this.overlay.querySelector(".ship-activate-row");
+    if (this.viewShipId === hangar.active) {
+      row.innerHTML = "";
+      return;
+    }
+    row.innerHTML = `<button class="activate-ship-btn">${t("activateShip")}</button>`;
+    row.querySelector(".activate-ship-btn").onclick = () => this._activate(this.viewShipId);
+  }
+
+  _activate(shipId) {
+    // algum equipamento ficaria pra trás? pergunta se move junto (nunca duplica)
+    const leftBehind = MOVABLE_ITEMS.some(
+      (it) => ownsItem(this.save, it) && itemShip(this.save, it) && itemShip(this.save, it) !== shipId
+    );
+    if (!leftBehind) {
+      this._doActivate(shipId, false);
+      return;
+    }
+    const row = this.overlay.querySelector(".ship-activate-row");
+    row.innerHTML = `
+      <div class="ship-move-prompt">
+        <span>${t("moveAllPrompt")}</span>
+        <button class="activate-ship-btn" data-move="yes">${t("moveAllYes")}</button>
+        <button class="activate-ship-btn ghost" data-move="no">${t("moveAllNo")}</button>
+      </div>`;
+    row.querySelector('[data-move="yes"]').onclick = () => this._doActivate(shipId, true);
+    row.querySelector('[data-move="no"]').onclick = () => this._doActivate(shipId, false);
+  }
+
+  _doActivate(shipId, moveEquipment) {
+    setActiveShip(this.save, shipId, { moveEquipment });
+    this.saveManager?.saveNow?.();
+    this.hooks.onLoadoutChanged?.();
+    this.hooks.onActiveShipChanged?.(shipDef(shipId));
+    this._viewShip(shipId);
+  }
+
+  _viewShip(shipId) {
+    this.viewShipId = shipId;
+    const def = shipDef(shipId);
+    const info = t(shipId, "ships");
+    this.overlay.querySelector(".ship-model-label").textContent = info.registry;
+    this.overlay.querySelector(".ship-display-name").textContent = info.name;
+    this.overlay.querySelector(".ship-story").textContent = info.story || "";
+    this.shipRenderer.setModel(def.modelPath, def.yaw, def.pitch);
+    this.stats.render(this.save, shipId);
+    this.slots.render(this.save, shipId);
+    this._renderShips();
+
+    // Auto-select first slot da nave em exibição
+    const firstSlot = this.slots.getSlots(this.save, shipId)[0];
+    if (firstSlot) {
+      this.slots.selectedId = firstSlot.id;
+      this.slots.render(this.save, shipId);
+      this.selectEquipment(firstSlot.id, firstSlot.state);
+    }
+  }
+
+  // ---- equipamento -----------------------------------------------------------
+
+  selectEquipment(id, state = "here") {
     this.selectedEquipmentId = id;
     const locale = getLocale();
 
     const detailContent = this.overlay.querySelector(".detail-content");
     const detailPlaceholder = this.overlay.querySelector(".detail-placeholder");
 
-    if (!isEquipped) {
+    if (state === "empty") {
       detailPlaceholder.textContent = t("emptySlotPrompt");
       detailPlaceholder.style.display = "flex";
       detailContent.style.display = "none";
@@ -123,14 +221,16 @@ export class ShipMenu {
     const loreEl = this.overlay.querySelector(".detail-lore");
     const statsEl = this.overlay.querySelector(".detail-stats");
     const legendEl = this.overlay.querySelector(".detail-en-legend");
+    const actionsEl = this.overlay.querySelector(".detail-actions");
 
     detailPlaceholder.style.display = "none";
     detailContent.style.display = "flex";
 
     nameEl.textContent = equipInfo.name;
-    statusEl.textContent = t("equipped");
-    statusEl.className = `detail-status-badge equipped`;
-    
+    const away = state === "elsewhere";
+    statusEl.textContent = away ? t("onOtherShip") : t("equipped");
+    statusEl.className = `detail-status-badge ${away ? "away" : "equipped"}`;
+
     // Image mapping
     let imgPath = "itens/canhao_plasma_nave_pequena.png"; // fallback
     if (id === "plasmaCannon") imgPath = "itens/canhao_plasma_nave_pequena.png";
@@ -152,6 +252,21 @@ export class ShipMenu {
     }
     statsEl.innerHTML = statsHtml;
 
+    // item em outra nave: dá pra trazer pra cá (mover, nunca duplicar)
+    if (away) {
+      actionsEl.innerHTML = `<button class="activate-ship-btn move-here">${t("moveHere")}</button>`;
+      actionsEl.querySelector(".move-here").onclick = () => {
+        moveItem(this.save, id, this.viewShipId);
+        this.saveManager?.saveNow?.();
+        this.hooks.onLoadoutChanged?.();
+        this.stats.render(this.save, this.viewShipId);
+        this.slots.render(this.save, this.viewShipId);
+        this.selectEquipment(id, "here");
+      };
+    } else {
+      actionsEl.innerHTML = "";
+    }
+
     // English legend handling
     if (locale !== "pt") {
       const enEquip = t(id, "equip"); // Already localized as it checks getLocale()
@@ -169,17 +284,10 @@ export class ShipMenu {
   open() {
     this.isOpen = true;
     this.overlay.style.display = "flex";
-    this.stats.render(this.save);
-    this.slots.render(this.save);
-    this.shipRenderer.init();
-    
-    // Auto-select first slot
-    const firstSlot = this.slots.getSlots(this.save)[0];
-    if (firstSlot) {
-      this.slots.selectedId = firstSlot.id;
-      this.slots.render(this.save);
-      this.selectEquipment(firstSlot.id, firstSlot.equipped);
-    }
+    const hangar = ensureHangar(this.save);
+    this.viewShipId = hangar.active;
+    this.shipRenderer.init(shipDef(this.viewShipId));
+    this._viewShip(this.viewShipId);
 
     // Set pause state in game logic if needed
     if (window.setGamePaused) {
@@ -191,7 +299,7 @@ export class ShipMenu {
     this.isOpen = false;
     this.overlay.style.display = "none";
     this.shipRenderer.destroy();
-    
+
     if (window.setGamePaused) {
       window.setGamePaused(false);
     }

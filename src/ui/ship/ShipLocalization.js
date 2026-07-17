@@ -9,6 +9,26 @@ export const TRANSLATIONS = {
     shipName: "Astra Mk-I",
     sectionStats: "ATRIBUTOS DA NAVE",
     sectionSlots: "SLOTS DE EQUIPAMENTO",
+    sectionShips: "NAVES NO HANGAR",
+    ships: {
+      xr07: {
+        name: "Astra Mk-I",
+        registry: "REGISTRY // XR-07",
+        story: "Caça leve de patrulha, construído para a primeira geração de pilotos do Sistema Solar. Ágil, confiável e o único casco que já derrubou dois cruzadores capitais.",
+      },
+      shuttle: {
+        name: "Ônibus Espacial",
+        registry: "REGISTRY // OV-208 HUMANIDADE",
+        story: "O orgulho da engenharia humana: um orbitador clássico restaurado e modernizado pela Estação como agradecimento por limpar a rede de espionagem. Cada rebite dele foi feito na Terra.",
+      },
+    },
+    activateShip: "ATIVAR ESTA NAVE",
+    activeShip: "NAVE ATIVA",
+    moveHere: "⚓ Mover para esta nave",
+    onOtherShip: "Em outra nave",
+    moveAllPrompt: "Mover os equipamentos instalados para esta nave?",
+    moveAllYes: "Mover tudo",
+    moveAllNo: "Deixar onde estão",
     stats: {
       hull: "Integridade do Casco",
       shield: "Capacidade de Escudo",
@@ -138,6 +158,26 @@ export const TRANSLATIONS = {
     shipName: "Astra Mk-I",
     sectionStats: "SHIP ATTRIBUTES",
     sectionSlots: "EQUIPMENT SLOTS",
+    sectionShips: "SHIPS IN HANGAR",
+    ships: {
+      xr07: {
+        name: "Astra Mk-I",
+        registry: "REGISTRY // XR-07",
+        story: "Light patrol fighter, built for the first generation of Solar System pilots. Agile, reliable, and the only hull that has ever brought down two capital cruisers.",
+      },
+      shuttle: {
+        name: "Space Shuttle",
+        registry: "REGISTRY // OV-208 HUMANITY",
+        story: "The pride of human engineering: a classic orbiter restored and modernized by the Station as a thank-you for clearing the spy network. Every rivet was made on Earth.",
+      },
+    },
+    activateShip: "ACTIVATE THIS SHIP",
+    activeShip: "ACTIVE SHIP",
+    moveHere: "⚓ Move to this ship",
+    onOtherShip: "On another ship",
+    moveAllPrompt: "Move the installed equipment to this ship?",
+    moveAllYes: "Move everything",
+    moveAllNo: "Leave them where they are",
     stats: {
       hull: "Hull Integrity",
       shield: "Shield Capacity",

@@ -176,10 +176,12 @@ export class ShipFlight {
     this.ship.scale.setScalar(SHIP_SIZE);
     this.ship.visible = false;
     this.model = new THREE.Group();
-    const procShip = buildShipModel(); // fallback até o GLB carregar (ou se falhar)
-    this.model.add(procShip);
+    this._procShip = buildShipModel(); // fallback até o GLB carregar (ou se falhar)
+    this.model.add(this._procShip);
     this.ship.add(this.model);
-    this._loadShipModel(procShip);
+    this._modelFix = null; // GLB atual instalado (trocável pelo hangar)
+    this._modelReq = null; // última URL pedida — troca durante o load não vaza
+    this.setModelUrl("models/Spaceship.glb");
 
     this.engineGlow = new THREE.Sprite(
       new THREE.SpriteMaterial({
@@ -310,11 +312,15 @@ export class ShipFlight {
   }
 
   // carrega a nave 3D (GLB leve). Centraliza, gira o nariz pra -Z, escala pra
-  // caber no enquadramento da master e troca a procedural. Se falhar, mantém ela.
-  _loadShipModel(fallback) {
+  // caber no enquadramento da master e troca a procedural. Se falhar, mantém o
+  // que estiver instalado. yaw corrige o nariz do modelo (convenção de voo: -Z).
+  // Chamável a qualquer momento — é assim que o hangar troca de nave.
+  setModelUrl(url, yaw = Math.PI, pitch = 0) {
+    this._modelReq = url;
     new GLTFLoader().load(
-      "models/Spaceship.glb",
+      url,
       (gltf) => {
+        if (this._modelReq !== url) return; // pediu outra nave enquanto baixava
         const s = gltf.scene;
         const box = new THREE.Box3().setFromObject(s);
         const center = new THREE.Vector3();
@@ -330,12 +336,15 @@ export class ShipFlight {
         });
         const fix = new THREE.Group();
         fix.add(s);
-        fix.rotation.y = Math.PI; // o modelo tem o nariz em +Z; nossa convenção é -Z
+        fix.rotation.set(pitch, yaw, 0);
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
         fix.scale.setScalar(1.6 / maxDim); // ~equivalente ao tamanho da procedural
-        this.model.remove(fallback);
+        this.model.remove(this._modelFix || this._procShip);
+        this._modelFix = fix;
         this.model.add(fix);
-        this.engineGlow.position.set(0, 0, (size.z * (1.6 / maxDim)) / 2 + 0.1);
+        // extensão do casco no eixo de voo (com pitch, o comprimento era o Y do modelo)
+        const axisLen = (pitch !== 0 ? size.y : size.z) * (1.6 / maxDim);
+        this.engineGlow.position.set(0, 0, axisLen / 2 + 0.1);
       },
       undefined,
       () => {}
