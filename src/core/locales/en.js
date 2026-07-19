@@ -231,6 +231,7 @@ export const en = {
   "mission.rocks.collect": "⚓ Collect rock (or click it)",
   "mission.rocks.whatMat": "{mat} rocks",
   "mission.rocks.whatSpace": "space rocks",
+  "mission.rocks.beaconMarker": "Rock to tow",
   "mission.rocks.objective": "Tow {goal} {what} to the Space Station ({n}/{goal})",
   "mission.rocks.doneMatDialog": "Last {mat} rock received! Mission completed. Thank you for your effort.",
   "mission.rocks.doneDialog": "Last rock received! Mission completed. Thank you for your effort.",
@@ -319,6 +320,19 @@ export const en = {
   "mission.hunt.rewardLater": "Later",
   "discovery.name.mark:spy-network-cleared": "Clear Skies",
   "discovery.sub.mark:spy-network-cleared": "Brought down the spy satellite network",
+
+  // ---- Mission: Voyager Maintenance ----
+  "mission.voyager.title": "Interstellar Maintenance",
+  "mission.voyager.astronaut": "Astronaut Vega",
+  "mission.voyager.objCollect": "Go to the Space Station to collect new plutonium cores",
+  "mission.voyager.objMaintenance": "Perform maintenance on Voyager 1 and 2 ({n}/2)",
+  "mission.voyager.objReturn": "Return to the Space Station to report",
+  "mission.voyager.dialogCollect": "Pilot, Voyager 1 and Voyager 2's RTGs are failing due to plutonium decay. They are at the very outer limits of the solar system. Here are the new plutonium-238 cores. Turn on your scanner (G) to locate their GPS markers in the sky!",
+  "mission.voyager.dialogReturn": "Excellent job! The new plutonium cores will give Voyager 1 and 2 several more decades of scientific life in interstellar space. We gained +15 prestige and Earth's recognition.",
+  "mission.voyager.v1Repaired": "Voyager 1 reactivated! Thermoelectric generator operational and transmitting data.",
+  "mission.voyager.v2Repaired": "Voyager 2 reactivated! Thermoelectric generator operational and transmitting data.",
+  "mission.voyager.interactBtn": "Install Plutonium Core",
+  "mission.voyager.marker": "Voyager Probe",
 
   // ---- Mission Manager ----
   "mission.station": "Station",

@@ -22,6 +22,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { composition, tintForMaterial } from "./materials.js";
+import { OuterAsteroidBelt } from "./outerAsteroidBelt.js";
 
 const CELL = 24;
 
@@ -51,6 +52,7 @@ export class AsteroidSystem {
 
     this.fields = [];
     this.belts = []; // cinturões densos instanciados (AsteroidBelt)
+    this.outerBelt = new OuterAsteroidBelt(scene, this);
     this.loaded = false;
     this._sources = null; // geometrias fundidas p/ instancing (lazy, pós-load)
     this._protos = new Map(); // key -> Object3D (root scale 1, inner normalizado a raio 1)
@@ -205,6 +207,9 @@ export class AsteroidSystem {
         if (!belt.built) belt.build(this.scene, this._beltSources());
         belt.update(dt, shipPos, beltsVisible, this.getBody);
       }
+      if (this.outerBelt) {
+        this.outerBelt.update(dt, shipPos);
+      }
     }
 
     if (!active || !shipPos) {
@@ -259,6 +264,10 @@ export class AsteroidSystem {
       const hit = belt.hitTest(shipPos);
       if (hit) return hit;
     }
+    if (this.outerBelt) {
+      const hit = this.outerBelt.hitTest(shipPos);
+      if (hit) return hit;
+    }
     return null;
   }
 
@@ -300,6 +309,14 @@ export class AsteroidSystem {
       }
     }
 
+    if (this.outerBelt) {
+      const hit = this.outerBelt.nearestActive(pos, bestD);
+      if (hit && hit.dist < bestD) {
+        bestD = hit.dist;
+        best = hit;
+      }
+    }
+
     return best;
   }
 
@@ -325,6 +342,10 @@ export class AsteroidSystem {
         if (d < maxDist) out.push({ id: rock.id, center: rockWorld, dist: d, radius });
       }
     }
+    if (this.outerBelt) {
+      const outerRocks = this.outerBelt.rocksNear(pos, maxDist);
+      out.push(...outerRocks);
+    }
     out.sort((a, b) => a.dist - b.dist);
     return out.slice(0, cap);
   }
@@ -334,6 +355,13 @@ export class AsteroidSystem {
   rockWorld(id, out = new THREE.Vector3()) {
     const inst = this._active.get(id);
     if (inst) return out.copy(inst.world);
+    if (id.startsWith("outer-belt:")) {
+      if (this.outerBelt) {
+        const w = this.outerBelt.rockWorld(id, out);
+        if (w) return w;
+      }
+      return null;
+    }
     for (const belt of this.belts) {
       const w = belt.rockWorld(id, this.getBody, out);
       if (w) return w;
@@ -344,6 +372,10 @@ export class AsteroidSystem {
   // remove um asteroide específico (campo OU cinturão) — despawna/esconde e apaga
   // o descritor. Chamado ao colidir: o asteroide some junto com a nave.
   destroyAsteroid(id) {
+    if (id.startsWith("outer-belt:")) {
+      if (this.outerBelt && this.outerBelt.destroyRock(id)) return true;
+      return false;
+    }
     for (const belt of this.belts) {
       if (belt.destroyRock(id)) return true;
     }
@@ -479,6 +511,9 @@ export class AsteroidSystem {
     this._pool.clear();
     for (const belt of this.belts) belt.dispose(this.scene);
     this.belts.length = 0;
+    if (this.outerBelt) {
+      this.outerBelt.dispose();
+    }
     this._sources = null;
     for (const proto of this._protos.values()) {
       proto.traverse((o) => {

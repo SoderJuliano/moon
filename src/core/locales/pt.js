@@ -232,6 +232,7 @@ export const pt = {
   "mission.rocks.collect": "⚓ Coletar rocha (ou clique nela)",
   "mission.rocks.whatMat": "rochas de {mat}",
   "mission.rocks.whatSpace": "rochas espaciais",
+  "mission.rocks.beaconMarker": "Rocha para reboque",
   "mission.rocks.objective": "Reboque {goal} {what} até a Estação Espacial ({n}/{goal})",
   "mission.rocks.doneMatDialog": "Última rocha de {mat} recebida! Missão concluída. Obrigado pelo empenho.",
   "mission.rocks.doneDialog": "Última rocha recebida! Missão concluída. Obrigado pelo empenho.",
@@ -320,6 +321,19 @@ export const pt = {
   "mission.hunt.rewardLater": "Depois",
   "discovery.name.mark:spy-network-cleared": "Céu Limpo",
   "discovery.sub.mark:spy-network-cleared": "Derrubou a rede de satélites espiões",
+
+  // ---- Missão: Manutenção das Voyagers (Voyager Maintenance) ----
+  "mission.voyager.title": "Manutenção Interestelar",
+  "mission.voyager.astronaut": "Astronauta Vega",
+  "mission.voyager.objCollect": "Vá à Estação Espacial buscar novos núcleos de plutônio",
+  "mission.voyager.objMaintenance": "Realize a manutenção na Voyager 1 e 2 ({n}/2)",
+  "mission.voyager.objReturn": "Retorne à Estação Espacial para reportar",
+  "mission.voyager.dialogCollect": "Piloto, os geradores termoelétricos (RTG) da Voyager 1 e Voyager 2 estão falhando por decaimento de plutônio. Elas estão nos limites externos do sistema solar. Aqui estão os novos núcleos de plutônio-238. Use o seu scanner (G) para localizar os marcadores GPS delas no céu!",
+  "mission.voyager.dialogReturn": "Excelente trabalho! Os novos núcleos de plutônio darão mais algumas décadas de vida científica para a Voyager 1 e 2 no espaço interestelar. Recebemos +15 de prestígio e o reconhecimento da Terra.",
+  "mission.voyager.v1Repaired": "Voyager 1 reativada! Gerador termoelétrico operacional e transmitindo dados.",
+  "mission.voyager.v2Repaired": "Voyager 2 reativada! Gerador termoelétrico operacional e transmitindo dados.",
+  "mission.voyager.interactBtn": "Instalar Núcleo de Plutônio",
+  "mission.voyager.marker": "Sonda Voyager",
 
   // ---- Gerenciador de Missões ----
   "mission.station": "Estação",

@@ -42,6 +42,8 @@ import { createSpaceRocksMission, createRockChores } from "../missions/spaceRock
 import { createNeptuneIncident } from "../missions/neptuneIncident.js";
 import { createGhostSignalMission, createTwinsMission, createDebrisChore } from "../missions/bossArc.js";
 import { createSatelliteHuntMission } from "../missions/satelliteHunt.js";
+import { VoyagerSystem } from "../systems/voyagers.js";
+import { createVoyagerMission } from "../missions/voyagerMission.js";
 import { ensureHangar, activeShipDef } from "../game/hangar.js";
 import { ScannerSystem } from "../systems/scanner.js";
 import { input } from "../input/InputManager.js";
@@ -148,6 +150,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   const station = new SpaceStation(scene, () => bodyById.get(START_BODY_ID));
   cannon.addTargetSystem(station);
 
+  // Voyager 1 & 2 no espaço interestelar
+  const voyagers = new VoyagerSystem(scene);
+
   // --- Combate PvE (pacote apartado em src/combat/) ----------------------------
   // 30s depois de instalar o canhão, um portal negro rasga o espaço e a nave
   // alien ataca. Enquanto o combate está ativo o GPS some e o ambiente é
@@ -205,6 +210,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // CAÇADA: satélites espiões nas luas de Júpiter/Saturno + guardas (pós-Gêmeos)
   const hunt = createSatelliteHuntMission(scene);
   cannon.addTargetSystem(hunt.targets);
+  const voyagerMission = createVoyagerMission(scene, voyagers);
   missions.ctx.shipMenu = shipMenu; // a recompensa abre o hangar
   missions.register(strange);
   missions.register(spaceRocks);
@@ -215,6 +221,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   missions.register(createTwinsMission());
   missions.register(createDebrisChore(scene));
   missions.register(hunt);
+  missions.register(voyagerMission);
 
   // já derrotou a 1ª nave num save anterior? a secundária já pode aparecer
   if (save.flags.alienDefeated && missions.status("strange-objects") === MISSION.LOCKED) {
@@ -230,12 +237,16 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   if (done("strange-objects") && locked("space-rocks") && !done("space-rocks")) missions.makeAvailable("space-rocks");
   if (done("space-rocks") && locked("sec-ferro") && !done("sec-ferro")) missions.makeAvailable("sec-ferro");
   if (done("sec-ferro") && locked("sec-gelo") && !done("sec-gelo")) missions.makeAvailable("sec-gelo");
-  // arco dos Gêmeos: o scanner (de qualquer via) abre o "Eco no Cemitério"
-  if (save.inventory.scanner?.owned && locked("ghost-signal")) missions.makeAvailable("ghost-signal");
+  // arco dos Gêmeos: o scanner (de qualquer via) abre o "Eco no Cemitério" e a manutenção das Voyagers
+  if (save.inventory.scanner?.owned) {
+    if (locked("ghost-signal")) missions.makeAvailable("ghost-signal");
+    if (locked("voyager-mission")) missions.makeAvailable("voyager-mission");
+  }
   const _scanGrant = scanner.grant.bind(scanner);
   scanner.grant = () => {
     _scanGrant();
     missions.makeAvailable("ghost-signal"); // no-op se já saiu de LOCKED
+    missions.makeAvailable("voyager-mission");
   };
   if (done("ghost-signal") && locked("twins")) missions.makeAvailable("twins");
   if (done("twins") && locked("sec-destrocos") && save.flags.debrisPos && !save.flags.debrisTowed) {
@@ -675,6 +686,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       // mostrar/esconder pela distância ao raio atual da Terra)
       satellites.update(dt, flying ? ship.ship.position : camera.position);
       station.update(dt, flying ? ship.ship.position : camera.position);
+      voyagers.update(dt, simDays, flying ? ship.ship.position : camera.position);
 
       // Auto-lock assistente de mira para a ISS ao se aproximar dela
       if (flying && station.alive && station.holder && station.group.visible) {

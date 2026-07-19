@@ -15,6 +15,9 @@ export function createSpaceRocksMission(scene) {
     kind: "primary",
     goal: 5,
     material: null,
+    // 5 rochas-farol perto da Terra (na direção de Marte) c/ GPS, só nesta
+    // 1ª missão; somem ao concluir. Qualquer rocha do espaço também conta.
+    beacons: { count: 5, anchor: "earth", toward: "mars", dist: 120, spread: 45 },
     reward: (ctx) => {
       emit("milestone", { id: "space-tow" }); // conquista "Reboque Espacial"
       ctx.scanner?.grant(); // recompensa: scanner equipável

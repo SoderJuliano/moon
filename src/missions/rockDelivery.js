@@ -13,10 +13,11 @@
 
 import * as THREE from "three";
 import { TowController } from "./towController.js";
+import { AsteroidField } from "../systems/asteroidField.js";
 import { composition } from "../systems/scanner.js";
 import { t } from "../core/i18n.js";
 
-const PROMPT_DIST = 4.5;
+const PROMPT_DIST = 9.0; // alcance do botão "Coletar" (dobrado — visível de mais longe)
 const DELIVER_DIST = 6.0;
 
 function makeFallbackRock() {
@@ -31,7 +32,8 @@ function makeFallbackRock() {
 }
 
 export function createRockDeliveryMission(scene, opts) {
-  const { id, title, kind = "secondary", goal = 10, material = null, reward = null, onDone = null } = opts;
+  const { id, title, kind = "secondary", goal = 10, material = null, reward = null, onDone = null, beacons = null } = opts;
+  const BEACON_FIELD = `${id}-beacons`;
   const tow = new TowController(scene);
   const rock = new THREE.Group();
   scene.add(rock);
@@ -69,6 +71,7 @@ export function createRockDeliveryMission(scene, opts) {
 
     onStart(ctx) {
       this._refresh(ctx);
+      this._spawnBeacons(ctx);
       collectBtn.onclick = (e) => {
         e.currentTarget.blur();
         this._grab(ctx);
@@ -110,6 +113,50 @@ export function createRockDeliveryMission(scene, opts) {
         document.body.style.cursor = "";
       }
       collectBtn.style.display = "none";
+      this._clearBeacons(ctx);
+    },
+
+    // Rochas-farol da 1ª missão: algumas pedras perto da Terra (na direção de
+    // Marte) com marcador GPS, só pra dar um alvo claro. Somem ao concluir; e a
+    // missão continua aceitando QUALQUER rocha do espaço.
+    _spawnBeacons(ctx) {
+      if (!beacons || this._beacons) return;
+      const getBody = ctx.asteroids?.getBody;
+      const anchor = getBody?.(beacons.anchor);
+      const toward = getBody?.(beacons.toward);
+      if (!anchor || !toward) return;
+
+      // direção Terra→Marte "congelada" no momento de aceitar a missão
+      const a = anchor.worldPosition(new THREE.Vector3());
+      const dir = toward.worldPosition(new THREE.Vector3()).sub(a).normalize();
+      if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0);
+
+      const field = new AsteroidField({
+        id: BEACON_FIELD, kind: "scatter", anchorId: beacons.anchor,
+        offsetDir: [dir.x, dir.y, dir.z], offsetDist: beacons.dist ?? 120,
+        count: beacons.count ?? 5, models: ["rockHi", "rockSingle", "rocksSmall"],
+        scaleRange: [0.12, 0.4], spinRange: [0.02, 0.15], drift: 0,
+        spread: beacons.spread ?? 45, seed: beacons.seed ?? 4242,
+      });
+      ctx.asteroids.addField(field);
+
+      const markerIds = [];
+      field.descriptors.forEach((desc, i) => {
+        const mid = `${BEACON_FIELD}-${i}`;
+        markerIds.push(mid);
+        ctx.markers.add({
+          id: mid, name: t("mission.rocks.beaconMarker"), color: "#c9a15a", kind: "poi",
+          getWorldPosition: (v) => field.getCenter(getBody, v).add(desc.local),
+        });
+      });
+      this._beacons = { field, markerIds };
+    },
+
+    _clearBeacons(ctx) {
+      if (!this._beacons) return;
+      for (const mid of this._beacons.markerIds) ctx.markers?.remove(mid);
+      ctx.asteroids?.removeField(this._beacons.field.id);
+      this._beacons = null;
     },
 
     // só oferece coletar rochas ELEGÍVEIS (material certo, se a missão exige)
@@ -175,6 +222,10 @@ export function createRockDeliveryMission(scene, opts) {
       rock.position.copy(near.center);
       rock.visible = true;
       ctx.asteroids.destroyAsteroid(near.id);
+      // se era uma rocha-farol, tira o GPS dela (a pedra virou reboque)
+      if (this._beacons && near.id.startsWith(`${BEACON_FIELD}:`)) {
+        ctx.markers.remove(`${BEACON_FIELD}-${near.id.split(":")[1]}`);
+      }
       tow.attach(rock);
 
       // Adiciona o marcador da ISS para orientar o voo de entrega

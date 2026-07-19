@@ -13,14 +13,22 @@ import * as THREE from "three";
 import { AsteroidField } from "./asteroidField.js";
 
 const MIN_SHIP_DIST = 22;     // distância mínima entre o grupo e a nave
-const SURFACE_BUFFER = 6;     // folga até a superfície de qualquer corpo
-const MAX_FIELDS = 6;         // cap de campos vivos (recicla mais antigos)
+const MAX_FIELDS = 8;         // cap de campos vivos (recicla mais antigos)
 const SPAWN_DIST_MIN = 40;    // à frente da nave — aparece na borda do stream (60)
 const SPAWN_DIST_MAX = 55;
-const INTERVAL_MIN = 8;
-const INTERVAL_MAX = 15;
+const INTERVAL_MIN = 8;       // ~10 s entre encontros no voo normal
+const INTERVAL_MAX = 12;
+const COUNT_MIN = 2;          // pedras por encontro (grupo bem mais denso)
+const COUNT_MAX = 10;
 const REGION_MARGIN = 80;     // distância a uma região fixa que suspende encontros
 const MODELS = ["rocksSmall", "rocksField", "rockSingle", "rockHi"];
+
+// Bolha de aproximação/inflação de um corpo (espelha AsteroidField): planeta
+// infla ~40× ao chegar perto, mínimo 60u. Asteroides de encontro nunca nascem
+// dentro dela — ficam longe da órbita e não são engolidos pela cena inflada.
+const APPROACH_MUL = 40;
+const MIN_APPROACH_R = 60;
+const BODY_MARGIN = 25;       // folga extra além da bolha de inflação
 
 export class AsteroidEncounter {
   constructor(system, { getBodies = null } = {}) {
@@ -70,7 +78,7 @@ export class AsteroidEncounter {
 
     if (!this._isSafe(this._tmp, ctx.position)) return;
 
-    const count = Math.random() < 0.35 ? 2 : 1;
+    const count = COUNT_MIN + ((Math.random() * (COUNT_MAX - COUNT_MIN + 1)) | 0);
     const field = new AsteroidField({
       id: `enc:${this._n++}`,
       kind: "cluster",
@@ -80,7 +88,7 @@ export class AsteroidEncounter {
       scaleRange: [0.03, 0.28],
       spinRange: [0.04, 0.5],
       drift: 0.0015,
-      spread: 3,
+      spread: 4 + count * 0.8, // grupo maior acompanha mais pedras
       seed: (Math.random() * 1e9) | 0,
     });
     this.system.addField(field);
@@ -110,7 +118,10 @@ export class AsteroidEncounter {
       for (const b of this.getBodies()) {
         if (b.mesh && !b.mesh.visible) continue;
         b.worldPosition(this._bp);
-        if (center.distanceTo(this._bp) - b.radius < SURFACE_BUFFER) return false;
+        // fora da bolha de inflação do corpo (não perto de nenhum planeta)
+        const base = b.baseRadius || b.radius || 1;
+        const bubble = Math.max(APPROACH_MUL * base, MIN_APPROACH_R);
+        if (center.distanceTo(this._bp) < bubble + BODY_MARGIN) return false;
       }
     }
     return true;

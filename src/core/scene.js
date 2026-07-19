@@ -74,12 +74,12 @@ export function createScene() {
   scene.background = new THREE.Color(0x000005); // mesmo tom de fundo da textura antiga
   scene.add(makeStarDome());
 
-  // Faixa de distância enorme no modo real (Éris > 1,5 milhão de unidades).
+  // Faixa de distância enorme no modo real (Éris > 1,5 milhão de unidades, Voyagers > 3,8 milhões).
   const camera = new THREE.PerspectiveCamera(
     55,
     window.innerWidth / window.innerHeight,
     0.02,
-    3_000_000
+    10_000_000
   );
   camera.position.set(0, 120, 320);
 
@@ -100,7 +100,7 @@ export function createScene() {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minDistance = 0.05; // chega bem perto de luas minúsculas no modo real
-  controls.maxDistance = 2_500_000;
+  controls.maxDistance = 10_000_000;
 
   // --- Iluminação ---------------------------------------------------------
   // Luz pontual no Sol (origem). decay = 0 => não atenua com a distância, então
