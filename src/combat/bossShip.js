@@ -36,12 +36,15 @@ const PASS_EVERY = [11, 17]; // s entre passadas (sorteado)
 const PASS_DUR = 3.6; // s de cada passada
 
 export class BossShip {
-  // opts: { id, name, modelUrl }
-  constructor(scene, { id, name, modelUrl }) {
+  // opts: { id, name, modelUrl, yaw, pitch, roll }
+  constructor(scene, { id, name, modelUrl, yaw = 0, pitch = 0, roll = 0 }) {
     this.scene = scene;
     this.id = id;
     this.name = name;
     this.modelUrl = modelUrl;
+    this.yaw = yaw;
+    this.pitch = pitch;
+    this.roll = roll;
 
     this.group = new THREE.Group();
     this.group.visible = false;
@@ -163,7 +166,12 @@ export class BossShip {
             o.material.emissiveIntensity = Math.min(o.material.emissiveIntensity, 1.2);
         }
       });
-      this.group.add(model);
+      const fix = new THREE.Group();
+      fix.add(model);
+      if (this.yaw || this.pitch || this.roll) {
+        fix.rotation.set(this.pitch, this.yaw, this.roll);
+      }
+      this.group.add(fix);
       this.loaded = true;
       onDone?.();
     })

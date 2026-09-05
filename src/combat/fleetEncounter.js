@@ -181,7 +181,12 @@ export class FleetEncounter {
     if (this.bosses) return;
     this.bosses = [
       new BossShip(this.scene, { id: "boss-eclipse", name: t("boss.eclipse"), modelUrl: "models/starship.glb" }),
-      new BossShip(this.scene, { id: "boss-vortice", name: t("boss.vortice"), modelUrl: "models/combatstarship.glb" }),
+      new BossShip(this.scene, {
+        id: "boss-vortice",
+        name: t("boss.vortice"),
+        modelUrl: "models/combatstarship.glb",
+        yaw: -Math.PI / 2,
+      }),
     ];
     for (const b of this.bosses) {
       b.onDestroyed = (boss) => {

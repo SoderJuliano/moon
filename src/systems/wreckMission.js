@@ -17,7 +17,7 @@
 
 import * as THREE from "three";
 import { playDiscovery } from "../ui/sfx.js";
-import cannonImgUrl from "../assets/itens/canhao_plasma_nave_pequena.png";
+const cannonImgUrl = "itens/canhao_plasma_nave_pequena.png";
 
 const INVESTIGATE_DIST = 30; // "bem próximo": ~2.5× o comprimento do casco (12u)
 const BANNER_SECS = 9; // banner do briefing vira chip depois disso
