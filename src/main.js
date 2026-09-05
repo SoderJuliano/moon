@@ -20,6 +20,9 @@ async function startMode(mode, opts) {
   if (mode === "game") {
     const { startGameMode } = await import("./app/gameMode.js");
     startGameMode(opts); // { resume: true|false } do menu; ?mode=game = "auto"
+  } else if (mode === "trailer") {
+    const { startTrailerMode } = await import("./trailer/trailerDirector.js");
+    startTrailerMode(opts);
   } else {
     const { startExplorationMode } = await import("./app/explorationMode.js");
     startExplorationMode();
@@ -27,5 +30,5 @@ async function startMode(mode, opts) {
 }
 
 const requested = new URLSearchParams(location.search).get("mode");
-if (requested === "game" || requested === "exploration") startMode(requested);
+if (requested === "game" || requested === "exploration" || requested === "trailer") startMode(requested);
 else startMainMenu({ onSelect: startMode });

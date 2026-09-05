@@ -259,6 +259,10 @@ export function startMainMenu({ onSelect }) {
           <span class="mm-option-name">${t("menu.game")}</span>
           <span class="mm-option-desc">${t("menu.gameDesc")}</span>
         </button>
+        <button class="mm-option" type="button" data-mode="trailer">
+          <span class="mm-option-name">🎬 Gravar Trailer (30s)</span>
+          <span class="mm-option-desc">Grava automaticamente o trailer cinematográfico em 60 FPS com download direto.</span>
+        </button>
       </div>
       <div class="mm-view-game">
         <button class="mm-option" type="button" data-game="continue">
@@ -446,6 +450,7 @@ export function startMainMenu({ onSelect }) {
 
   root.querySelector('[data-mode="exploration"]').addEventListener("click", () => launch("exploration"));
   root.querySelector('[data-mode="game"]').addEventListener("click", () => showScreen("game"));
+  root.querySelector('[data-mode="trailer"]')?.addEventListener("click", () => launch("trailer"));
   views.game.querySelector('[data-game="back"]').addEventListener("click", () => showScreen("modes"));
 
   // NOVO JOGO: pede um nome; se já existe (ou há legado), confirma sobrescrever
