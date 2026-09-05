@@ -383,7 +383,7 @@ export function startMainMenu({ onSelect }) {
     views.modes.style.display = which === "modes" ? "" : "none";
     if (which === "game") {
       const has = hasAnySave();
-      views.game.querySelector('[data-game="continue"]').style.display = has ? "" : "none";
+      views.game.querySelector('[data-game="continue"]').style.display = ""; // Sempre visível para permitir carregar local ou da nuvem (Abra API)
       views.game.querySelector('[data-game="export"]').style.display = has ? "" : "none";
       saveNote.textContent = "";
     }
@@ -488,40 +488,49 @@ export function startMainMenu({ onSelect }) {
 
   function renderPlayers() {
     playersList.innerHTML = "";
-    for (const p of listPlayers()) {
-      const btn = document.createElement("button");
-      btn.className = "mm-option";
-      btn.type = "button";
-      btn.innerHTML = `<span class="mm-option-name">${p.name}</span>
-        <span class="mm-option-desc">Continuar este jogo.</span>`;
-      btn.addEventListener("click", () => {
-        const sm = createPlayerSave(p.name);
-        const save = sm.load();
-        if (save) {
-          if (save.player && save.player.password) {
-            askPassword("Digite a senha do seu save", "Senha", (pwd) => {
-              if (pwd === save.player.password) {
+    const players = listPlayers();
+    if (players.length === 0) {
+      const emptyNote = document.createElement("div");
+      emptyNote.className = "mm-save-note";
+      emptyNote.style.margin = "6px 0 16px 0";
+      emptyNote.textContent = t("menu.noLocalPlayers");
+      playersList.appendChild(emptyNote);
+    } else {
+      for (const p of players) {
+        const btn = document.createElement("button");
+        btn.className = "mm-option";
+        btn.type = "button";
+        btn.innerHTML = `<span class="mm-option-name">${p.name}</span>
+          <span class="mm-option-desc">Continuar este jogo.</span>`;
+        btn.addEventListener("click", () => {
+          const sm = createPlayerSave(p.name);
+          const save = sm.load();
+          if (save) {
+            if (save.player && save.player.password) {
+              askPassword("Digite a senha do seu save", "Senha", (pwd) => {
+                if (pwd === save.player.password) {
+                  currentPlayerName = p.name;
+                  showScreen("profile");
+                } else {
+                  passwordNote.textContent = t("menu.wrongPassword");
+                }
+              }, () => showScreen("players"));
+            } else {
+              askPassword("Crie uma senha para seu save", "Escolha uma senha", (pwd) => {
+                save.player = save.player || {};
+                save.player.password = pwd;
+                sm.saveNow();
                 currentPlayerName = p.name;
                 showScreen("profile");
-              } else {
-                passwordNote.textContent = t("menu.wrongPassword");
-              }
-            }, () => showScreen("players"));
+              }, () => showScreen("players"));
+            }
           } else {
-            askPassword("Crie uma senha para seu save", "Escolha uma senha", (pwd) => {
-              save.player = save.player || {};
-              save.player.password = pwd;
-              sm.saveNow();
-              currentPlayerName = p.name;
-              showScreen("profile");
-            }, () => showScreen("players"));
+            currentPlayerName = p.name;
+            showScreen("profile");
           }
-        } else {
-          currentPlayerName = p.name;
-          showScreen("profile");
-        }
-      });
-      playersList.appendChild(btn);
+        });
+        playersList.appendChild(btn);
+      }
     }
   }
   views.players.querySelector('[data-players="back"]').addEventListener("click", () => showScreen("game"));

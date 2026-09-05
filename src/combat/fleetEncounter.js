@@ -21,8 +21,9 @@ import { radialGlowTexture } from "../core/textures.js";
 import { Portal } from "./portal.js";
 import { AlienShip, ALIEN_MAX_HP } from "./alienShip.js";
 import { BossShip, BOSS_SHIELD_HP, BOSS_HULL_HP } from "./bossShip.js";
-import { playBossRupture, playFlybyRumble, playExplosionBig } from "./battleSfx.js";
+import { playBossRupture, playFlybyRumble, playExplosionBig, playEmpShockwave } from "./battleSfx.js";
 import { playPortalRupture } from "../ui/sfx.js";
+import { emit } from "../game/events.js";
 import { t } from "../core/i18n.js";
 
 const PLAYER_MAX_HP = 8;
@@ -124,6 +125,13 @@ export class FleetEncounter {
     document.body.appendChild(this.chip);
     this._chipFade = 0;
 
+    // Alerta de EMP (controles desligados com contagem regressiva)
+    this.empAlert = document.createElement("div");
+    this.empAlert.className = "emp-alert";
+    this.empAlert.style.display = "none";
+    document.body.appendChild(this.empAlert);
+    this.empCountdown = 0;
+
     // fagulhas de impacto na nave do jogador
     this.sparks = [];
     const sparkTex = radialGlowTexture("#ffb36a");
@@ -194,11 +202,12 @@ export class FleetEncounter {
         this._shake = Math.max(this._shake, 1.2);
         this._enemyDown(boss);
       };
-      b.onPlayerHit = (pos, dmg) => this._playerHit(pos, dmg);
+      b.onPlayerHit = (pos, dmg, vel) => this._playerHit(pos, dmg, vel);
       b.onFlyby = () => {
         playFlybyRumble(); // o cargueiro roçando no bote
-        this._shake = Math.max(this._shake, 1);
+        this._shake = Math.max(this._shake, 1.8);
       };
+      b.onShieldBreakEMP = (pos) => this._onShieldBreakEMP(pos);
     }
     this._buildBossBars();
   }
@@ -268,6 +277,25 @@ export class FleetEncounter {
     }
     return null;
   }
+  isImmune(id) {
+    for (const e of this.enemies) {
+      if ((e.idTag || e.id) === id && e instanceof BossShip) {
+        return e.invulnerableTimer > 0;
+      }
+    }
+    return false;
+  }
+  tryTriggerInvulnerability(id) {
+    for (const e of this.enemies) {
+      if ((e.idTag || e.id) === id && e instanceof BossShip) {
+        if (!e.invulnerableUsed) {
+          e.triggerInvulnerability();
+          return true;
+        }
+      }
+    }
+    return false;
+  }
   onDamaged(id, hp, maxHp, at) {
     for (const e of this.enemies) {
       if ((e.idTag || e.id) === id) {
@@ -287,33 +315,64 @@ export class FleetEncounter {
 
   _enemyDown(enemy) {
     this.enemies = this.enemies.filter((e) => e !== enemy && e.alive);
+    if (this.mode === "invasion" || !(enemy instanceof BossShip)) {
+      emit("stat", { key: "enemyShipsDestroyed" });
+    }
     if (this.enemies.length === 0) this._end("victory");
   }
 
-  _playerHit(pos, dmg = 1) {
+  _playerHit(pos, dmg = 1, boltVel = null) {
     if (this.state !== "fight") return;
     // ESCUDO do jogador (se equipado e com carga): absorve — bolha azul acende
     if (this.shield?.tryAbsorb(pos)) return;
     this.playerHp -= dmg;
     this._vigT = 1;
-    this.ship.angVel.x += (Math.random() - 0.5) * 1.6 * dmg;
-    this.ship.angVel.z += (Math.random() - 0.5) * 2.2 * dmg;
+
+    // Empurrão cinético violento do tiro pesado
+    if (boltVel) {
+      this._tmp2.copy(boltVel).normalize();
+      this.ship.velocity.addScaledVector(this._tmp2, 8.5);
+    }
+    this.ship.angVel.x += (Math.random() - 0.5) * 5.5 * dmg;
+    this.ship.angVel.y += (Math.random() - 0.5) * 5.5 * dmg;
+    this.ship.angVel.z += (Math.random() - 0.5) * 8.0 * dmg;
+    this._shake = Math.max(this._shake, 2.2);
+
     this.ship.speed *= 0.55;
-    this.ship.velocity.multiplyScalar(0.55);
-    for (let i = 0; i < 3; i++) {
+    this.ship.velocity.multiplyScalar(0.75);
+    for (let i = 0; i < 4; i++) {
       const p = this.sparks.find((x) => x.life <= 0);
       if (!p) break;
       p.s.position.copy(pos);
-      p.vel.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.9);
-      p.s.scale.setScalar(0.05 + Math.random() * 0.05);
+      p.vel.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(1.2);
+      p.s.scale.setScalar(0.06 + Math.random() * 0.07);
       p.s.material.opacity = 1;
-      p.life = 0.7;
+      p.life = 0.8;
       p.s.visible = true;
     }
     if (this.playerHp <= 0) {
       this._end("defeat");
       this.ship.explode();
     }
+  }
+
+  _onShieldBreakEMP(pos) {
+    playEmpShockwave();
+    this._shake = Math.max(this._shake, 2.8);
+    const dist = this.ship.ship.position.distanceTo(pos);
+    if (dist < 14.5) {
+      this.triggerPlayerEMP(5.0, pos);
+    }
+  }
+
+  triggerPlayerEMP(secs, originPos) {
+    this.ship.empTimer = secs;
+    this.empCountdown = secs;
+    this.empAlert.style.display = "";
+    // Onda de choque magnética arremessa a nave
+    this._tmp.copy(this.ship.ship.position).sub(originPos).normalize();
+    this.ship.velocity.addScaledVector(this._tmp, 16.0);
+    this.ship.angVel.set((Math.random() - 0.5) * 7.0, (Math.random() - 0.5) * 7.0, (Math.random() - 0.5) * 9.0);
   }
 
   _end(result) {
@@ -324,6 +383,8 @@ export class FleetEncounter {
     this._tmp.set(0, 0, -1).applyQuaternion(this.ship.ship.quaternion);
     this.lastBattlePos.copy(this.ship.ship.position).addScaledVector(this._tmp, 4);
     this.state = "idle";
+    this.empCountdown = 0;
+    this.empAlert.style.display = "none";
     this.bossPortal.close();
     for (const p of this.smallPortals) p.close();
     for (const e of [...(this.scouts || []), ...(this.bosses || [])]) e.hide();
@@ -423,7 +484,7 @@ export class FleetEncounter {
       }
 
       case "banner":
-        for (const e of this.enemies) e.update(dt, playerPos);
+        for (const e of this.enemies) e.update(dt, playerPos, this.ship);
         if (this._t >= bannerSecs) {
           for (const e of this.enemies) e.setFiring(true);
           this.state = "fight";
@@ -432,7 +493,7 @@ export class FleetEncounter {
         break;
 
       case "fight":
-        for (const e of this.enemies) e.update(dt, playerPos);
+        for (const e of this.enemies) e.update(dt, playerPos, this.ship);
         this._mouseSteer(dt);
         this._aimAssist(dt, playerPos);
         break;
@@ -440,6 +501,34 @@ export class FleetEncounter {
 
     this._updateCinematicCamera(dt);
     this._applyShake(dt);
+
+    // Atualiza o display de alerta de EMP
+    if (this.empCountdown > 0) {
+      this.empCountdown -= dt;
+      const secs = Math.ceil(this.empCountdown);
+      if (secs > 0) {
+        this.empAlert.className = "emp-alert active";
+        this.empAlert.innerHTML = `
+          <div class="emp-alert-icon">⚡</div>
+          <div class="emp-alert-body">
+            <div class="emp-alert-title">${t("combat.empAlertTitle")}</div>
+            <div class="emp-alert-sub">${t("combat.empAlertSub", { secs })}</div>
+          </div>
+          <div class="emp-alert-timer">${secs}s</div>
+        `;
+      } else {
+        this.empAlert.className = "emp-alert restored";
+        this.empAlert.innerHTML = `
+          <div class="emp-alert-icon">✓</div>
+          <div class="emp-alert-body">
+            <div class="emp-alert-title">${t("combat.empRestoredTitle")}</div>
+          </div>
+        `;
+        setTimeout(() => {
+          if (this.empCountdown <= 0) this.empAlert.style.display = "none";
+        }, 1500);
+      }
+    }
 
     if (this.holdShip) {
       for (const m of this.marks) m.style.display = "none";
@@ -462,16 +551,23 @@ export class FleetEncounter {
       const ui = this._barEls[i];
       if (!ui) return;
       if (!b.alive) {
-        ui.el.classList.add("down");
+        ui.el.className = "boss-bar down";
         ui.fill.style.width = "0%";
         ui.stage.textContent = t("fleet.destroyed");
         return;
       }
-      if (b.shielded) {
+      if (b.invulnerableTimer > 0) {
+        ui.el.className = "boss-bar invulnerable";
+        ui.fill.className = "boss-fill invulnerable";
+        ui.fill.style.width = "100%";
+        ui.stage.textContent = `🛡️ ${t("fleet.invulnerable")} (${b.invulnerableTimer.toFixed(1)}s)`;
+      } else if (b.shielded) {
+        ui.el.className = "boss-bar";
         ui.fill.className = "boss-fill shield";
         ui.fill.style.width = `${(b.shieldHp / BOSS_SHIELD_HP) * 100}%`;
         ui.stage.textContent = t("fleet.shield");
       } else {
+        ui.el.className = "boss-bar";
         ui.fill.className = "boss-fill hull";
         ui.fill.style.width = `${(b.hullHp / BOSS_HULL_HP) * 100}%`;
         ui.stage.textContent = t("fleet.hull");

@@ -361,3 +361,57 @@ export function playBossRupture() {
   nz.connect(nf); nf.connect(ng); ng.connect(master);
   nz.start(tb); nz.stop(tb + 1.7);
 }
+
+// PULSO ELETROMAGNÉTICO (EMP) — onda de choque magnética da quebra de escudo
+export function playEmpShockwave() {
+  const c = ctx();
+  if (!c) return;
+  const t = c.currentTime + 0.005;
+  const master = c.createGain();
+  master.gain.value = 0.85;
+  master.connect(c.destination);
+
+  // Zumbido elétrico agudo modulado
+  const o = c.createOscillator();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(120, t);
+  o.frequency.exponentialRampToValueAtTime(1800, t + 0.35);
+  o.frequency.exponentialRampToValueAtTime(60, t + 1.8);
+  const f = c.createBiquadFilter();
+  f.type = "bandpass";
+  f.frequency.setValueAtTime(600, t);
+  f.frequency.exponentialRampToValueAtTime(3200, t + 0.4);
+  f.frequency.exponentialRampToValueAtTime(200, t + 2.0);
+  f.Q.value = 3.5;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.75, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 2.2);
+  o.connect(f); f.connect(g); g.connect(master);
+  o.start(t); o.stop(t + 2.3);
+
+  // Subgrave de choque e explosão
+  const sub = c.createOscillator();
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(140, t);
+  sub.frequency.exponentialRampToValueAtTime(25, t + 1.4);
+  const gs = c.createGain();
+  gs.gain.setValueAtTime(1.0, t);
+  gs.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+  sub.connect(gs); gs.connect(master);
+  sub.start(t); sub.stop(t + 1.9);
+
+  // Descarga elétrica e estática ruidosa
+  const nz = c.createBufferSource();
+  nz.buffer = noiseBuf(c);
+  nz.playbackRate.value = 2.2;
+  const nf = c.createBiquadFilter();
+  nf.type = "bandpass";
+  nf.frequency.setValueAtTime(2800, t);
+  nf.frequency.exponentialRampToValueAtTime(300, t + 1.6);
+  nf.Q.value = 2.5;
+  const ng = c.createGain();
+  ng.gain.setValueAtTime(0.65, t);
+  ng.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
+  nz.connect(nf); nf.connect(ng); ng.connect(master);
+  nz.start(t); nz.stop(t + 1.9);
+}

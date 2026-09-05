@@ -27,16 +27,30 @@ const SHIP_SIZE = 0.06; // mesmo valor da ShipFlight (offsets das asas em escala
 const BOLT_SPEED = 25; // u/s somado à velocidade de avanço da nave
 const BOLT_TTL = 2; // s de vida (alcance ~50u)
 const BOLT_LEN = 0.09; // ~1,5× a nave — proporção dos feixes de Star Wars
-const FIRE_EVERY = 0.16; // cadência da rajada (segurando Espaço)
+const FIRE_EVERY = 0.32; // cadência da rajada (segurando Espaço) — 2x mais lenta (era 0.16)
 const SUBSTEP = 0.12; // passo do teste de colisão ao longo do trajeto (u)
 const HPBAR_TTL = 3; // s que a barra de vida fica visível após um hit
 
-// bocas do canhão: por BAIXO das asas (as asas ficam em x ±0.5, z ~0.2 no
-// modelo — o tiro nasce ali, não na ponta do nariz), em coords locais da nave
-const MUZZLES = [
-  new THREE.Vector3(-0.5, -0.08, 0.1).multiplyScalar(SHIP_SIZE),
-  new THREE.Vector3(0.5, -0.08, 0.1).multiplyScalar(SHIP_SIZE),
-];
+// bocas do canhão por tipo de nave, em coords locais da nave
+export const SHIP_MUZZLES = {
+  xr07: [
+    new THREE.Vector3(-0.5, -0.08, 0.1).multiplyScalar(SHIP_SIZE),
+    new THREE.Vector3(0.5, -0.08, 0.1).multiplyScalar(SHIP_SIZE),
+  ],
+  shuttle: [
+    new THREE.Vector3(-0.45, -0.05, 0.1).multiplyScalar(SHIP_SIZE),
+    new THREE.Vector3(0.45, -0.05, 0.1).multiplyScalar(SHIP_SIZE),
+  ],
+  naveSW: [
+    // 4 tiros: 1 de cada asa nas 4 pontas com extrema precisão
+    new THREE.Vector3(-0.4894, 0.2947, -0.2496).multiplyScalar(SHIP_SIZE), // Asa Superior Esquerda
+    new THREE.Vector3(-0.5639, -0.0187, -0.2428).multiplyScalar(SHIP_SIZE), // Asa Inferior Esquerda
+    new THREE.Vector3(0.6072, 0.0191, -0.1461).multiplyScalar(SHIP_SIZE),  // Asa Superior Direita
+    new THREE.Vector3(0.5102, -0.2676, -0.1492).multiplyScalar(SHIP_SIZE), // Asa Inferior Direita
+  ],
+};
+
+const MUZZLES = SHIP_MUZZLES.xr07;
 
 // HP por tamanho (r = raio de colisão): nave ~0.06u → pedras "do tamanho da
 // nave" têm r pequeno e caem com 1; grandes aguentam 3.
@@ -70,7 +84,7 @@ export class PlasmaCannon {
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     this.bolts = [];
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 64; i++) {
       const mesh = new THREE.Mesh(boltGeo, boltMat);
       mesh.visible = false;
       scene.add(mesh);
@@ -164,11 +178,12 @@ export class PlasmaCannon {
     this._tmp.set(0, 0, -1).applyQuaternion(ship.quaternion); // forward
     // bolt herda o avanço da nave (senão parece que anda pra trás no boost)
     const shipAdvance = Math.max(this.ship.velocity.dot(this._tmp), 0);
-    for (const muzzle of MUZZLES) {
+    const muzzles = this.ship.getMuzzles ? this.ship.getMuzzles() : (SHIP_MUZZLES[this.ship.activeShipId] || MUZZLES);
+    for (const muzzle of muzzles) {
       const b = this.bolts.find((x) => x.ttl <= 0);
-      if (!b) return;
+      if (!b) continue;
       // a CAUDA do feixe nasce na boca (o cilindro é centrado: desloca meia
-      // extensão pra frente) — o tiro visivelmente SAI de baixo da asa
+      // extensão pra frente) — o tiro visivelmente SAI de baixo da asa / ponta da asa
       b.mesh.position
         .copy(muzzle)
         .applyQuaternion(ship.quaternion)
@@ -257,6 +272,20 @@ export class PlasmaCannon {
     let hp = this._hp.get(hit.id);
     const maxHp = hit.maxHp ?? maxHpFor(hit.r); // alvo pode ditar o próprio HP
     if (hp == null) hp = maxHp;
+
+    // Alvo temporariamente imune (ex: fase de sobrecarga/last stand do boss)
+    if (hit.immune || (sys.isImmune && sys.isImmune(hit.id))) {
+      if (sys.onDamaged) sys.onDamaged(hit.id, hp, maxHp, at);
+      return;
+    }
+
+    // 1 vez antes de morrer: ativa imunidade temporária do boss
+    if (hp <= 1 && sys.tryTriggerInvulnerability && sys.tryTriggerInvulnerability(hit.id)) {
+      this._hp.set(hit.id, 1);
+      if (sys.onDamaged) sys.onDamaged(hit.id, 1, maxHp, at);
+      return;
+    }
+
     hp -= 1;
     // alvos com barra/efeitos próprios (nave alien, bosses) acompanham o HP que
     // vive aqui — recebem também ONDE o tiro pegou (ondulação do escudo)
@@ -279,7 +308,8 @@ export class PlasmaCannon {
 
   update(dt, { canFire = false } = {}) {
     this._cd -= dt;
-    if (this.enabled && canFire && this._fireHeld && this._cd <= 0) {
+    const shipEmp = this.ship?.empTimer > 0;
+    if (this.enabled && canFire && !shipEmp && this._fireHeld && this._cd <= 0) {
       this._cd = FIRE_EVERY;
       this._fire();
     }

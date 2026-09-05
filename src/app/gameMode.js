@@ -106,7 +106,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // hooks rodam só depois do boot (menu aberto pelo jogador) — ship/cannon já existem
   const shipMenu = new ShipMenu(save, saveManager, {
     onLoadoutChanged: () => cannon.setEnabled(!!save.ship.weapons.plasmaCannon),
-    onActiveShipChanged: (def) => ship.setModelUrl(def.modelPath, def.yaw, def.pitch),
+    onActiveShipChanged: (def) => ship.setModelUrl(def.modelPath, def.yaw, def.pitch, def.id),
   });
 
   // Cemitério atrás de Júpiter (conteúdo SÓ do jogo): nuvem ~4× o cinturão
@@ -128,9 +128,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     getEntryInfo: (id) => ENTRY_OVERRIDES[id],
   });
   ship.setEnabled(true);
-  // nave ativa do hangar (a XR-07 já é o modelo padrão do construtor)
+  // nave ativa do hangar
   const activeDef = activeShipDef(save);
-  if (activeDef.id !== "xr07") ship.setModelUrl(activeDef.modelPath, activeDef.yaw, activeDef.pitch);
+  ship.setModelUrl(activeDef.modelPath, activeDef.yaw, activeDef.pitch, activeDef.id);
 
   // Canhão de plasma: nasce DESABILITADO — a missão do sinal de socorro é quem
   // desbloqueia (a tecnologia é recuperada do cruzador destruído).
@@ -170,6 +170,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
         }
       }
       saveManager.saveNow(); // vitória/fuga/derrota: persiste (local + nuvem)
+      if (save.flags.alienDefeated && !fleet.active) {
+        combatCountdown = 45; // continua gerando encontros de patrulha para acumular abates
+      }
     },
   });
   cannon.addTargetSystem(combat.alien); // nossos bolts acertam a nave alien
@@ -609,6 +612,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       combat.update(dt);
       fleet.update(dt);
       const anyCombat = combat.active || fleet.active;
+      ship.supercruiseDisabled = anyCombat;
       if (anyCombat !== anyCombatBefore) {
         audio.setDucked(anyCombat); // abafa/devolve as vibrações dos corpos
         // música por encontro: batida comum (alien 1v1 e invasão) vs TEMA DE

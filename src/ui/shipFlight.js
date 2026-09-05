@@ -24,6 +24,27 @@ import { t, getLang } from "../core/i18n.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture, warpRingTexture } from "../core/textures.js";
 import { input } from "../input/InputManager.js";
+import { SHIP_MUZZLES } from "../systems/plasmaCannon.js";
+
+// Configuração de propulsores / exaustores de motor por nave:
+export const SHIP_THRUSTERS_CONFIG = {
+  xr07: [
+    { pos: [0, 0, 0.7], baseScale: 0.45, color: 0x9fe6ff, tint: "#86d6ff" },
+  ],
+  shuttle: [
+    { pos: [0, 0.14, 0.75], baseScale: 0.35, color: 0x9fe6ff, tint: "#86d6ff" },
+    { pos: [-0.12, -0.06, 0.75], baseScale: 0.32, color: 0x9fe6ff, tint: "#86d6ff" },
+    { pos: [0.12, -0.06, 0.75], baseScale: 0.32, color: 0x9fe6ff, tint: "#86d6ff" },
+  ],
+  naveSW: [
+    // 5 propulsores com alinhamento exato: 1 grande central + 4 pequenos nas asas
+    { pos: [0.0522, 0.0277, 0.78], baseScale: 0.55, color: 0x9fe6ff, tint: "#86d6ff" }, // Central Grande
+    { pos: [-0.1871, 0.1370, 0.772], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Superior Esquerdo
+    { pos: [0.1113, 0.0538, 0.799], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Superior Direito
+    { pos: [-0.2551, -0.1015, 0.763], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Inferior Esquerdo
+    { pos: [0.0708, -0.1940, 0.793], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Inferior Direito
+  ],
+};
 
 const NAV_KEYS = new Set([
   "KeyW", "KeyS", "KeyA", "KeyD", "KeyX", "KeyZ", "KeyQ", "KeyE",
@@ -152,6 +173,8 @@ export class ShipFlight {
     this.scAccel = 1.5; // rampa do empuxo até o teto de supercruise (spool-up)
     this.brakeAccel = 400; // frenagem de segurança: desaceleração ao detectar impacto
     this._braking = false; // estado do auto-brake (p/ HUD/readout)
+    this.supercruiseDisabled = false; // desativado obrigatoriamente durante combate
+    this.empTimer = 0; // segundos de paralisia por pulso eletromagnético (EMP)
 
     // --- rotação 6DoF (rad/s, eixos locais, com inércia) ---------------------
     this.pitchRate = 1.6; // cabrar/picar (local X)
@@ -181,16 +204,11 @@ export class ShipFlight {
     this.ship.add(this.model);
     this._modelFix = null; // GLB atual instalado (trocável pelo hangar)
     this._modelReq = null; // última URL pedida — troca durante o load não vaza
-    this.setModelUrl("models/Spaceship.glb");
-
-    this.engineGlow = new THREE.Sprite(
-      new THREE.SpriteMaterial({
-        map: radialGlowTexture("#86d6ff"), color: 0x9fe6ff, transparent: true,
-        blending: THREE.AdditiveBlending, depthWrite: false,
-      })
-    );
-    this.engineGlow.position.set(0, 0, 0.7);
-    this.model.add(this.engineGlow);
+    this.activeShipId = "xr07";
+    this.engineGlowGroup = new THREE.Group();
+    this.model.add(this.engineGlowGroup);
+    this.engineGlows = [];
+    this.setModelUrl("models/Spaceship.glb", Math.PI, 0, "xr07");
     scene.add(this.ship);
 
     // camada de ar superaquecido: brilha no lado da nave voltado pro planeta
@@ -315,8 +333,10 @@ export class ShipFlight {
   // caber no enquadramento da master e troca a procedural. Se falhar, mantém o
   // que estiver instalado. yaw corrige o nariz do modelo (convenção de voo: -Z).
   // Chamável a qualquer momento — é assim que o hangar troca de nave.
-  setModelUrl(url, yaw = Math.PI, pitch = 0) {
+  setModelUrl(url, yaw = Math.PI, pitch = 0, shipId = null) {
     this._modelReq = url;
+    const id = shipId || (url.includes("naveSW") ? "naveSW" : url.includes("onibusEspacial") ? "shuttle" : "xr07");
+    this.activeShipId = id;
     new GLTFLoader().load(
       url,
       (gltf) => {
@@ -344,11 +364,51 @@ export class ShipFlight {
         this.model.add(fix);
         // extensão do casco no eixo de voo (com pitch, o comprimento era o Y do modelo)
         const axisLen = (pitch !== 0 ? size.y : size.z) * (1.6 / maxDim);
-        this.engineGlow.position.set(0, 0, axisLen / 2 + 0.1);
+        this._setupEngineGlows(this.activeShipId, axisLen);
       },
       undefined,
       () => {}
     );
+  }
+
+  // monta e posiciona os propulsores traseiros de acordo com a geometria da nave ativa
+  _setupEngineGlows(shipId, axisLen = null) {
+    while (this.engineGlowGroup.children.length > 0) {
+      this.engineGlowGroup.remove(this.engineGlowGroup.children[0]);
+    }
+    this.engineGlows = [];
+    const configs = SHIP_THRUSTERS_CONFIG[shipId] || SHIP_THRUSTERS_CONFIG.xr07;
+    for (const cfg of configs) {
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: radialGlowTexture(cfg.tint || "#86d6ff"),
+          color: cfg.color || 0x9fe6ff,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      const zPos = axisLen != null && shipId === "xr07" ? (axisLen / 2 + 0.1) : cfg.pos[2];
+      sprite.position.set(cfg.pos[0], cfg.pos[1], zPos);
+      sprite.scale.setScalar(cfg.baseScale);
+      this.engineGlowGroup.add(sprite);
+      this.engineGlows.push({ sprite, baseScale: cfg.baseScale });
+    }
+    this.engineGlow = this.engineGlows[0]?.sprite || null;
+  }
+
+  // atualiza o brilho e a escala de todos os propulsores da nave proporcionalmente ao empuxo
+  _updateEngineGlows(spN, opacityMul = 1) {
+    const scaleMul = 0.6 + spN * 1.4;
+    const op = (0.35 + Math.min(spN, 1) * 0.5) * opacityMul;
+    for (const g of this.engineGlows) {
+      g.sprite.scale.setScalar(g.baseScale * scaleMul);
+      g.sprite.material.opacity = op;
+    }
+  }
+
+  getMuzzles() {
+    return SHIP_MUZZLES[this.activeShipId] || SHIP_MUZZLES.xr07;
   }
 
   get isActive() {
@@ -863,8 +923,7 @@ export class ShipFlight {
     this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
     this.ship.position.addScaledVector(this._fwd, intro.glideSpeed * dt);
 
-    this.engineGlow.scale.setScalar(0.45);
-    this.engineGlow.material.opacity = 0.6;
+    this._updateEngineGlows(0.3, 0.9);
 
     // pose-alvo de 3ª pessoa: atrás e um pouco acima, olhando à frente da nave
     this._up.set(0, 1, 0).applyQuaternion(this.ship.quaternion);
@@ -918,26 +977,38 @@ export class ShipFlight {
       this._prevRef.copy(this._refPos);
     }
 
-      const shiftHeld = k.has("ShiftLeft") || k.has("ShiftRight");
-      const ctrlHeld = k.has("ControlLeft") || k.has("ControlRight");
-      const fwdKey = k.has("KeyW");
-      const revKey = k.has("KeyS");
-      let boosting = fwdKey && shiftHeld && !ctrlHeld;
+      if (this.empTimer > 0) {
+        this.empTimer = Math.max(0, this.empTimer - dt);
+      }
+      const empActive = this.empTimer > 0;
+
+      const shiftHeld = (k.has("ShiftLeft") || k.has("ShiftRight")) && !empActive;
+      const ctrlHeld = (k.has("ControlLeft") || k.has("ControlRight")) && !empActive;
+      const fwdKey = k.has("KeyW") && !empActive;
+      const revKey = k.has("KeyS") && !empActive;
+      let boosting = fwdKey && shiftHeld && !ctrlHeld && !this.supercruiseDisabled && !empActive;
 
     // sinais -1..1 por eixo de rotação (sem interferência entre eles)
     let pitchIn = 0, yawIn = 0, rollIn = 0;
-    if (k.has("ArrowUp") || k.has("KeyX")) pitchIn += 1;   // cabra (nariz sobe)
-    if (k.has("ArrowDown") || k.has("KeyZ")) pitchIn -= 1; // pica (nariz desce)
-    if (k.has("KeyA") || k.has("ArrowLeft")) yawIn += 1;   // guina à esquerda
-    if (k.has("KeyD") || k.has("ArrowRight")) yawIn -= 1;  // guina à direita
-    if (k.has("KeyQ")) rollIn += 1;  // rola asas (sentido anti-horário visto de trás)
-    if (k.has("KeyE")) rollIn -= 1;  // rola asas (sentido horário) — caça vira de ponta-cabeça
+    if (!empActive) {
+      if (k.has("ArrowUp") || k.has("KeyX")) pitchIn += 1;   // cabra (nariz sobe)
+      if (k.has("ArrowDown") || k.has("KeyZ")) pitchIn -= 1; // pica (nariz desce)
+      if (k.has("KeyA") || k.has("ArrowLeft")) yawIn += 1;   // guina à esquerda
+      if (k.has("KeyD") || k.has("ArrowRight")) yawIn -= 1;  // guina à direita
+      if (k.has("KeyQ")) rollIn += 1;  // rola asas (sentido anti-horário visto de trás)
+      if (k.has("KeyE")) rollIn -= 1;  // rola asas (sentido horário) — caça vira de ponta-cabeça
 
-    // analógico esquerdo do gamepad (contínuo, já com deadzone) soma às teclas;
-    // sem gamepad os eixos são 0 e nada muda
-    pitchIn = Math.max(-1, Math.min(1, pitchIn + input.getPitch()));
-    yawIn = Math.max(-1, Math.min(1, yawIn + input.getYaw()));
-    rollIn = Math.max(-1, Math.min(1, rollIn + input.getRoll()));
+      // analógico esquerdo do gamepad (contínuo, já com deadzone) soma às teclas;
+      // sem gamepad os eixos são 0 e nada muda
+      pitchIn = Math.max(-1, Math.min(1, pitchIn + input.getPitch()));
+      yawIn = Math.max(-1, Math.min(1, yawIn + input.getYaw()));
+      rollIn = Math.max(-1, Math.min(1, rollIn + input.getRoll()));
+    } else {
+      // Pequena oscilação inercial durante paralisia EMP
+      pitchIn = (Math.random() - 0.5) * 0.08;
+      yawIn = (Math.random() - 0.5) * 0.08;
+      rollIn = (Math.random() - 0.5) * 0.12;
+    }
 
       const steerMag = Math.max(Math.abs(pitchIn), Math.abs(yawIn), Math.abs(rollIn));
       if (this.objectLock) {
@@ -1154,9 +1225,8 @@ export class ShipFlight {
 
     const sp = this.velocity.length();
     const spN = Math.min(sp / this.maxSpeed, 1.4);
-    const supercruising = sp > this.boostSpeed * 1.5;
-    this.engineGlow.scale.setScalar(0.25 + spN * 0.6);
-    this.engineGlow.material.opacity = 0.35 + Math.min(spN, 1) * 0.5;
+    const supercruising = !this.supercruiseDisabled && (sp > this.boostSpeed * 1.5);
+    this._updateEngineGlows(spN, 1.0);
 
     // 6) CÂMERA — orientação EXATAMENTE igual à da nave (inclui roll; sem
     //    horizonte fixo, sem up global, sem lookAt). Chase cam rígida: a posição

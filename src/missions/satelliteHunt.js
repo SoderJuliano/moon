@@ -272,6 +272,7 @@ export function createSatelliteHuntMission(scene) {
             g.alive = false;
             g.mesh.visible = false;
             if (swallow?.guard === g) swallow = null;
+            emit("stat", { key: "enemyShipsDestroyed" });
             return;
           }
         }

@@ -9,6 +9,7 @@
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { emit } from "../game/events.js";
 
 const COUNT = 5;
 const SIZE = 0.12; // ~2× a nave (0.06)
@@ -133,6 +134,7 @@ export class SlimeSwarm {
     if (!s || !s.alive) return;
     s.alive = false;
     s.mesh.visible = false;
+    emit("stat", { key: "enemyShipsDestroyed" });
     if (this.remaining === 0) this.onCleared?.();
   }
 

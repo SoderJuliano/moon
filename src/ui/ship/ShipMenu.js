@@ -2,7 +2,7 @@ import { getLocale, t } from "./ShipLocalization.js";
 import { ShipRenderer } from "./ShipRenderer.js";
 import { ShipEquipmentSlots } from "./ShipEquipmentSlots.js";
 import { ShipStats } from "./ShipStats.js";
-import { SHIP_CATALOG, shipDef, ensureHangar, setActiveShip, isShipUnlocked, getAchievementsProgress, moveItem, ownsItem, itemShip, MOVABLE_ITEMS } from "../../game/hangar.js";
+import { SHIP_CATALOG, shipDef, ensureHangar, setActiveShip, isShipUnlocked, getAchievementsProgress, getCombatKillsProgress, moveItem, ownsItem, itemShip, MOVABLE_ITEMS } from "../../game/hangar.js";
 
 export class ShipMenu {
   // hooks (opcionais, ligados pelo gameMode):
@@ -129,7 +129,12 @@ export class ShipMenu {
       if (active) {
         badgeHtml = `<span class="ship-car-badge active">${t("activeShip")}</span>`;
       } else if (!isUnlocked) {
-        badgeHtml = `<span class="ship-car-badge locked">🔒 ${prog.percentage}% / 80%</span>`;
+        if (def.id === "naveSW") {
+          const combatProg = getCombatKillsProgress(this.save);
+          badgeHtml = `<span class="ship-car-badge locked">🔒 ${combatProg.kills} / 20</span>`;
+        } else {
+          badgeHtml = `<span class="ship-car-badge locked">🔒 ${prog.percentage}% / 80%</span>`;
+        }
       }
 
       html += `
@@ -157,11 +162,19 @@ export class ShipMenu {
     }
 
     if (!isUnlocked) {
-      const prog = getAchievementsProgress(this.save);
-      row.innerHTML = `
-        <div class="ship-locked-banner">
-          <span class="lock-text">${t("lockedNotice", { count: prog.unlocked, reqCount: prog.required, pct: prog.percentage, req: 80 })}</span>
-        </div>`;
+      if (this.viewShipId === "naveSW") {
+        const combatProg = getCombatKillsProgress(this.save);
+        row.innerHTML = `
+          <div class="ship-locked-banner">
+            <span class="lock-text">${t("lockedNoticeKills", { kills: combatProg.kills, required: combatProg.required })}</span>
+          </div>`;
+      } else {
+        const prog = getAchievementsProgress(this.save);
+        row.innerHTML = `
+          <div class="ship-locked-banner">
+            <span class="lock-text">${t("lockedNotice", { count: prog.unlocked, reqCount: prog.required, pct: prog.percentage, req: 80 })}</span>
+          </div>`;
+      }
       return;
     }
 

@@ -11,6 +11,10 @@ const BASE = {
     hull: "1800 / 1800 HP", speed: "3.3 c-units/s", accel: "2.9 c-units/s²",
     rotSpeed: "1.3 rad/s", cargo: "220 Tons", energy: "140 MW", heat: "55°C", mass: "112.6 Tons",
   },
+  naveSW: {
+    hull: "1500 / 1500 HP", speed: "3.5 c-units/s", accel: "3.6 c-units/s²",
+    rotSpeed: "2.0 rad/s", cargo: "100 Tons", energy: "180 MW", heat: "35°C", mass: "36.4 Tons",
+  },
 };
 
 export class ShipStats {

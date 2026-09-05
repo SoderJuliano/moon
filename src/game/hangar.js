@@ -18,6 +18,7 @@ export const SHIP_CATALOG = [
   // o ônibus espacial vem "em pé" (nariz em +Y) — deita com pitch -90°
   { id: "xr07", modelPath: "models/Spaceship.glb", yaw: Math.PI, pitch: 0 },
   { id: "shuttle", modelPath: "models/onibusEspacialTerra.glb", yaw: 0, pitch: -Math.PI / 2 },
+  { id: "naveSW", modelPath: "models/naveSW.glb", yaw: Math.PI, pitch: 0 },
 ];
 
 // itens que podem ser movidos de uma nave pra outra (o raio trator é
@@ -48,6 +49,16 @@ export function getAchievementsProgress(save) {
   return { unlocked, total, required, ratio, percentage };
 }
 
+// Progresso de inimigos abatidos em combate para desbloqueio da naveSW (20 inimigos)
+export function getCombatKillsProgress(save) {
+  const stats = save?.statistics || save?.data?.statistics || {};
+  const kills = stats.enemyShipsDestroyed || 0;
+  const required = 20;
+  const ratio = Math.min(kills / required, 1);
+  const percentage = Math.round(ratio * 100);
+  return { kills, required, ratio, percentage, unlocked: kills >= required };
+}
+
 export function isShipUnlocked(save, shipId) {
   if (!save) return shipId === "xr07";
   const h = ensureHangar(save);
@@ -55,6 +66,10 @@ export function isShipUnlocked(save, shipId) {
   if (shipId === "shuttle") {
     const prog = getAchievementsProgress(save);
     return prog.ratio >= 0.8;
+  }
+  if (shipId === "naveSW") {
+    const prog = getCombatKillsProgress(save);
+    return prog.unlocked;
   }
   return false;
 }
@@ -72,8 +87,23 @@ export function ensureHangar(save) {
     h.unlocked.push("shuttle");
   }
 
+  // Desbloqueia a naveSW se tiver 20 abates de inimigos em combate
+  const combatProg = getCombatKillsProgress(save);
+  if (combatProg.unlocked && !h.unlocked.includes("naveSW")) {
+    h.unlocked.push("naveSW");
+  }
+
   if (!h.active || !h.unlocked.includes(h.active)) h.active = h.unlocked[0];
   h.install = h.install || {};
+
+  // Se a naveSW for a ativa, ela já vem com canhão equipado de fábrica
+  if (h.active === "naveSW") {
+    if (!save.ship) save.ship = { weapons: {} };
+    if (!save.ship.weapons) save.ship.weapons = {};
+    save.ship.weapons.plasmaCannonOwned = true;
+    save.ship.weapons.plasmaCannon = true;
+  }
+
   if (save.ship?.weapons?.plasmaCannon && !save.ship.weapons.plasmaCannonOwned) {
     save.ship.weapons.plasmaCannonOwned = true;
   }
