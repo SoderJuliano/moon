@@ -1,5 +1,5 @@
-// Gravador de Vídeo do Canvas via MediaRecorder API nativa do navegador.
-// Grava diretamente os frames do Three.js em 60 FPS com alta taxa de bits.
+// Gravador de Vídeo do Canvas com suporte a Áudio Mixado via MediaRecorder.
+// Grava diretamente os frames do Three.js em 60 FPS + trilha sonora em alta definição.
 
 export class TrailerRecorder {
   constructor(canvas, { fps = 60, videoBitsPerSecond = 16_000_000 } = {}) {
@@ -12,14 +12,17 @@ export class TrailerRecorder {
     this.startTime = 0;
     this.duration = 0;
     this.mimeType = this._selectMimeType();
+    this.audioCtx = null;
+    this.audioDest = null;
+    this.audioSource = null;
   }
 
   _selectMimeType() {
     const types = [
-      "video/webm;codecs=vp9",
-      "video/webm;codecs=vp8",
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
       "video/webm",
-      "video/mp4;codecs=h264",
+      "video/mp4;codecs=h264,aac",
       "video/mp4",
     ];
     for (const type of types) {
@@ -30,12 +33,42 @@ export class TrailerRecorder {
     return "video/webm";
   }
 
-  start() {
+  start(audioEl = null) {
     if (this.isRecording) return;
     this.recordedChunks = [];
 
     try {
-      const stream = this.canvas.captureStream(this.fps);
+      const canvasStream = this.canvas.captureStream(this.fps);
+      let stream = canvasStream;
+
+      if (audioEl && typeof window !== "undefined") {
+        try {
+          if (!this.audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+              this.audioCtx = new AudioContext();
+              this.audioDest = this.audioCtx.createMediaStreamDestination();
+              this.audioSource = this.audioCtx.createMediaElementSource(audioEl);
+              this.audioSource.connect(this.audioDest);
+              this.audioSource.connect(this.audioCtx.destination);
+            }
+          }
+          if (this.audioCtx && this.audioCtx.state === "suspended") {
+            this.audioCtx.resume();
+          }
+
+          if (this.audioDest) {
+            const videoTrack = canvasStream.getVideoTracks()[0];
+            const audioTrack = this.audioDest.stream.getAudioTracks()[0];
+            if (videoTrack && audioTrack) {
+              stream = new MediaStream([videoTrack, audioTrack]);
+            }
+          }
+        } catch (audioErr) {
+          console.warn("[TrailerRecorder] Mixagem de áudio indisponível, gravando vídeo puro:", audioErr);
+        }
+      }
+
       const options = {
         mimeType: this.mimeType,
         videoBitsPerSecond: this.videoBitsPerSecond,
@@ -52,7 +85,7 @@ export class TrailerRecorder {
       this.mediaRecorder.start(250);
       this.isRecording = true;
       this.startTime = performance.now();
-      console.log(`[TrailerRecorder] Gravação iniciada (${this.fps} FPS, ${this.mimeType})`);
+      console.log(`[TrailerRecorder] Gravação com áudio iniciada (${this.fps} FPS, ${this.mimeType})`);
     } catch (err) {
       console.warn("[TrailerRecorder] Falha ao iniciar MediaRecorder:", err);
       this.isRecording = false;
@@ -78,7 +111,7 @@ export class TrailerRecorder {
 
         const blob = new Blob(this.recordedChunks, { type: this.mimeType });
         this.downloadBlob(blob, filename);
-        console.log(`[TrailerRecorder] Gravação concluída (${this.duration.toFixed(1)}s, ${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+        console.log(`[TrailerRecorder] Gravação concluída com áudio (${this.duration.toFixed(1)}s, ${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
         resolve(blob);
       };
 

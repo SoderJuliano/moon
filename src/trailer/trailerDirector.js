@@ -1,6 +1,6 @@
 // TrailerDirector — Diretor de Câmera e Coreografia do Trailer de Lançamento (30s)
-// Controla câmeras dinâmicas, nave, planetas, combate dos chefes e textos cinematográficos,
-// gravando tudo em 60 FPS via TrailerRecorder.
+// Controla câmeras dinâmicas, nave, planetas, combate dos chefes, textos cinematográficos e
+// trilha sonora Dark Trap sincronizada, gravando vídeo e áudio em 60 FPS via TrailerRecorder.
 
 import * as THREE from "three";
 import { createScene } from "../core/scene.js";
@@ -50,6 +50,12 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   }
   updatePlanetPositions();
 
+  // ---- Trilha Sonora do Trailer ----------------------------------------------
+  const music = new Audio("audio/trailer_beat.mp3");
+  music.loop = true;
+  music.playbackRate = 1.10; // Acelera levemente o beat para ~154 BPM (ritmo dinâmico de trailer)
+  music.volume = 0.85;
+
   // ---- Nave do Jogador -------------------------------------------------------
   const playerGroup = new THREE.Group();
   scene.add(playerGroup);
@@ -68,7 +74,6 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
     s.position.sub(center);
     const fix = new THREE.Group();
     fix.add(s);
-    // Spaceship.glb tem o bico no +Z e os motores no -Z (sem rotacao yaw extra)
     fix.rotation.set(0, 0, 0);
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
     fix.scale.setScalar((1.6 / maxDim) * 1.4);
@@ -88,7 +93,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
     })
   );
   thrusterSprite.scale.set(0.65, 0.65, 0.65);
-  thrusterSprite.position.set(0, 0, -0.75); // Posicionado nos bocais traseiros (-Z)
+  thrusterSprite.position.set(0, 0, -0.75);
   playerGroup.add(thrusterSprite);
 
   // ---- Efeito de Partículas de Dobra (Supercruise Warp) -----------------------
@@ -179,10 +184,11 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
 
     <div class="trailer-hud">
       <div class="trailer-rec-badge">
-        <span class="rec-dot"></span> <span class="rec-status">GRAVANDO 4K/60FPS</span>
+        <span class="rec-dot"></span> <span class="rec-status">GRAVANDO VÍDEO + ÁUDIO</span>
         <span class="rec-timer">00:00 / 00:30</span>
       </div>
       <div class="trailer-hud-controls">
+        <button class="trailer-hud-btn" id="btn-hud-speed">🎵 Vel: 1.1x</button>
         <button class="trailer-hud-btn" id="btn-hud-toggle-text">👁️ Textos On/Off</button>
         <button class="trailer-hud-btn exit" id="btn-hud-exit">✕ Sair</button>
       </div>
@@ -216,7 +222,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
     <div class="trailer-finish-modal" style="display:none;">
       <div class="finish-box">
         <div class="finish-title">🎉 Trailer Gravado com Sucesso!</div>
-        <div class="finish-desc">O arquivo de vídeo <b>moon-trailer-30s.webm</b> foi gerado em alta definição e baixado no seu computador.</div>
+        <div class="finish-desc">O arquivo de vídeo e áudio <b>moon-trailer-30s.webm</b> foi gerado em alta definição e baixado no seu computador.</div>
         <div class="finish-actions">
           <button class="trailer-btn" id="btn-replay">🎬 Gravar Novamente (30s)</button>
           <button class="trailer-btn secondary" id="btn-toggle-text">👁️ Alternar Textos</button>
@@ -459,6 +465,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   const timerEl = overlay.querySelector(".rec-timer");
   const progressFill = overlay.querySelector(".trailer-progress-fill");
   const modal = overlay.querySelector(".trailer-finish-modal");
+  const speedBtn = overlay.querySelector("#btn-hud-speed");
 
   function setCard(activeId) {
     for (const [id, el] of Object.entries(cards)) {
@@ -470,7 +477,9 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
     time = 0;
     isRunning = true;
     modal.style.display = "none";
-    if (autoRecord) recorder.start();
+    music.currentTime = 0;
+    music.play().catch(() => {});
+    if (autoRecord) recorder.start(music);
   }
 
   function toggleText() {
@@ -479,8 +488,18 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   }
 
   function exitToMenu() {
+    music.pause();
     window.location.href = window.location.pathname;
   }
+
+  const speeds = [1.0, 1.10, 1.20, 1.30];
+  let speedIdx = 1;
+  speedBtn.addEventListener("click", () => {
+    speedIdx = (speedIdx + 1) % speeds.length;
+    const spd = speeds[speedIdx];
+    music.playbackRate = spd;
+    speedBtn.textContent = `🎵 Vel: ${spd.toFixed(1)}x`;
+  });
 
   // Botoes do modal e HUD
   overlay.querySelector("#btn-replay").addEventListener("click", () => startSequence());
@@ -489,7 +508,9 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   overlay.querySelector("#btn-take-combat").addEventListener("click", () => {
     time = 15.0; // Pula direto pro combate
     modal.style.display = "none";
-    recorder.start();
+    music.currentTime = 13.5;
+    music.play().catch(() => {});
+    recorder.start(music);
   });
   overlay.querySelector("#btn-exit").addEventListener("click", exitToMenu);
   overlay.querySelector("#btn-hud-exit").addEventListener("click", exitToMenu);
@@ -531,7 +552,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         warpMat.opacity = 0;
 
         const tNorm = time / 7.5;
-        // Órbita suave sobre a Terra (raio de órbita 1.8u a 3.4u — superfície da Terra é r=1.0)
+        // Órbita suave sobre a Terra (raio de órbita 1.75u a 3.4u — superfície da Terra é r=1.0)
         const angle = -0.4 + tNorm * 1.1;
         const orbitR = 1.75 + tNorm * 1.6;
         
@@ -579,7 +600,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
 
         if (tAct < 4.0) {
           // Passagem pelos anéis de Saturno (raio do planeta = 9.1u, anéis até 21u)
-          // Nave voa a r = 16.5u e y = +3.5u (deslizando sobre os anéis com segurança)
+          // Nave voa a r = 16.5u e y = +3.2u (deslizando sobre os anéis com segurança)
           const sNorm = tAct / 4.0;
           const sAngle = 0.3 + sNorm * 0.9;
           const sDist = 16.5;
@@ -607,7 +628,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
           camTgt.copy(shipPos);
           camera.lookAt(camTgt);
         } else {
-          // Rasante por Júpiter (raio = 11u; nave voa a r = 19u e y = +4.5u)
+          // Rasante por Júpiter (raio = 11u; nave voa a r = 19.5u e y = +4.8u)
           const jNorm = (tAct - 4.0) / 3.5;
           const jAngle = -0.8 + jNorm * 1.2;
           const jDist = 19.5;
@@ -743,6 +764,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
       else {
         isRunning = false;
         setCard(null);
+        music.pause();
         if (recorder.isRecording) {
           recorder.stop("moon-trailer-30s.webm");
         }
