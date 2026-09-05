@@ -26,19 +26,29 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   controls.enabled = false; // Desativa controle manual de câmera durante o trailer
 
   const world = buildSolarSystem(scene, glow, { mode: "real", withOrbitLines: false });
-  const { bodyById } = world;
+  const { bodyById, bodies } = world;
 
-  // Garante que o Sol, Terra, Júpiter, Saturno e Lua estejam posicionados
+  // Atualiza planetas na órbita real
+  for (const b of bodies) b.update(0, 0, 0.016);
+  scene.updateMatrixWorld(true);
+
   const earth = bodyById.get("earth");
   const moon = bodyById.get("moon");
   const jupiter = bodyById.get("jupiter");
   const saturn = bodyById.get("saturn");
 
-  // Ajusta posições ideais para cinematografia do trailer
-  if (earth) earth.orbitGroup.position.set(0, 0, 0);
-  if (moon) moon.orbitGroup.position.set(22, 4, -18);
-  if (saturn) saturn.orbitGroup.position.set(240, -10, -320);
-  if (jupiter) jupiter.orbitGroup.position.set(-380, 20, 420);
+  const posE = new THREE.Vector3();
+  const posM = new THREE.Vector3();
+  const posS = new THREE.Vector3();
+  const posJ = new THREE.Vector3();
+
+  function updatePlanetPositions() {
+    if (earth) earth.worldPosition(posE);
+    if (moon) moon.worldPosition(posM);
+    if (saturn) saturn.worldPosition(posS);
+    if (jupiter) jupiter.worldPosition(posJ);
+  }
+  updatePlanetPositions();
 
   // ---- Nave do Jogador -------------------------------------------------------
   const playerGroup = new THREE.Group();
@@ -105,9 +115,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   scene.add(warpLines);
 
   // ---- Inimigos & Combate (Chefes Gêmeos + Batedores) ------------------------
-  const combatGroup = new THREE.Group();
-  combatGroup.position.set(100, 30, 150);
-  scene.add(combatGroup);
+  const combatPos = new THREE.Vector3(posE.x + 35, posE.y + 6, posE.z + 45);
 
   const portal = new Portal(scene, {
     colors: { core: "#070208", veil: "#3a0a1a", halo: "#6e1030", rim: "#ff3b57", spark: "#ff7d95" },
@@ -520,17 +528,17 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         warpMat.opacity = 0;
 
         const tNorm = time / 7.5;
-        // Câmera orbitando suavemente da sombra para a luz da Terra
+        // Câmera orbitando suavemente ao redor da Terra (raio ~3.5 a 5.0u)
         const camAngle = -Math.PI * 0.4 + tNorm * 0.8;
-        const camDist = 5.2 - tNorm * 0.8;
-        camera.position.set(Math.cos(camAngle) * camDist, 1.2 + tNorm * 0.6, Math.sin(camAngle) * camDist);
-        camTgt.set(0, 0, 0);
+        const camDist = 4.6 - tNorm * 0.8;
+        camera.position.set(posE.x + Math.cos(camAngle) * camDist, posE.y + 1.2 + tNorm * 0.6, posE.z + Math.sin(camAngle) * camDist);
+        camTgt.copy(posE);
         camera.lookAt(camTgt);
 
         // Nave voando elegantemente em direção à Lua
         const shipZ = -2.5 + tNorm * 9.0;
         const shipX = -1.2 + Math.sin(tNorm * Math.PI) * 2.2;
-        playerGroup.position.set(shipX, 0.4 + tNorm * 0.3, shipZ);
+        playerGroup.position.set(posE.x + shipX, posE.y + 0.4 + tNorm * 0.3, posE.z + shipZ);
         playerGroup.rotation.set(0, Math.PI * 0.05 - tNorm * 0.2, -0.15);
 
         thrusterSprite.scale.setScalar(0.7 + Math.sin(time * 20) * 0.1);
@@ -550,23 +558,21 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
 
         if (tAct < 4.0) {
           // Passagem pelos anéis de Saturno
-          const satPos = saturn ? saturn.orbitGroup.position : new THREE.Vector3(240, -10, -320);
           const sNorm = tAct / 4.0;
-          camera.position.set(satPos.x - 35 + sNorm * 70, satPos.y + 4 - sNorm * 2, satPos.z + 18 + sNorm * 10);
-          camTgt.copy(satPos);
+          camera.position.set(posS.x - 30 + sNorm * 60, posS.y + 6 - sNorm * 2, posS.z + 18 + sNorm * 10);
+          camTgt.copy(posS);
           camera.lookAt(camTgt);
 
-          playerGroup.position.set(satPos.x - 20 + sNorm * 80, satPos.y + 2, satPos.z + 10 + sNorm * 12);
+          playerGroup.position.set(posS.x - 18 + sNorm * 70, posS.y + 3, posS.z + 10 + sNorm * 12);
           playerGroup.rotation.set(0.05, 1.2, -0.2);
         } else {
           // Rasante por Júpiter
-          const jupPos = jupiter ? jupiter.orbitGroup.position : new THREE.Vector3(-380, 20, 420);
           const jNorm = (tAct - 4.0) / 3.5;
-          camera.position.set(jupPos.x + 60 - jNorm * 120, jupPos.y + 12 - jNorm * 8, jupPos.z - 40 + jNorm * 90);
-          camTgt.copy(jupPos);
+          camera.position.set(posJ.x + 50 - jNorm * 100, posJ.y + 12 - jNorm * 8, posJ.z - 35 + jNorm * 80);
+          camTgt.copy(posJ);
           camera.lookAt(camTgt);
 
-          playerGroup.position.set(jupPos.x + 40 - jNorm * 130, jupPos.y + 8, jupPos.z - 30 + jNorm * 100);
+          playerGroup.position.set(posJ.x + 35 - jNorm * 110, posJ.y + 8, posJ.z - 25 + jNorm * 90);
           playerGroup.rotation.set(-0.1, -1.1, 0.25);
         }
       }
@@ -579,7 +585,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         warpMat.opacity = 0;
         const tAct = time - 15.0;
 
-        const cPos = combatGroup.position;
+        const cPos = combatPos;
 
         // Portal abre nos primeiros 2.5s
         if (tAct < 2.5) {
@@ -647,11 +653,11 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
 
         const tNorm = (time - 24.0) / 6.0;
         // Nave voando para o infinito contra o fundo estelar
-        playerGroup.position.set(0, 0, -10 - tNorm * 80);
+        playerGroup.position.set(posE.x, posE.y, posE.z - 10 - tNorm * 80);
         playerGroup.rotation.set(0, Math.PI, 0);
 
-        camera.position.set(0, 2.5, 0);
-        camTgt.set(0, 0, -100);
+        camera.position.set(posE.x, posE.y + 2.5, posE.z);
+        camTgt.set(posE.x, posE.y, posE.z - 100);
         camera.lookAt(camTgt);
       }
 
