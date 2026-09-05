@@ -11,6 +11,8 @@
 // A posse do canhão vive em ship.weapons.plasmaCannonOwned (a flag antiga
 // plasmaCannon vira "instalado na nave ativa"; saves velhos migram sozinhos).
 
+import { buildCatalog } from "./discoveryRegistry.js";
+
 export const SHIP_CATALOG = [
   // yaw/pitch: correção do nariz do modelo (nossa convenção de voo é -Z);
   // o ônibus espacial vem "em pé" (nariz em +Y) — deita com pitch -90°
@@ -30,20 +32,57 @@ export function activeShipDef(save) {
   return shipDef(ensureHangar(save).active) || SHIP_CATALOG[0];
 }
 
+// Progresso de conquistas para cálculo de desbloqueio do Hangar (80%)
+export function getAchievementsProgress(save) {
+  const catalog = buildCatalog();
+  const total = catalog.length;
+  if (total === 0) return { unlocked: 0, total: 0, required: 0, ratio: 0, percentage: 0 };
+  const discoveries = save?.discoveries || save?.data?.discoveries || {};
+  let unlocked = 0;
+  for (const item of catalog) {
+    if (discoveries[item.id]) unlocked++;
+  }
+  const ratio = unlocked / total;
+  const percentage = Math.round(ratio * 100);
+  const required = Math.ceil(total * 0.8);
+  return { unlocked, total, required, ratio, percentage };
+}
+
+export function isShipUnlocked(save, shipId) {
+  if (!save) return shipId === "xr07";
+  const h = ensureHangar(save);
+  if (h.unlocked.includes(shipId)) return true;
+  if (shipId === "shuttle") {
+    const prog = getAchievementsProgress(save);
+    return prog.ratio >= 0.8;
+  }
+  return false;
+}
+
 // garante a estrutura no save (migração leve de saves antigos): tudo que já
 // estava equipado passa a constar como instalado na nave ativa.
 export function ensureHangar(save) {
   if (!save.hangar) save.hangar = { unlocked: ["xr07"], active: "xr07", install: {} };
   const h = save.hangar;
   if (!Array.isArray(h.unlocked) || !h.unlocked.length) h.unlocked = ["xr07"];
+
+  // Desbloqueia o Ônibus Espacial se tiver 80% das conquistas
+  const prog = getAchievementsProgress(save);
+  if (prog.ratio >= 0.8 && !h.unlocked.includes("shuttle")) {
+    h.unlocked.push("shuttle");
+  }
+
   if (!h.active || !h.unlocked.includes(h.active)) h.active = h.unlocked[0];
   h.install = h.install || {};
   if (save.ship?.weapons?.plasmaCannon && !save.ship.weapons.plasmaCannonOwned) {
     save.ship.weapons.plasmaCannonOwned = true;
   }
-  if (save.inventory?.scanner?.equipped && !h.install.scanner) h.install.scanner = h.active;
-  if (save.inventory?.shield?.equipped && !h.install.shieldGen) h.install.shieldGen = h.active;
-  if (save.ship?.weapons?.plasmaCannon && !h.install.plasmaCannon) h.install.plasmaCannon = h.active;
+  // Garante que todo item possuído tenha alocação (padrão: nave ativa)
+  for (const it of MOVABLE_ITEMS) {
+    if (ownsItem(save, it) && !h.install[it]) {
+      h.install[it] = h.active;
+    }
+  }
   return h;
 }
 
@@ -70,12 +109,17 @@ export function moveItem(save, id, shipId) {
   syncLoadout(save);
 }
 
-export function setActiveShip(save, shipId, { moveEquipment = false } = {}) {
+export function setActiveShip(save, shipId, { moveEquipment = true } = {}) {
   const h = ensureHangar(save);
-  if (!h.unlocked.includes(shipId)) return;
+  if (!isShipUnlocked(save, shipId)) return;
+  if (!h.unlocked.includes(shipId)) h.unlocked.push(shipId);
   h.active = shipId;
   if (moveEquipment) {
-    for (const it of MOVABLE_ITEMS) if (ownsItem(save, it) && h.install[it]) h.install[it] = shipId;
+    for (const it of MOVABLE_ITEMS) {
+      if (ownsItem(save, it)) {
+        h.install[it] = shipId;
+      }
+    }
   }
   syncLoadout(save);
 }

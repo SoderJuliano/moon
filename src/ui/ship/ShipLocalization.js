@@ -19,11 +19,14 @@ export const TRANSLATIONS = {
       shuttle: {
         name: "Ônibus Espacial",
         registry: "REGISTRY // OV-208 HUMANIDADE",
-        story: "O orgulho da engenharia humana: um orbitador clássico restaurado e modernizado pela Estação como agradecimento por limpar a rede de espionagem. Cada rebite dele foi feito na Terra.",
+        story: "O clássico orbitador terrestre restaurado e modernizado pela Estação com propulsores de dobra e blindagem térmica avançada. Desbloqueado ao completar 80% das Conquistas do Sistema Solar.",
       },
     },
     activateShip: "ATIVAR ESTA NAVE",
     activeShip: "NAVE ATIVA",
+    activeShipInFlight: "Nave em uso atual",
+    lockedShip: "BLOQUEADA",
+    lockedNotice: "🔒 Bloqueado: Conclua 80% das Conquistas do Sistema Solar para desbloquear ({count}/{reqCount} · {pct}% de {req}%)",
     moveHere: "⚓ Mover para esta nave",
     onOtherShip: "Em outra nave",
     moveAllPrompt: "Mover os equipamentos instalados para esta nave?",
@@ -168,11 +171,14 @@ export const TRANSLATIONS = {
       shuttle: {
         name: "Space Shuttle",
         registry: "REGISTRY // OV-208 HUMANITY",
-        story: "The pride of human engineering: a classic orbiter restored and modernized by the Station as a thank-you for clearing the spy network. Every rivet was made on Earth.",
+        story: "The classic Earth orbiter restored and modernized by the Station with warp drives and advanced thermal shielding. Unlocked upon completing 80% of Solar System Achievements.",
       },
     },
     activateShip: "ACTIVATE THIS SHIP",
     activeShip: "ACTIVE SHIP",
+    activeShipInFlight: "Currently active ship",
+    lockedShip: "LOCKED",
+    lockedNotice: "🔒 Locked: Complete 80% of Solar System Achievements to unlock ({count}/{reqCount} · {pct}% of {req}%)",
     moveHere: "⚓ Move to this ship",
     onOtherShip: "On another ship",
     moveAllPrompt: "Move the installed equipment to this ship?",
@@ -304,10 +310,22 @@ export const TRANSLATIONS = {
   }
 };
 
-export const t = (key, category = null) => {
-  const locale = getLocale();
-  if (category) {
-    return TRANSLATIONS[locale][category]?.[key] || TRANSLATIONS["pt"][category]?.[key] || key;
+export const t = (key, category = null, params = null) => {
+  if (category && typeof category === "object" && params == null) {
+    params = category;
+    category = null;
   }
-  return TRANSLATIONS[locale][key] || TRANSLATIONS["pt"][key] || key;
+  const locale = getLocale();
+  let str = "";
+  if (category) {
+    str = TRANSLATIONS[locale]?.[category]?.[key] || TRANSLATIONS["pt"]?.[category]?.[key] || key;
+  } else {
+    str = TRANSLATIONS[locale]?.[key] || TRANSLATIONS["pt"]?.[key] || key;
+  }
+  if (params && typeof str === "string") {
+    for (const [k, v] of Object.entries(params)) {
+      str = str.replace(new RegExp(`\\{${k}\\}`, "g"), v);
+    }
+  }
+  return str;
 };
