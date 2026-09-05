@@ -2225,6 +2225,19 @@ canvas {
   box-shadow: 0 0 12px rgba(90, 150, 240, 0.2);
 }
 
+.ship-car-card.locked {
+  opacity: 0.7;
+  border-style: dashed;
+  border-color: rgba(220, 140, 70, 0.4);
+  background: rgba(24, 16, 20, 0.5);
+}
+
+.ship-car-card.locked:hover {
+  opacity: 0.9;
+  border-color: rgba(240, 160, 90, 0.6);
+  background: rgba(36, 22, 28, 0.7);
+}
+
 .ship-car-name {
   font-size: 13px;
   font-weight: 600;
@@ -2250,6 +2263,36 @@ canvas {
   background: rgba(50, 120, 70, 0.9);
   border: 1px solid rgba(120, 200, 140, 0.6);
   color: #eafff0;
+}
+
+.ship-car-badge.locked {
+  background: rgba(180, 80, 40, 0.9);
+  border-color: rgba(240, 130, 80, 0.7);
+  color: #fff2eb;
+}
+
+.ship-active-tag {
+  font-family: monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #86e8a0;
+  background: rgba(40, 110, 60, 0.25);
+  border: 1px solid rgba(80, 180, 110, 0.4);
+  padding: 6px 14px;
+  border-radius: 6px;
+}
+
+.ship-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: monospace;
+  font-size: 11px;
+  color: #ffab76;
+  background: rgba(180, 60, 20, 0.18);
+  border: 1px dashed rgba(240, 120, 60, 0.45);
+  padding: 6px 14px;
+  border-radius: 6px;
 }
 
 /* item que existe, mas está instalado em OUTRA nave (dá pra mover, não duplicar) */

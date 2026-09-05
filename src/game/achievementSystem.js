@@ -14,6 +14,7 @@
 import { on } from "./events.js";
 import { buildCatalog } from "./discoveryRegistry.js";
 import { playDiscovery } from "../ui/sfx.js";
+import { ensureHangar } from "./hangar.js";
 
 // conquistas-SURPRESA por estatística: ao cruzar o limiar, desbloqueia sozinho
 // (sem missão, sem aviso prévio) — adicionar limiar novo é uma linha aqui
@@ -56,6 +57,7 @@ export class AchievementSystem {
     d.discoveries[id] = { at };
     playDiscovery();
     this.popup.show(item, at);
+    ensureHangar(d);
     this.save.saveNow(); // descoberta é evento importante → auto-save
   }
 }

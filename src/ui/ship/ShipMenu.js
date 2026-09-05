@@ -2,7 +2,7 @@ import { getLocale, t } from "./ShipLocalization.js";
 import { ShipRenderer } from "./ShipRenderer.js";
 import { ShipEquipmentSlots } from "./ShipEquipmentSlots.js";
 import { ShipStats } from "./ShipStats.js";
-import { SHIP_CATALOG, shipDef, ensureHangar, setActiveShip, moveItem, ownsItem, itemShip, MOVABLE_ITEMS } from "../../game/hangar.js";
+import { SHIP_CATALOG, shipDef, ensureHangar, setActiveShip, isShipUnlocked, getAchievementsProgress, moveItem, ownsItem, itemShip, MOVABLE_ITEMS } from "../../game/hangar.js";
 
 export class ShipMenu {
   // hooks (opcionais, ligados pelo gameMode):
@@ -116,18 +116,27 @@ export class ShipMenu {
 
   _renderShips() {
     const hangar = ensureHangar(this.save);
+    const prog = getAchievementsProgress(this.save);
     const bar = this.overlay.querySelector(".ship-carousel");
     let html = "";
     for (const def of SHIP_CATALOG) {
-      if (!hangar.unlocked.includes(def.id)) continue; // só o que o jogador possui
+      const isUnlocked = isShipUnlocked(this.save, def.id);
       const info = t(def.id, "ships");
       const active = hangar.active === def.id;
       const viewing = this.viewShipId === def.id;
+
+      let badgeHtml = "";
+      if (active) {
+        badgeHtml = `<span class="ship-car-badge active">${t("activeShip")}</span>`;
+      } else if (!isUnlocked) {
+        badgeHtml = `<span class="ship-car-badge locked">🔒 ${prog.percentage}% / 80%</span>`;
+      }
+
       html += `
-        <div class="ship-car-card ${viewing ? "selected" : ""} ${active ? "active" : ""}" data-id="${def.id}">
-          <span class="ship-car-name">${info.name}</span>
+        <div class="ship-car-card ${viewing ? "selected" : ""} ${active ? "active" : ""} ${!isUnlocked ? "locked" : ""}" data-id="${def.id}">
+          <span class="ship-car-name">${!isUnlocked ? "🔒 " : ""}${info.name}</span>
           <span class="ship-car-reg">${info.registry}</span>
-          ${active ? `<span class="ship-car-badge">${t("activeShip")}</span>` : ""}
+          ${badgeHtml}
         </div>`;
     }
     bar.innerHTML = html;
@@ -140,35 +149,32 @@ export class ShipMenu {
   _renderActivateRow() {
     const hangar = ensureHangar(this.save);
     const row = this.overlay.querySelector(".ship-activate-row");
+    const isUnlocked = isShipUnlocked(this.save, this.viewShipId);
+
     if (this.viewShipId === hangar.active) {
-      row.innerHTML = "";
+      row.innerHTML = `<span class="ship-active-tag">✓ ${t("activeShipInFlight")}</span>`;
       return;
     }
-    row.innerHTML = `<button class="activate-ship-btn">${t("activateShip")}</button>`;
+
+    if (!isUnlocked) {
+      const prog = getAchievementsProgress(this.save);
+      row.innerHTML = `
+        <div class="ship-locked-banner">
+          <span class="lock-text">${t("lockedNotice", { count: prog.unlocked, reqCount: prog.required, pct: prog.percentage, req: 80 })}</span>
+        </div>`;
+      return;
+    }
+
+    row.innerHTML = `<button class="activate-ship-btn">🚀 ${t("activateShip")}</button>`;
     row.querySelector(".activate-ship-btn").onclick = () => this._activate(this.viewShipId);
   }
 
   _activate(shipId) {
-    // algum equipamento ficaria pra trás? pergunta se move junto (nunca duplica)
-    const leftBehind = MOVABLE_ITEMS.some(
-      (it) => ownsItem(this.save, it) && itemShip(this.save, it) && itemShip(this.save, it) !== shipId
-    );
-    if (!leftBehind) {
-      this._doActivate(shipId, false);
-      return;
-    }
-    const row = this.overlay.querySelector(".ship-activate-row");
-    row.innerHTML = `
-      <div class="ship-move-prompt">
-        <span>${t("moveAllPrompt")}</span>
-        <button class="activate-ship-btn" data-move="yes">${t("moveAllYes")}</button>
-        <button class="activate-ship-btn ghost" data-move="no">${t("moveAllNo")}</button>
-      </div>`;
-    row.querySelector('[data-move="yes"]').onclick = () => this._doActivate(shipId, true);
-    row.querySelector('[data-move="no"]').onclick = () => this._doActivate(shipId, false);
+    // Ao ativar, transfere automaticamente todos os equipamentos possuídos
+    this._doActivate(shipId, true);
   }
 
-  _doActivate(shipId, moveEquipment) {
+  _doActivate(shipId, moveEquipment = true) {
     setActiveShip(this.save, shipId, { moveEquipment });
     this.saveManager?.saveNow?.();
     this.hooks.onLoadoutChanged?.();
