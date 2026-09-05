@@ -387,7 +387,7 @@ export function startMainMenu({ onSelect }) {
     views.modes.style.display = which === "modes" ? "" : "none";
     if (which === "game") {
       const has = hasAnySave();
-      views.game.querySelector('[data-game="continue"]').style.display = has ? "" : "none";
+      views.game.querySelector('[data-game="continue"]').style.display = ""; // Sempre visível para permitir carregar local ou da nuvem (Abra API)
       views.game.querySelector('[data-game="export"]').style.display = has ? "" : "none";
       saveNote.textContent = "";
     }

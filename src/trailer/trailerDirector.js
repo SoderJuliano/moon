@@ -68,54 +68,57 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
     s.position.sub(center);
     const fix = new THREE.Group();
     fix.add(s);
-    fix.rotation.set(0, Math.PI, 0);
+    // Spaceship.glb tem o bico no +Z e os motores no -Z (sem rotacao yaw extra)
+    fix.rotation.set(0, 0, 0);
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
     fix.scale.setScalar((1.6 / maxDim) * 1.4);
     playerGroup.remove(fallbackShip);
     playerGroup.add(fix);
   });
 
-  // Fagulhas de propulsão azul
+  // Fogo dos motores na TRASEIRA (-Z)
   const thrusterSprite = new THREE.Sprite(
     new THREE.SpriteMaterial({
       map: radialGlowTexture("#4dc3ff"),
       color: 0x66ccff,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.95,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     })
   );
-  thrusterSprite.scale.set(0.6, 0.6, 0.6);
-  thrusterSprite.position.set(0, 0, -0.6);
+  thrusterSprite.scale.set(0.65, 0.65, 0.65);
+  thrusterSprite.position.set(0, 0, -0.75); // Posicionado nos bocais traseiros (-Z)
   playerGroup.add(thrusterSprite);
 
   // ---- Efeito de Partículas de Dobra (Supercruise Warp) -----------------------
-  const WARP_COUNT = 300;
+  const WARP_COUNT = 350;
   const warpGeo = new THREE.BufferGeometry();
   const warpPositions = new Float32Array(WARP_COUNT * 6);
   for (let i = 0; i < WARP_COUNT; i++) {
-    const x = (Math.random() - 0.5) * 40;
-    const y = (Math.random() - 0.5) * 40;
-    const z = (Math.random() - 0.5) * 80;
+    const x = (Math.random() - 0.5) * 50;
+    const y = (Math.random() - 0.5) * 50;
+    const z = (Math.random() - 0.5) * 100;
     warpPositions[i * 6] = x;
     warpPositions[i * 6 + 1] = y;
     warpPositions[i * 6 + 2] = z;
     warpPositions[i * 6 + 3] = x;
     warpPositions[i * 6 + 4] = y;
-    warpPositions[i * 6 + 5] = z - (4 + Math.random() * 8);
+    warpPositions[i * 6 + 5] = z - (6 + Math.random() * 10);
   }
   warpGeo.setAttribute("position", new THREE.BufferAttribute(warpPositions, 3));
   const warpMat = new THREE.LineBasicMaterial({
-    color: 0x70b8ff,
+    color: 0x85c7ff,
     transparent: true,
     opacity: 0.0,
     blending: THREE.AdditiveBlending,
+    depthWrite: false,
   });
   const warpLines = new THREE.LineSegments(warpGeo, warpMat);
   scene.add(warpLines);
 
   // ---- Inimigos & Combate (Chefes Gêmeos + Batedores) ------------------------
-  const combatPos = new THREE.Vector3(posE.x + 35, posE.y + 6, posE.z + 45);
+  const combatPos = new THREE.Vector3(posE.x + 60, posE.y + 10, posE.z + 80);
 
   const portal = new Portal(scene, {
     colors: { core: "#070208", veil: "#3a0a1a", halo: "#6e1030", rim: "#ff3b57", spark: "#ff7d95" },
@@ -142,7 +145,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   scout1.load();
   scout2.load();
 
-  // Tiros de Plasma Azuis e Carmesins
+  // Tiros de Plasma Azuis (Jogador) e Vermelhos (Inimigos)
   const boltGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.8, 6);
   boltGeo.rotateX(Math.PI / 2);
   const boltPlayerMat = new THREE.MeshBasicMaterial({
@@ -159,7 +162,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   });
 
   const plasmaBolts = [];
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 20; i++) {
     const isPlayer = i % 2 === 0;
     const mesh = new THREE.Mesh(boltGeo, isPlayer ? boltPlayerMat : boltEnemyMat);
     mesh.visible = false;
@@ -528,20 +531,38 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         warpMat.opacity = 0;
 
         const tNorm = time / 7.5;
-        // Câmera orbitando suavemente ao redor da Terra (raio ~3.5 a 5.0u)
-        const camAngle = -Math.PI * 0.4 + tNorm * 0.8;
-        const camDist = 4.6 - tNorm * 0.8;
-        camera.position.set(posE.x + Math.cos(camAngle) * camDist, posE.y + 1.2 + tNorm * 0.6, posE.z + Math.sin(camAngle) * camDist);
-        camTgt.copy(posE);
+        // Órbita suave sobre a Terra (raio de órbita 1.8u a 3.4u — superfície da Terra é r=1.0)
+        const angle = -0.4 + tNorm * 1.1;
+        const orbitR = 1.75 + tNorm * 1.6;
+        
+        // Posição da nave voando para frente no espaço
+        const shipPos = new THREE.Vector3(
+          posE.x + Math.cos(angle) * orbitR,
+          posE.y + 0.5 + tNorm * 0.7,
+          posE.z + Math.sin(angle) * orbitR
+        );
+        playerGroup.position.copy(shipPos);
+
+        // Próxima posição para orientar o nariz da nave para frente (+Z)
+        const nextAngle = angle + 0.06;
+        const nextOrbitR = orbitR + 0.05;
+        const targetPos = new THREE.Vector3(
+          posE.x + Math.cos(nextAngle) * nextOrbitR,
+          posE.y + 0.5 + tNorm * 0.7 + 0.03,
+          posE.z + Math.sin(nextAngle) * nextOrbitR
+        );
+        playerGroup.lookAt(targetPos);
+
+        // Câmera dinâmica acompanhando a nave e mostrando a curva da Terra ao fundo
+        camera.position.set(
+          posE.x + Math.cos(angle - 0.35) * (orbitR + 1.2),
+          posE.y + 1.4 + tNorm * 0.5,
+          posE.z + Math.sin(angle - 0.35) * (orbitR + 1.2)
+        );
+        camTgt.copy(shipPos);
         camera.lookAt(camTgt);
 
-        // Nave voando elegantemente em direção à Lua
-        const shipZ = -2.5 + tNorm * 9.0;
-        const shipX = -1.2 + Math.sin(tNorm * Math.PI) * 2.2;
-        playerGroup.position.set(posE.x + shipX, posE.y + 0.4 + tNorm * 0.3, posE.z + shipZ);
-        playerGroup.rotation.set(0, Math.PI * 0.05 - tNorm * 0.2, -0.15);
-
-        thrusterSprite.scale.setScalar(0.7 + Math.sin(time * 20) * 0.1);
+        thrusterSprite.scale.setScalar(0.7 + Math.sin(time * 25) * 0.1);
       }
 
       // =========================================================================
@@ -552,28 +573,66 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         const tAct = time - 7.5;
         const tNorm = tAct / 7.5;
 
-        // Dobra espacial ativada
+        // Efeito de Dobra Espacial
         warpMat.opacity = Math.min(0.85, Math.sin(tNorm * Math.PI) * 1.2);
         warpLines.position.copy(camera.position);
 
         if (tAct < 4.0) {
-          // Passagem pelos anéis de Saturno
+          // Passagem pelos anéis de Saturno (raio do planeta = 9.1u, anéis até 21u)
+          // Nave voa a r = 16.5u e y = +3.5u (deslizando sobre os anéis com segurança)
           const sNorm = tAct / 4.0;
-          camera.position.set(posS.x - 30 + sNorm * 60, posS.y + 6 - sNorm * 2, posS.z + 18 + sNorm * 10);
-          camTgt.copy(posS);
-          camera.lookAt(camTgt);
+          const sAngle = 0.3 + sNorm * 0.9;
+          const sDist = 16.5;
 
-          playerGroup.position.set(posS.x - 18 + sNorm * 70, posS.y + 3, posS.z + 10 + sNorm * 12);
-          playerGroup.rotation.set(0.05, 1.2, -0.2);
+          const shipPos = new THREE.Vector3(
+            posS.x + Math.cos(sAngle) * sDist,
+            posS.y + 3.2,
+            posS.z + Math.sin(sAngle) * sDist
+          );
+          playerGroup.position.copy(shipPos);
+
+          const nextPos = new THREE.Vector3(
+            posS.x + Math.cos(sAngle + 0.08) * sDist,
+            posS.y + 3.2,
+            posS.z + Math.sin(sAngle + 0.08) * sDist
+          );
+          playerGroup.lookAt(nextPos);
+
+          // Câmera cinematográfica rente aos anéis
+          camera.position.set(
+            posS.x + Math.cos(sAngle - 0.25) * (sDist + 4.5),
+            posS.y + 4.8,
+            posS.z + Math.sin(sAngle - 0.25) * (sDist + 4.5)
+          );
+          camTgt.copy(shipPos);
+          camera.lookAt(camTgt);
         } else {
-          // Rasante por Júpiter
+          // Rasante por Júpiter (raio = 11u; nave voa a r = 19u e y = +4.5u)
           const jNorm = (tAct - 4.0) / 3.5;
-          camera.position.set(posJ.x + 50 - jNorm * 100, posJ.y + 12 - jNorm * 8, posJ.z - 35 + jNorm * 80);
-          camTgt.copy(posJ);
-          camera.lookAt(camTgt);
+          const jAngle = -0.8 + jNorm * 1.2;
+          const jDist = 19.5;
 
-          playerGroup.position.set(posJ.x + 35 - jNorm * 110, posJ.y + 8, posJ.z - 25 + jNorm * 90);
-          playerGroup.rotation.set(-0.1, -1.1, 0.25);
+          const shipPos = new THREE.Vector3(
+            posJ.x + Math.cos(jAngle) * jDist,
+            posJ.y + 4.8 - jNorm * 1.5,
+            posJ.z + Math.sin(jAngle) * jDist
+          );
+          playerGroup.position.copy(shipPos);
+
+          const nextPos = new THREE.Vector3(
+            posJ.x + Math.cos(jAngle + 0.08) * jDist,
+            posJ.y + 4.8 - jNorm * 1.5,
+            posJ.z + Math.sin(jAngle + 0.08) * jDist
+          );
+          playerGroup.lookAt(nextPos);
+
+          camera.position.set(
+            posJ.x + Math.cos(jAngle - 0.22) * (jDist + 5.5),
+            posJ.y + 6.8,
+            posJ.z + Math.sin(jAngle - 0.22) * (jDist + 5.5)
+          );
+          camTgt.copy(shipPos);
+          camera.lookAt(camTgt);
         }
       }
 
@@ -589,22 +648,28 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
 
         // Portal abre nos primeiros 2.5s
         if (tAct < 2.5) {
-          portal.openAt(cPos, 7.0);
+          portal.openAt(cPos, 7.5);
         }
         portal.update(dt);
 
         // Naves chefes emergem e avançam
         if (tAct >= 1.5) {
           if (!bossEclipse.alive) {
-            bossEclipse.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(-2.2, 0.6, -1)));
-            bossVortice.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(2.2, -0.6, -1)));
-            scout1.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(-4.5, 2.0, 3)));
-            scout2.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(4.5, -2.0, 3)));
+            bossEclipse.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(-3.0, 0.6, -2)));
+            bossVortice.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(3.0, -0.6, -2)));
+            scout1.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(-5.5, 2.0, 2)));
+            scout2.spawnAt(tmpV1.copy(cPos).add(tmpV2.set(5.5, -2.0, 2)));
           }
 
           const adv = (tAct - 1.5) * 1.8;
-          bossEclipse.group.position.set(cPos.x - 2.2, cPos.y + 0.6, cPos.z - 1 + adv * 0.8);
-          bossVortice.group.position.set(cPos.x + 2.2, cPos.y - 0.6, cPos.z - 1 + adv * 0.8);
+          bossEclipse.group.position.set(cPos.x - 3.0, cPos.y + 0.6, cPos.z - 2 + adv * 0.7);
+          bossVortice.group.position.set(cPos.x + 3.0, cPos.y - 0.6, cPos.z - 2 + adv * 0.7);
+
+          // Chefes olham diretamente para a nave do jogador
+          bossEclipse.group.lookAt(playerGroup.position);
+          bossVortice.group.lookAt(playerGroup.position);
+          scout1.group.lookAt(playerGroup.position);
+          scout2.group.lookAt(playerGroup.position);
 
           bossEclipse.update(dt, playerGroup.position);
           bossVortice.update(dt, playerGroup.position);
@@ -612,30 +677,41 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
           scout2.update(dt, playerGroup.position);
         }
 
-        // Nave do jogador contra-atacando
-        const pZ = cPos.z + 18 - tAct * 3.2;
-        playerGroup.position.set(cPos.x + Math.sin(tAct * 2.5) * 1.8, cPos.y - 0.5, pZ);
-        playerGroup.rotation.set(0.1, Math.PI, Math.sin(tAct * 3) * 0.3);
+        // Nave do jogador voando de frente contra os chefes
+        const pZ = cPos.z + 24 - tAct * 3.4;
+        const pX = cPos.x + Math.sin(tAct * 2.2) * 2.4;
+        const pY = cPos.y - 0.4 + Math.cos(tAct * 1.8) * 0.6;
+        playerGroup.position.set(pX, pY, pZ);
 
-        // Tiros de Plasma disparando
-        if (Math.sin(time * 12) > 0.6) {
+        // Nave do jogador aponta o bico (+Z) na direção do combate/portal
+        playerGroup.lookAt(cPos.x, cPos.y, cPos.z);
+
+        // Tiros de Plasma disparando para frente
+        if (Math.sin(time * 14) > 0.4) {
           const b = plasmaBolts.find((x) => x.life <= 0);
           if (b) {
             b.life = 1.2;
             b.mesh.visible = true;
             if (b.isPlayer) {
-              b.mesh.position.copy(playerGroup.position).add(tmpV1.set((Math.random() - 0.5) * 0.4, 0, -0.6));
-              b.vel.set(0, 0, -18);
+              // Tiros do jogador saem da frente do bico (+Z) rumo aos chefes
+              b.mesh.position.copy(playerGroup.position).add(tmpV1.set((Math.random() - 0.5) * 0.4, 0, 0.8));
+              tmpV2.copy(cPos).sub(playerGroup.position).normalize().multiplyScalar(22);
+              b.vel.copy(tmpV2);
+              b.mesh.lookAt(cPos);
             } else {
-              b.mesh.position.copy(bossEclipse.group.position).add(tmpV1.set((Math.random() - 0.5) * 0.8, 0, 1));
-              b.vel.set(0, 0, 14);
+              // Tiros dos chefes saem em direção ao jogador
+              const srcPos = Math.random() > 0.5 ? bossEclipse.group.position : bossVortice.group.position;
+              b.mesh.position.copy(srcPos).add(tmpV1.set((Math.random() - 0.5) * 0.8, 0, 0.8));
+              tmpV2.copy(playerGroup.position).sub(srcPos).normalize().multiplyScalar(16);
+              b.vel.copy(tmpV2);
+              b.mesh.lookAt(playerGroup.position);
             }
           }
         }
 
         // Câmera dinâmica de ação com leve tremor
-        const shake = Math.sin(time * 30) * 0.08;
-        camera.position.set(playerGroup.position.x + 1.8 + shake, playerGroup.position.y + 1.2, playerGroup.position.z + 4.5);
+        const shake = Math.sin(time * 35) * 0.09;
+        camera.position.set(pX + 2.2 + shake, pY + 1.4, pZ + 5.5);
         camTgt.set(cPos.x, cPos.y, cPos.z);
         camera.lookAt(camTgt);
       }
@@ -652,12 +728,12 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         scout2.hide();
 
         const tNorm = (time - 24.0) / 6.0;
-        // Nave voando para o infinito contra o fundo estelar
-        playerGroup.position.set(posE.x, posE.y, posE.z - 10 - tNorm * 80);
-        playerGroup.rotation.set(0, Math.PI, 0);
+        // Nave voando para frente no espaço estelar
+        playerGroup.position.set(posE.x, posE.y, posE.z + 10 + tNorm * 90);
+        playerGroup.lookAt(posE.x, posE.y, posE.z + 200);
 
-        camera.position.set(posE.x, posE.y + 2.5, posE.z);
-        camTgt.set(posE.x, posE.y, posE.z - 100);
+        camera.position.set(posE.x + 2.5, posE.y + 2.0, posE.z - 4.0);
+        camTgt.set(posE.x, posE.y, posE.z + 100);
         camera.lookAt(camTgt);
       }
 
