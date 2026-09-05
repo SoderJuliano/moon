@@ -19,9 +19,14 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   window.isTrailerMode = true;
   document.body.classList.add("trailer-mode");
 
-  const { scene, camera, renderer, glow } = createScene();
+  // Remove tela de loading do menu imediatamente
+  document.getElementById("loading")?.remove();
+
+  const { scene, camera, renderer, controls, glow } = createScene();
+  controls.enabled = false; // Desativa controle manual de câmera durante o trailer
+
   const world = buildSolarSystem(scene, glow, { mode: "real", withOrbitLines: false });
-  const { bodyById, bodies } = world;
+  const { bodyById } = world;
 
   // Garante que o Sol, Terra, Júpiter, Saturno e Lua estejam posicionados
   const earth = bodyById.get("earth");
@@ -29,7 +34,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   const jupiter = bodyById.get("jupiter");
   const saturn = bodyById.get("saturn");
 
-  // Ajusta posições estáticas ideais para cinematografia do trailer
+  // Ajusta posições ideais para cinematografia do trailer
   if (earth) earth.orbitGroup.position.set(0, 0, 0);
   if (moon) moon.orbitGroup.position.set(22, 4, -18);
   if (saturn) saturn.orbitGroup.position.set(240, -10, -320);
@@ -77,7 +82,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
   // ---- Efeito de Partículas de Dobra (Supercruise Warp) -----------------------
   const WARP_COUNT = 300;
   const warpGeo = new THREE.BufferGeometry();
-  const warpPositions = new Float32Array(WARP_COUNT * 6); // linhas
+  const warpPositions = new Float32Array(WARP_COUNT * 6);
   for (let i = 0; i < WARP_COUNT; i++) {
     const x = (Math.random() - 0.5) * 40;
     const y = (Math.random() - 0.5) * 40;
@@ -166,6 +171,10 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         <span class="rec-dot"></span> <span class="rec-status">GRAVANDO 4K/60FPS</span>
         <span class="rec-timer">00:00 / 00:30</span>
       </div>
+      <div class="trailer-hud-controls">
+        <button class="trailer-hud-btn" id="btn-hud-toggle-text">👁️ Textos On/Off</button>
+        <button class="trailer-hud-btn exit" id="btn-hud-exit">✕ Sair</button>
+      </div>
       <div class="trailer-progress-bar"><div class="trailer-progress-fill"></div></div>
     </div>
 
@@ -234,8 +243,10 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
       left: 32px;
       right: 32px;
       display: flex;
-      flex-direction: column;
-      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
       pointer-events: auto;
       z-index: 102;
     }
@@ -247,11 +258,10 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
       font-weight: 600;
       letter-spacing: 0.08em;
       color: #fff;
-      background: rgba(10, 15, 25, 0.75);
+      background: rgba(10, 15, 25, 0.85);
       border: 1px solid rgba(255, 255, 255, 0.15);
       padding: 6px 14px;
       border-radius: 20px;
-      width: fit-content;
       backdrop-filter: blur(8px);
     }
     .rec-dot {
@@ -264,12 +274,38 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
     }
     @keyframes rec-blink { from { opacity: 0.3; } to { opacity: 1; } }
 
+    .trailer-hud-controls {
+      display: flex;
+      gap: 8px;
+    }
+    .trailer-hud-btn {
+      appearance: none;
+      background: rgba(10, 15, 25, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #eaf1ff;
+      padding: 6px 12px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s;
+    }
+    .trailer-hud-btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+    .trailer-hud-btn.exit:hover {
+      background: rgba(255, 59, 87, 0.4);
+      border-color: #ff3b57;
+    }
+
     .trailer-progress-bar {
       width: 100%;
       height: 4px;
       background: rgba(255, 255, 255, 0.1);
       border-radius: 2px;
       overflow: hidden;
+      margin-top: 4px;
     }
     .trailer-progress-fill {
       width: 0%;
@@ -426,31 +462,44 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
     if (autoRecord) recorder.start();
   }
 
-  // Botoes do modal
-  overlay.querySelector("#btn-replay").addEventListener("click", () => startSequence());
-  overlay.querySelector("#btn-toggle-text").addEventListener("click", () => {
+  function toggleText() {
     textHidden = !textHidden;
     overlay.classList.toggle("clean-mode", textHidden);
-  });
+  }
+
+  function exitToMenu() {
+    window.location.href = window.location.pathname;
+  }
+
+  // Botoes do modal e HUD
+  overlay.querySelector("#btn-replay").addEventListener("click", () => startSequence());
+  overlay.querySelector("#btn-toggle-text").addEventListener("click", toggleText);
+  overlay.querySelector("#btn-hud-toggle-text").addEventListener("click", toggleText);
   overlay.querySelector("#btn-take-combat").addEventListener("click", () => {
     time = 15.0; // Pula direto pro combate
     modal.style.display = "none";
     recorder.start();
   });
-  overlay.querySelector("#btn-exit").addEventListener("click", () => {
-    window.location.href = window.location.pathname;
-  });
+  overlay.querySelector("#btn-exit").addEventListener("click", exitToMenu);
+  overlay.querySelector("#btn-hud-exit").addEventListener("click", exitToMenu);
 
   // ---- LOOP PRINCIPAL (Cinema & Coreografia) --------------------------------
   const clock = new THREE.Clock();
   const tmpV1 = new THREE.Vector3();
   const tmpV2 = new THREE.Vector3();
   const camTgt = new THREE.Vector3();
+  let loadingHidden = false;
 
   startSequence();
 
   function animate() {
     requestAnimationFrame(animate);
+
+    if (!loadingHidden) {
+      document.getElementById("loading")?.remove();
+      loadingHidden = true;
+    }
+
     const dt = Math.min(clock.getDelta(), 0.05);
 
     if (isRunning) {
@@ -501,7 +550,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
 
         if (tAct < 4.0) {
           // Passagem pelos anéis de Saturno
-          const satPos = saturn.orbitGroup.position;
+          const satPos = saturn ? saturn.orbitGroup.position : new THREE.Vector3(240, -10, -320);
           const sNorm = tAct / 4.0;
           camera.position.set(satPos.x - 35 + sNorm * 70, satPos.y + 4 - sNorm * 2, satPos.z + 18 + sNorm * 10);
           camTgt.copy(satPos);
@@ -511,7 +560,7 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
           playerGroup.rotation.set(0.05, 1.2, -0.2);
         } else {
           // Rasante por Júpiter
-          const jupPos = jupiter.orbitGroup.position;
+          const jupPos = jupiter ? jupiter.orbitGroup.position : new THREE.Vector3(-380, 20, 420);
           const jNorm = (tAct - 4.0) / 3.5;
           camera.position.set(jupPos.x + 60 - jNorm * 120, jupPos.y + 12 - jNorm * 8, jupPos.z - 40 + jNorm * 90);
           camTgt.copy(jupPos);
@@ -529,7 +578,6 @@ export function startTrailerMode({ autoRecord = true, cleanMode = false } = {}) 
         setCard("act3");
         warpMat.opacity = 0;
         const tAct = time - 15.0;
-        const tNorm = tAct / 9.0;
 
         const cPos = combatGroup.position;
 
