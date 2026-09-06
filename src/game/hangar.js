@@ -15,11 +15,12 @@ import { buildCatalog } from "./discoveryRegistry.js";
 
 export const SHIP_CATALOG = [
   // yaw/pitch/roll: correção do nariz e alinhamento do modelo (nossa convenção de voo é -Z);
+  // a nave base XR-07 tem nariz em +Z — gira 180° com yaw Math.PI;
   // o ônibus espacial vem "em pé" (nariz em +Y) — deita com pitch -90°;
-  // o caça estelar vem com inclinação diagonal de fábrica — nivelado com roll -24.9° (-0.4345 rad)
+  // o caça estelar SW-X já possui o nariz no eixo frontal -Z nativo — yaw 0, pitch 0, roll 0
   { id: "xr07", modelPath: "models/Spaceship.glb", yaw: Math.PI, pitch: 0, roll: 0 },
   { id: "shuttle", modelPath: "models/onibusEspacialTerra.glb", yaw: 0, pitch: -Math.PI / 2, roll: 0 },
-  { id: "naveSW", modelPath: "models/naveSW.glb", yaw: Math.PI, pitch: 0, roll: -0.4345 },
+  { id: "naveSW", modelPath: "models/naveSW.glb", yaw: 0, pitch: 0, roll: 0 },
 ];
 
 // itens que podem ser movidos de uma nave pra outra (o raio trator é
