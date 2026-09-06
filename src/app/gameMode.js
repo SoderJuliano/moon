@@ -159,6 +159,8 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // abafado (o gameMode só consulta combat.active — o resto vive no pacote).
   let combatCountdown = -1;
   let strangeAvailTimer = -1; // 1 min após a 1ª vitória → libera a secundária
+  save.flags.pveMiniBossKills = save.flags.pveMiniBossKills || 0;
+
   const combat = new CombatEncounter(scene, camera, ship, {
     onEnd: (result) => {
       if (result === "victory") {
@@ -171,24 +173,47 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       }
       saveManager.saveNow(); // vitória/fuga/derrota: persiste (local + nuvem)
       if (save.flags.alienDefeated && !fleet.active) {
-        combatCountdown = 45; // continua gerando encontros de patrulha para acumular abates
+        combatCountdown = save.flags.pveMiniBossKills >= 10 ? 2.5 : 45; // continua gerando patrulhas ou mini-boss
       }
     },
   });
   cannon.addTargetSystem(combat.alien); // nossos bolts acertam a nave alien
 
-  // --- Arco dos Gêmeos: escudo do jogador + encontros de FROTA -----------------
+  // --- Arco dos Gêmeos & Mini-Chefe: escudo do jogador + encontros de FROTA ----
   // O escudo (troféu da boss fight) absorve tiros inimigos quando equipado.
   const playerShield = new PlayerShield(scene, save, () => ship.ship);
-  // FleetEncounter roda a invasão de treino (3 batedores) e a boss fight (os
-  // dois cruzadores capitais). Mesmo contrato do combate: GPS some, ambiente
-  // abafado, música própria (batida comum na invasão, TEMA DE BOSS nos Gêmeos).
+  // FleetEncounter roda a invasão de treino (3 batedores), o Mini-Chefe (a cada 10 abates) e a boss fight (os dois cruzadores).
   const fleet = new FleetEncounter(scene, camera, ship, {
     shield: playerShield,
     renderer, // pré-compila shaders/texturas dos bosses no preload
-    onEnd: () => saveManager.saveNow(), // resultado sempre persiste
+    onEnd: (result, mode) => {
+      saveManager.saveNow(); // resultado sempre persiste
+      if (mode === "miniboss" && result === "victory") {
+        combatCountdown = 45; // retoma a patrulha comum até os próximos 10 abates
+      }
+    },
   });
   cannon.addTargetSystem(fleet); // um só sistema de alvo pra frota inteira
+
+  // Monitora abates em tempo real para ativar o Mini-Chefe a cada 10 naves derrotadas no PvE
+  on("stat", ({ key, add = 1 }) => {
+    if (key === "enemyShipsDestroyed") {
+      save.flags.pveMiniBossKills = (save.flags.pveMiniBossKills || 0) + add;
+      if (save.flags.pveMiniBossKills >= 10) {
+        const flying = ship.isActive && !ship.exploding;
+        if (flying && !mission.holdShip && !fleet.active) {
+          save.flags.pveMiniBossKills = 0;
+          if (combat.active) combat._end("fled");
+          fleet.triggerMiniBoss();
+        } else if (flying && fleet.active && fleet.mode === "invasion") {
+          save.flags.pveMiniBossKills = 0;
+          fleet.triggerMiniBoss(fleet.enemies.filter((e) => e.alive));
+        } else {
+          combatCountdown = 2.0;
+        }
+      }
+    }
+  });
   // sons de batalha (exceção autorizada): o canhão só SOA nos encontros épicos
   cannon.sfxShot = () => {
     if (fleet.active) playCannonShot();
@@ -603,11 +628,17 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       navHud.update(dt);
 
       // Combate PvE: contagem da emboscada + estado dos encontros (o 1v1 do
-      // alien e a FROTA — invasão/boss — nunca rodam ao mesmo tempo: a frota
-      // só é disparada pelas missões fora de combate)
+      // alien, o Mini-Chefe a cada 10 abates e a FROTA)
       if (combatCountdown > 0 && flying && !mission.holdShip && !fleet.active) {
         combatCountdown -= dt;
-        if (combatCountdown <= 0) combat.trigger();
+        if (combatCountdown <= 0) {
+          if (save.flags.pveMiniBossKills >= 10) {
+            save.flags.pveMiniBossKills = 0;
+            fleet.triggerMiniBoss();
+          } else {
+            combat.trigger();
+          }
+        }
       }
       combat.update(dt);
       fleet.update(dt);
@@ -615,9 +646,8 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       ship.supercruiseDisabled = anyCombat;
       if (anyCombat !== anyCombatBefore) {
         audio.setDucked(anyCombat); // abafa/devolve as vibrações dos corpos
-        // música por encontro: batida comum (alien 1v1 e invasão) vs TEMA DE
-        // BOSS (os Gêmeos) — só um toca por vez
-        combatMusic.setActive(combat.active || (fleet.active && fleet.mode === "invasion"));
+        // música por encontro: batida comum (alien 1v1, invasão e mini-chefe) vs TEMA DE BOSS (os Gêmeos)
+        combatMusic.setActive(combat.active || (fleet.active && (fleet.mode === "invasion" || fleet.mode === "miniboss")));
         bossMusic.setActive(fleet.active && fleet.mode === "boss");
       }
       combatMusic.update();

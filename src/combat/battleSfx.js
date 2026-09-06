@@ -415,3 +415,41 @@ export function playEmpShockwave() {
   nz.connect(nf); nf.connect(ng); ng.connect(master);
   nz.start(t); nz.stop(t + 1.9);
 }
+
+// TIRO QUÁDRUPLO ALIENÍGENA (Mini-chefe) — 4 disparos rápidos e ressonantes de plasma
+export function playAlienQuadShot() {
+  const c = ctx();
+  if (!c) return;
+  const t0 = c.currentTime + 0.005;
+  const master = c.createGain();
+  master.gain.value = 0.38;
+  master.connect(c.destination);
+
+  for (let i = 0; i < 4; i++) {
+    const t = t0 + i * 0.04;
+    const o = c.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(880 + (i % 2) * 120, t);
+    o.frequency.exponentialRampToValueAtTime(140, t + 0.14);
+    const f = c.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.setValueAtTime(2200, t);
+    f.frequency.exponentialRampToValueAtTime(600, t + 0.14);
+    f.Q.value = 3.0;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.32, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    o.connect(f); f.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.16);
+
+    const sub = c.createOscillator();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(180, t);
+    sub.frequency.exponentialRampToValueAtTime(45, t + 0.08);
+    const gsub = c.createGain();
+    gsub.gain.setValueAtTime(0.28, t);
+    gsub.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    sub.connect(gsub); gsub.connect(master);
+    sub.start(t); sub.stop(t + 0.1);
+  }
+}

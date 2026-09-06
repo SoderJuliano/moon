@@ -21,6 +21,7 @@ import { radialGlowTexture } from "../core/textures.js";
 import { Portal } from "./portal.js";
 import { AlienShip, ALIEN_MAX_HP } from "./alienShip.js";
 import { BossShip, BOSS_SHIELD_HP, BOSS_HULL_HP } from "./bossShip.js";
+import { AlienMiniBoss, MINIBOSS_SHIELD_HP, MINIBOSS_HULL_HP, MINIBOSS_MAX_HP } from "./alienMiniBoss.js";
 import { playBossRupture, playFlybyRumble, playExplosionBig, playEmpShockwave } from "./battleSfx.js";
 import { playPortalRupture } from "../ui/sfx.js";
 import { emit } from "../game/events.js";
@@ -65,6 +66,7 @@ export class FleetEncounter {
     // cada — só baixam quando a luta arma)
     this.scouts = null; // AlienShip[3]
     this.bosses = null; // BossShip[2]
+    this.miniBoss = null; // AlienMiniBoss
     this.enemies = []; // os vivos do encontro atual
 
     this._tmp = new THREE.Vector3();
@@ -233,6 +235,42 @@ export class FleetEncounter {
     }
   }
 
+  _ensureMiniBoss() {
+    if (this.miniBoss) return;
+    this.miniBoss = new AlienMiniBoss(this.scene);
+    this.miniBoss.onDestroyed = (boss) => {
+      playExplosionBig();
+      this._shake = Math.max(this._shake, 1.4);
+      this._enemyDown(boss);
+    };
+    this.miniBoss.onPlayerHit = (pos, dmg, vel, isStun) => this._playerHit(pos, dmg, vel, isStun);
+    this.miniBoss.onShieldBreak = () => {
+      this._shake = Math.max(this._shake, 1.6);
+    };
+  }
+
+  triggerMiniBoss(existingScouts = null) {
+    if (this.state !== "idle" && this.mode === "miniboss") return;
+    this.mode = "miniboss";
+    this._ensureMiniBoss();
+    if (existingScouts && existingScouts.length) {
+      this.scouts = existingScouts;
+      this.enemies = [this.miniBoss, ...existingScouts];
+      // Naves pequenas param de atirar durante a animação de entrada
+      for (const s of existingScouts) s.setFiring(false);
+    } else {
+      this.enemies = [this.miniBoss];
+    }
+    this.miniBoss.sfx = true;
+    const shipObj = this.ship.ship;
+    this._tmp.set(0, 0, -1).applyQuaternion(shipObj.quaternion);
+    const portalPos = shipObj.position.clone().addScaledVector(this._tmp, 9.5);
+    this.bossPortal.openAt(portalPos, 3.2); // Portal com animação de ~2s
+    playBossRupture();
+    this.miniBoss.load(() => {});
+    this._begin();
+  }
+
   triggerBoss() {
     if (this.state !== "idle") return;
     this.mode = "boss";
@@ -258,7 +296,8 @@ export class FleetEncounter {
   }
 
   _buildBossBars() {
-    this.bossBars.innerHTML = this.bosses
+    const targets = this.mode === "miniboss" ? (this.miniBoss ? [this.miniBoss] : []) : (this.bosses || []);
+    this.bossBars.innerHTML = targets
       .map(
         (b) => `<div class="boss-bar">
           <div class="boss-bar-head"><span class="boss-name">${b.name}</span><span class="boss-stage"></span></div>
@@ -325,7 +364,7 @@ export class FleetEncounter {
     if (this.enemies.length === 0) this._end("victory");
   }
 
-  _playerHit(pos, dmg = 1, boltVel = null) {
+  _playerHit(pos, dmg = 1, boltVel = null, isStun = false) {
     if (this.state !== "fight") return;
     // ESCUDO do jogador (se equipado e com carga): absorve — bolha azul acende
     if (this.shield?.tryAbsorb(pos)) return;
@@ -335,12 +374,17 @@ export class FleetEncounter {
     // Empurrão cinético violento do tiro pesado
     if (boltVel) {
       this._tmp2.copy(boltVel).normalize();
-      this.ship.velocity.addScaledVector(this._tmp2, 8.5);
+      this.ship.velocity.addScaledVector(this._tmp2, isStun ? 5.0 : 8.5);
     }
-    this.ship.angVel.x += (Math.random() - 0.5) * 5.5 * dmg;
-    this.ship.angVel.y += (Math.random() - 0.5) * 5.5 * dmg;
-    this.ship.angVel.z += (Math.random() - 0.5) * 8.0 * dmg;
-    this._shake = Math.max(this._shake, 2.2);
+    const shakeMult = isStun ? 3.5 : 5.5;
+    this.ship.angVel.x += (Math.random() - 0.5) * shakeMult * dmg;
+    this.ship.angVel.y += (Math.random() - 0.5) * shakeMult * dmg;
+    this.ship.angVel.z += (Math.random() - 0.5) * (shakeMult * 1.5) * dmg;
+    this._shake = Math.max(this._shake, isStun ? 1.4 : 2.2);
+
+    if (isStun) {
+      this.ship.triggerStun?.(1.0);
+    }
 
     this.ship.speed *= 0.55;
     this.ship.velocity.multiplyScalar(0.75);
@@ -391,7 +435,7 @@ export class FleetEncounter {
     this.empAlert.style.display = "none";
     this.bossPortal.close();
     for (const p of this.smallPortals) p.close();
-    for (const e of [...(this.scouts || []), ...(this.bosses || [])]) e.hide();
+    for (const e of [...(this.scouts || []), ...(this.bosses || []), ...(this.miniBoss ? [this.miniBoss] : [])]) e.hide();
     this.enemies = [];
     this.hpBar.style.display = "none";
     this.bossBars.style.display = "none";
@@ -400,7 +444,9 @@ export class FleetEncounter {
       result === "victory"
         ? mode === "boss"
           ? t("fleet.bossVictory")
-          : t("fleet.invasionVictory")
+          : mode === "miniboss"
+            ? t("miniboss.victory")
+            : t("fleet.invasionVictory")
         : t("fleet.defeat");
     this._chipFade = 7;
     this.onEnd?.(result, mode);
@@ -408,15 +454,21 @@ export class FleetEncounter {
 
   _showBanner() {
     const banner = document.createElement("div");
-    banner.className = "mission-banner" + (this.mode === "boss" ? " boss" : "");
+    banner.className = "mission-banner" + (this.mode === "boss" ? " boss" : (this.mode === "miniboss" ? " miniboss" : ""));
     banner.innerHTML =
       this.mode === "boss"
         ? `<small>${t("fleet.capitalThreat")}</small>${t("fleet.twinsTitle")}`
-        : `<small>${t("fleet.invasion")}</small>${t("fleet.scoutsTitle")}`;
+        : this.mode === "miniboss"
+          ? `<small>${t("miniboss.bannerTag")}</small>${t("miniboss.bannerTitle")}`
+          : `<small>${t("fleet.invasion")}</small>${t("fleet.scoutsTitle")}`;
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 5600);
     this.chip.textContent =
-      this.mode === "boss" ? t("fleet.bossObjective") : t("fleet.invasionObjective");
+      this.mode === "boss"
+        ? t("fleet.bossObjective")
+        : this.mode === "miniboss"
+          ? t("miniboss.objective")
+          : t("fleet.invasionObjective");
     this.chip.style.display = "";
   }
 
@@ -439,8 +491,8 @@ export class FleetEncounter {
     }
 
     this._t += dt;
-    const openSecs = this.mode === "boss" ? 3.4 : 1.6; // portal do boss demora — tensão
-    const arriveSecs = this.mode === "boss" ? 6.0 : 3.0;
+    const openSecs = this.mode === "boss" ? 3.4 : (this.mode === "miniboss" ? 2.0 : 1.6); // 2s de animação do portal no mini-chefe
+    const arriveSecs = this.mode === "boss" ? 6.0 : (this.mode === "miniboss" ? 2.4 : 3.0);
     const bannerSecs = 2.8;
 
     switch (this.state) {
@@ -451,6 +503,8 @@ export class FleetEncounter {
             // os dois saem do MESMO portal gigante, lado a lado
             this.enemies[0].spawnAt(this._tmp.copy(this.bossPortal.group.position).add(this._tmp2.set(-1.6, 0.5, 0)));
             this.enemies[1].spawnAt(this._tmp.copy(this.bossPortal.group.position).add(this._tmp2.set(1.6, -0.5, 0)));
+          } else if (this.mode === "miniboss") {
+            this.miniBoss.spawnAt(this.bossPortal.group.position);
           } else {
             this.enemies.forEach((s, i) => {
               s.spawnAt(this.smallPortals[i].group.position);
@@ -468,11 +522,11 @@ export class FleetEncounter {
         this.enemies.forEach((e, i) => {
           this._tmp.copy(playerPos).sub(e.group.position);
           const d = this._tmp.length();
-          const stop = this.mode === "boss" ? 6.5 : 3.4;
-          const spd = this.mode === "boss" ? 1.1 : 1.6;
+          const stop = this.mode === "boss" ? 6.5 : (this.mode === "miniboss" ? 4.8 : 3.4);
+          const spd = this.mode === "boss" ? 1.1 : (this.mode === "miniboss" ? 1.5 : 1.6);
           if (d > stop) e.group.position.addScaledVector(this._tmp.normalize(), dt * spd);
           e.group.lookAt(playerPos);
-          const grow = this.mode === "boss" ? 0.35 : 0.8;
+          const grow = this.mode === "boss" ? 0.35 : (this.mode === "miniboss" ? 0.55 : 0.8);
           if (e.group.scale.x < 1) e.group.scale.setScalar(Math.min(1, e.group.scale.x + dt * grow));
         });
         if (this._t >= arriveSecs) {
@@ -480,7 +534,10 @@ export class FleetEncounter {
           for (const p of this.smallPortals) p.close();
           this._showBanner();
           this.hpBar.style.display = "";
-          if (this.mode === "boss") this.bossBars.style.display = "";
+          if (this.mode === "boss" || this.mode === "miniboss") {
+            this.bossBars.style.display = "";
+            this._buildBossBars();
+          }
           this.state = "banner";
           this._t = 0;
         }
@@ -551,7 +608,31 @@ export class FleetEncounter {
   }
 
   _updateBossBars() {
-    this.bosses.forEach((b, i) => {
+    if (this.mode === "miniboss") {
+      const b = this.miniBoss;
+      const ui = this._barEls[0];
+      if (!b || !ui) return;
+      if (!b.alive) {
+        ui.el.className = "boss-bar down";
+        ui.fill.style.width = "0%";
+        ui.stage.textContent = t("fleet.destroyed");
+        return;
+      }
+      if (b.shielded) {
+        ui.el.className = "boss-bar";
+        ui.fill.className = "boss-fill shield";
+        ui.fill.style.width = `${(b.shieldHp / MINIBOSS_SHIELD_HP) * 100}%`;
+        ui.stage.textContent = t("fleet.shield");
+      } else {
+        ui.el.className = "boss-bar";
+        ui.fill.className = "boss-fill hull";
+        ui.fill.style.width = `${(b.hullHp / MINIBOSS_HULL_HP) * 100}%`;
+        ui.stage.textContent = t("fleet.hull");
+      }
+      return;
+    }
+
+    this.bosses?.forEach((b, i) => {
       const ui = this._barEls[i];
       if (!ui) return;
       if (!b.alive) {
@@ -646,14 +727,14 @@ export class FleetEncounter {
     this._camT += ((cine ? 1 : 0) - this._camT) * Math.min(1, dt * 2.2);
     if (this._camT <= 0.004) return;
     if (cine) {
-      const boss = this.mode === "boss";
+      const boss = this.mode === "boss" || this.mode === "miniboss";
       const onPortal = this.state === "opening" || !this.enemies[0]?.group.visible;
       const focus = onPortal
         ? boss
           ? this.bossPortal.group.position
           : this.smallPortals[1].group.position
         : this._midpoint();
-      const dist = onPortal ? (boss ? 7.5 : 3.2) : boss ? 4.2 : 1.2;
+      const dist = onPortal ? (this.mode === "boss" ? 7.5 : (this.mode === "miniboss" ? 4.2 : 3.2)) : (this.mode === "boss" ? 4.2 : (this.mode === "miniboss" ? 2.2 : 1.2));
       this._cineTgt.copy(focus);
       this._tmp.copy(this.ship.ship.position).sub(focus).normalize();
       this._tmp2.crossVectors(this._tmp, this.camera.up);

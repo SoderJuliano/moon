@@ -182,6 +182,7 @@ export class ShipFlight {
     this._braking = false; // estado do auto-brake (p/ HUD/readout)
     this.supercruiseDisabled = false; // desativado obrigatoriamente durante combate
     this.empTimer = 0; // segundos de paralisia por pulso eletromagnético (EMP)
+    this.stunTimer = 0; // segundos de atordoamento / balanço por impacto de mini-chefe
 
     // --- rotação 6DoF (rad/s, eixos locais, com inércia) ---------------------
     this.pitchRate = 1.6; // cabrar/picar (local X)
@@ -467,6 +468,10 @@ export class ShipFlight {
   clearObjectLock() {
     this.objectLock = null;
     this._lockBreakHold = 0;
+  }
+
+  triggerStun(secs = 1.0) {
+    this.stunTimer = Math.max(this.stunTimer, secs);
   }
 
   engage() {
@@ -1007,7 +1012,11 @@ export class ShipFlight {
       if (this.empTimer > 0) {
         this.empTimer = Math.max(0, this.empTimer - dt);
       }
+      if (this.stunTimer > 0) {
+        this.stunTimer = Math.max(0, this.stunTimer - dt);
+      }
       const empActive = this.empTimer > 0;
+      const stunActive = this.stunTimer > 0;
 
       const shiftHeld = (k.has("ShiftLeft") || k.has("ShiftRight")) && !empActive;
       const ctrlHeld = (k.has("ControlLeft") || k.has("ControlRight")) && !empActive;
@@ -1030,6 +1039,14 @@ export class ShipFlight {
       pitchIn = Math.max(-1, Math.min(1, pitchIn + input.getPitch()));
       yawIn = Math.max(-1, Math.min(1, yawIn + input.getYaw()));
       rollIn = Math.max(-1, Math.min(1, rollIn + input.getRoll()));
+
+      // Desestabilização / balanço de 1s ao ser atingido pelo tiro quadruplo do mini-chefe
+      if (stunActive) {
+        const stunStrength = Math.min(1, this.stunTimer) * 0.45;
+        pitchIn += (Math.random() - 0.5) * stunStrength;
+        yawIn += (Math.random() - 0.5) * stunStrength;
+        rollIn += (Math.random() - 0.5) * stunStrength * 1.5;
+      }
     } else {
       // Pequena oscilação inercial durante paralisia EMP
       pitchIn = (Math.random() - 0.5) * 0.08;
