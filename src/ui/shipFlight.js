@@ -44,12 +44,12 @@ export const SHIP_THRUSTERS_CONFIG = {
     { pos: [0.015, 0.302, 0.728], baseScale: 0.20, color: 0xb8f0ff, tint: "#a0e8ff" },
   ],
   naveSW: [
-    // 5 propulsores simétricos alinhados ao caça nivelado: 1 grande central + 4 nos motores das asas
-    { pos: [0, 0, 0.78], baseScale: 0.50, color: 0x9fe6ff, tint: "#86d6ff" }, // Central Grande
-    { pos: [-0.17, 0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Superior Esquerdo
-    { pos: [0.17, 0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Superior Direito
-    { pos: [-0.17, -0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Inferior Esquerdo
-    { pos: [0.17, -0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Inferior Direito
+    // 5 propulsores nos locais exatos dos 5 bocais de escape da nave (1 central principal + 4 nas asas)
+    { pos: [0.0, 0.01, 0.78], baseScale: 0.44, color: 0x9fe6ff, tint: "#86d6ff" }, // Central Principal
+    { pos: [-0.163, 0.145, 0.75], baseScale: 0.25, color: 0x80d0ff, tint: "#70c8ff" }, // Superior Esquerdo
+    { pos: [0.153, 0.125, 0.77], baseScale: 0.25, color: 0x80d0ff, tint: "#70c8ff" },  // Superior Direito
+    { pos: [-0.174, -0.108, 0.74], baseScale: 0.25, color: 0x80d0ff, tint: "#70c8ff" }, // Inferior Esquerdo
+    { pos: [0.159, -0.128, 0.77], baseScale: 0.25, color: 0x80d0ff, tint: "#70c8ff" },  // Inferior Direito
   ],
 };
 
@@ -371,8 +371,8 @@ export class ShipFlight {
         box.getCenter(center);
         box.getSize(size);
         if (id === "naveSW" || url.includes("naveSW")) {
-          center.x += -0.060;
-          center.y += 0.038;
+          center.x += 0.0607;
+          center.y += -0.0318;
         }
         s.position.sub(center);
         s.traverse((o) => {

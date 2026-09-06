@@ -94,8 +94,8 @@ export class ShipRenderer {
         box.getCenter(center);
         box.getSize(size);
         if (url.includes("naveSW")) {
-          center.x += -0.060;
-          center.y += 0.038;
+          center.x += 0.0607;
+          center.y += -0.0318;
         }
         s.position.sub(center);
         s.traverse((o) => {
