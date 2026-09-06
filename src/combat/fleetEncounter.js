@@ -148,6 +148,10 @@ export class FleetEncounter {
     }
   }
 
+  get playerMaxHp() {
+    return this.ship?.activeShipId === "shuttle" ? 16 : PLAYER_MAX_HP;
+  }
+
   get active() {
     return this.state !== "idle";
   }
@@ -245,7 +249,7 @@ export class FleetEncounter {
   }
 
   _begin() {
-    this.playerHp = PLAYER_MAX_HP;
+    this.playerHp = this.playerMaxHp;
     this.state = "opening";
     this._t = 0;
     this._lock = 0;
@@ -543,7 +547,7 @@ export class FleetEncounter {
         this._updateBossBars();
       }
     }
-    this._hpFill.style.width = `${(this.playerHp / PLAYER_MAX_HP) * 100}%`;
+    this._hpFill.style.width = `${(this.playerHp / this.playerMaxHp) * 100}%`;
   }
 
   _updateBossBars() {

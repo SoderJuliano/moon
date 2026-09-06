@@ -38,15 +38,15 @@ export const SHIP_MUZZLES = {
     new THREE.Vector3(0.5, -0.08, 0.1).multiplyScalar(SHIP_SIZE),
   ],
   shuttle: [
-    new THREE.Vector3(-0.45, -0.05, 0.1).multiplyScalar(SHIP_SIZE),
-    new THREE.Vector3(0.45, -0.05, 0.1).multiplyScalar(SHIP_SIZE),
+    // 1 tiro central direto e concentrado (dano equivalente a 2 tiros)
+    new THREE.Vector3(0, -0.02, -0.55).multiplyScalar(SHIP_SIZE),
   ],
   naveSW: [
-    // 4 tiros: 1 de cada asa nas 4 pontas com extrema precisão
-    new THREE.Vector3(-0.4894, 0.2947, -0.2496).multiplyScalar(SHIP_SIZE), // Asa Superior Esquerda
-    new THREE.Vector3(-0.5639, -0.0187, -0.2428).multiplyScalar(SHIP_SIZE), // Asa Inferior Esquerda
-    new THREE.Vector3(0.6072, 0.0191, -0.1461).multiplyScalar(SHIP_SIZE),  // Asa Superior Direita
-    new THREE.Vector3(0.5102, -0.2676, -0.1492).multiplyScalar(SHIP_SIZE), // Asa Inferior Direita
+    // 4 tiros simultâneos: 1 de cada asa nas 4 pontas simétricas do caça nivelado
+    new THREE.Vector3(-0.50, 0.22, -0.26).multiplyScalar(SHIP_SIZE), // Asa Superior Esquerda
+    new THREE.Vector3(0.50, 0.22, -0.26).multiplyScalar(SHIP_SIZE),  // Asa Superior Direita
+    new THREE.Vector3(-0.50, -0.22, -0.26).multiplyScalar(SHIP_SIZE), // Asa Inferior Esquerda
+    new THREE.Vector3(0.50, -0.22, -0.26).multiplyScalar(SHIP_SIZE),  // Asa Inferior Direita
   ],
 };
 
@@ -179,6 +179,8 @@ export class PlasmaCannon {
     // bolt herda o avanço da nave (senão parece que anda pra trás no boost)
     const shipAdvance = Math.max(this.ship.velocity.dot(this._tmp), 0);
     const muzzles = this.ship.getMuzzles ? this.ship.getMuzzles() : (SHIP_MUZZLES[this.ship.activeShipId] || MUZZLES);
+    const isShuttle = this.ship.activeShipId === "shuttle";
+    const boltDmg = isShuttle ? 2 : 1;
     for (const muzzle of muzzles) {
       const b = this.bolts.find((x) => x.ttl <= 0);
       if (!b) continue;
@@ -192,6 +194,8 @@ export class PlasmaCannon {
       b.mesh.quaternion.copy(ship.quaternion);
       b.vel.copy(this._tmp).multiplyScalar(BOLT_SPEED + shipAdvance);
       b.ttl = BOLT_TTL;
+      b.dmg = boltDmg;
+      b.mesh.scale.set(isShuttle ? 1.5 : 1.0, 1.0, isShuttle ? 1.3 : 1.0);
       b.fresh = true; // não avança no frame do disparo (renderiza 1º colado na asa)
       b.mesh.visible = true;
     }
@@ -268,7 +272,7 @@ export class PlasmaCannon {
     return false;
   }
 
-  _hitTarget(sys, hit, at) {
+  _hitTarget(sys, hit, at, dmg = 1) {
     let hp = this._hp.get(hit.id);
     const maxHp = hit.maxHp ?? maxHpFor(hit.r); // alvo pode ditar o próprio HP
     if (hp == null) hp = maxHp;
@@ -280,13 +284,13 @@ export class PlasmaCannon {
     }
 
     // 1 vez antes de morrer: ativa imunidade temporária do boss
-    if (hp <= 1 && sys.tryTriggerInvulnerability && sys.tryTriggerInvulnerability(hit.id)) {
+    if (hp <= dmg && sys.tryTriggerInvulnerability && sys.tryTriggerInvulnerability(hit.id)) {
       this._hp.set(hit.id, 1);
       if (sys.onDamaged) sys.onDamaged(hit.id, 1, maxHp, at);
       return;
     }
 
-    hp -= 1;
+    hp -= dmg;
     // alvos com barra/efeitos próprios (nave alien, bosses) acompanham o HP que
     // vive aqui — recebem também ONDE o tiro pegou (ondulação do escudo)
     if (sys.onDamaged) sys.onDamaged(hit.id, Math.max(hp, 0), maxHp, at);
@@ -345,7 +349,7 @@ export class PlasmaCannon {
           }
         }
         if (hit) {
-          this._hitTarget(sys, hit, b.mesh.position);
+          this._hitTarget(sys, hit, b.mesh.position, b.dmg || 1);
           b.ttl = 0;
           b.mesh.visible = false;
           break;

@@ -32,17 +32,24 @@ export const SHIP_THRUSTERS_CONFIG = {
     { pos: [0, 0, 0.7], baseScale: 0.45, color: 0x9fe6ff, tint: "#86d6ff" },
   ],
   shuttle: [
-    { pos: [0, 0.14, 0.75], baseScale: 0.35, color: 0x9fe6ff, tint: "#86d6ff" },
-    { pos: [-0.12, -0.06, 0.75], baseScale: 0.32, color: 0x9fe6ff, tint: "#86d6ff" },
-    { pos: [0.12, -0.06, 0.75], baseScale: 0.32, color: 0x9fe6ff, tint: "#86d6ff" },
+    // 2 jatos fortes na parte de baixo (chama âmbar/laranja potente)
+    { pos: [-0.176, -0.178, 0.734], baseScale: 0.48, color: 0xff8833, tint: "#ff7722" },
+    { pos: [0.176, -0.178, 0.734], baseScale: 0.48, color: 0xff8833, tint: "#ff7722" },
+    // 3 médios no meio (azul elétrico)
+    { pos: [0, 0.082, 0.755], baseScale: 0.36, color: 0x60c8ff, tint: "#50b8ff" },
+    { pos: [-0.105, 0.054, 0.730], baseScale: 0.34, color: 0x60c8ff, tint: "#50b8ff" },
+    { pos: [0.105, 0.054, 0.730], baseScale: 0.34, color: 0x60c8ff, tint: "#50b8ff" },
+    // 2 pequenos em cima perto da cauda (ciano claro)
+    { pos: [-0.015, 0.302, 0.728], baseScale: 0.20, color: 0xb8f0ff, tint: "#a0e8ff" },
+    { pos: [0.015, 0.302, 0.728], baseScale: 0.20, color: 0xb8f0ff, tint: "#a0e8ff" },
   ],
   naveSW: [
-    // 5 propulsores com alinhamento exato: 1 grande central + 4 pequenos nas asas
-    { pos: [0.0522, 0.0277, 0.78], baseScale: 0.55, color: 0x9fe6ff, tint: "#86d6ff" }, // Central Grande
-    { pos: [-0.1871, 0.1370, 0.772], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Superior Esquerdo
-    { pos: [0.1113, 0.0538, 0.799], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Superior Direito
-    { pos: [-0.2551, -0.1015, 0.763], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Inferior Esquerdo
-    { pos: [0.0708, -0.1940, 0.793], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Inferior Direito
+    // 5 propulsores simétricos alinhados ao caça nivelado: 1 grande central + 4 nos motores das asas
+    { pos: [0, 0, 0.78], baseScale: 0.50, color: 0x9fe6ff, tint: "#86d6ff" }, // Central Grande
+    { pos: [-0.17, 0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Superior Esquerdo
+    { pos: [0.17, 0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Superior Direito
+    { pos: [-0.17, -0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" }, // Inferior Esquerdo
+    { pos: [0.17, -0.17, 0.77], baseScale: 0.24, color: 0x80d0ff, tint: "#70c8ff" },  // Inferior Direito
   ],
 };
 
@@ -329,14 +336,30 @@ export class ShipFlight {
     window.addEventListener("blur", () => this.keys.clear());
   }
 
+  // Atualiza os parâmetros físicos de voo de acordo com o perfil da nave ativa:
+  // Ônibus espacial: dobro de vida do casco (16 HP no combate), metade da velocidade de supercruise (teto 1500), aceleração ligeiramente mais rápida (3.7)
+  // XR-07 e Caça Estelar SW-X: nave balanceada (8 HP no combate, cruzeiro 3000, aceleração 3.2)
+  _applyShipFlightProfile(shipId) {
+    if (shipId === "shuttle") {
+      this.accel = 3.7; // aceleração ligeiramente mais rápida
+      this.supercruiseGain = 0.25; // metade do ganho de supercruise
+      this.supercruiseMax = 1500; // teto de supercruise pela metade
+    } else {
+      this.accel = 3.2;
+      this.supercruiseGain = 0.5;
+      this.supercruiseMax = 3000;
+    }
+  }
+
   // carrega a nave 3D (GLB leve). Centraliza, gira o nariz pra -Z, escala pra
   // caber no enquadramento da master e troca a procedural. Se falhar, mantém o
-  // que estiver instalado. yaw corrige o nariz do modelo (convenção de voo: -Z).
+  // que estiver instalado. yaw/pitch/roll corrigem a orientação do modelo (convenção de voo: -Z).
   // Chamável a qualquer momento — é assim que o hangar troca de nave.
-  setModelUrl(url, yaw = Math.PI, pitch = 0, shipId = null) {
+  setModelUrl(url, yaw = Math.PI, pitch = 0, shipId = null, roll = 0) {
     this._modelReq = url;
     const id = shipId || (url.includes("naveSW") ? "naveSW" : url.includes("onibusEspacial") ? "shuttle" : "xr07");
     this.activeShipId = id;
+    this._applyShipFlightProfile(id);
     new GLTFLoader().load(
       url,
       (gltf) => {
@@ -347,6 +370,10 @@ export class ShipFlight {
         const size = new THREE.Vector3();
         box.getCenter(center);
         box.getSize(size);
+        if (id === "naveSW" || url.includes("naveSW")) {
+          center.x += -0.060;
+          center.y += 0.038;
+        }
         s.position.sub(center);
         s.traverse((o) => {
           if (o.isMesh && o.material) {
@@ -356,7 +383,7 @@ export class ShipFlight {
         });
         const fix = new THREE.Group();
         fix.add(s);
-        fix.rotation.set(pitch, yaw, 0);
+        fix.rotation.set(pitch, yaw, roll);
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
         fix.scale.setScalar(1.6 / maxDim); // ~equivalente ao tamanho da procedural
         this.model.remove(this._modelFix || this._procShip);

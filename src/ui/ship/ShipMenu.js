@@ -202,7 +202,7 @@ export class ShipMenu {
     this.overlay.querySelector(".ship-model-label").textContent = info.registry;
     this.overlay.querySelector(".ship-display-name").textContent = info.name;
     this.overlay.querySelector(".ship-story").textContent = info.story || "";
-    this.shipRenderer.setModel(def.modelPath, def.yaw, def.pitch);
+    this.shipRenderer.setModel(def.modelPath, def.yaw, def.pitch, def.roll || 0);
     this.stats.render(this.save, shipId);
     this.slots.render(this.save, shipId);
     this._renderShips();

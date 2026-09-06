@@ -106,7 +106,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // hooks rodam só depois do boot (menu aberto pelo jogador) — ship/cannon já existem
   const shipMenu = new ShipMenu(save, saveManager, {
     onLoadoutChanged: () => cannon.setEnabled(!!save.ship.weapons.plasmaCannon),
-    onActiveShipChanged: (def) => ship.setModelUrl(def.modelPath, def.yaw, def.pitch, def.id),
+    onActiveShipChanged: (def) => ship.setModelUrl(def.modelPath, def.yaw, def.pitch, def.id, def.roll || 0),
   });
 
   // Cemitério atrás de Júpiter (conteúdo SÓ do jogo): nuvem ~4× o cinturão
@@ -130,7 +130,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   ship.setEnabled(true);
   // nave ativa do hangar
   const activeDef = activeShipDef(save);
-  ship.setModelUrl(activeDef.modelPath, activeDef.yaw, activeDef.pitch, activeDef.id);
+  ship.setModelUrl(activeDef.modelPath, activeDef.yaw, activeDef.pitch, activeDef.id, activeDef.roll || 0);
 
   // Canhão de plasma: nasce DESABILITADO — a missão do sinal de socorro é quem
   // desbloqueia (a tecnologia é recuperada do cruzador destruído).

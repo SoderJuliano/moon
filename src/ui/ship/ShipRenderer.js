@@ -64,7 +64,7 @@ export class ShipRenderer {
     this._currentFix = null;
     this._modelReq = null;
 
-    this.setModel(def?.modelPath || "models/Spaceship.glb", def?.yaw ?? Math.PI, def?.pitch ?? 0);
+    this.setModel(def?.modelPath || "models/Spaceship.glb", def?.yaw ?? Math.PI, def?.pitch ?? 0, def?.roll ?? 0);
 
     // Grid Floor
     const grid = new THREE.GridHelper(6, 30, 0x1d294a, 0x0c1328);
@@ -80,7 +80,7 @@ export class ShipRenderer {
   }
 
   // troca a nave exibida (carrossel do hangar). Última chamada vence.
-  setModel(url, yaw = Math.PI, pitch = 0) {
+  setModel(url, yaw = Math.PI, pitch = 0, roll = 0) {
     if (!this.ship) return;
     this._modelReq = url;
     new GLTFLoader().load(
@@ -93,6 +93,10 @@ export class ShipRenderer {
         const size = new THREE.Vector3();
         box.getCenter(center);
         box.getSize(size);
+        if (url.includes("naveSW")) {
+          center.x += -0.060;
+          center.y += 0.038;
+        }
         s.position.sub(center);
         s.traverse((o) => {
           if (o.isMesh && o.material) {
@@ -102,7 +106,7 @@ export class ShipRenderer {
         });
         const fix = new THREE.Group();
         fix.add(s);
-        fix.rotation.set(pitch, yaw, 0); // Nose should point in the correct direction
+        fix.rotation.set(pitch, yaw, roll); // Nose should point in the correct direction
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
         fix.scale.setScalar((1.6 / maxDim) * 1.5);
         this.ship.remove(this._currentFix || this._fallback);
