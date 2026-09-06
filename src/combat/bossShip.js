@@ -30,15 +30,15 @@ export const BOSS_INVULN_SECS = 4.5; // imunidade temporária antes de morrer
 const SIZE = 3.0; // eixo longo (~50× a nave do jogador)
 const SHIELD_R = SIZE * 0.62; // raio da bolha (envolve o casco todo)
 const HULL_R = SIZE * 0.42; // raio de acerto no casco
-const BOLT_DMG = 2; // mais forte que o nosso (que tira 1)
-const BOLT_SPEED = 30; // tiro em esfera de plasma super rápida (sem câmera lenta!)
+const BASE_BOLT_DMG = 2; // dano base do canhão do boss
+const BASE_BOLT_SPEED = 24; // 20% mais lento que os 30 anteriores
 const BOLT_TTL = 3.5;
-const FIRE_EVERY = 1.1; // 4x mais rápido (era 4.4s)
+const BASE_FIRE_EVERY = 1.35; // cadência base de disparo
 const CRUISE_SPEED = 1.8; // u/s — perseguição rápida
 const PREF_DIST_NEAR = 3.2; // distância de combate corpo a corpo
 const PREF_DIST_FAR = 7.5; // distância de bombardeio afastado
 const PASS_SPEED = 7.5; // u/s durante a passada acelerada
-const PASS_EVERY = [3.5, 5.5]; // investidas 3x mais frequentes (era [11, 17])
+const PASS_EVERY = [3.5, 5.5]; // investidas frequentes
 const PASS_DUR = 2.6; // s de cada passada
 
 export class BossShip {
@@ -65,6 +65,11 @@ export class BossShip {
     this.onFlyby = null; // passada rasante perto do jogador (tremor + ronco)
     this.onShieldBreakEMP = null; // (posMundo) => void (estouro de pulso magnético)
     this.sfx = false; // sons de batalha (o encontro liga)
+
+    this.handicap = 0;
+    this.boltSpeed = BASE_BOLT_SPEED;
+    this.fireEvery = BASE_FIRE_EVERY;
+    this.boltDmg = BASE_BOLT_DMG;
 
     this._tmp = new THREE.Vector3();
     this._tmp2 = new THREE.Vector3();
@@ -374,6 +379,13 @@ export class BossShip {
     sh.pts.visible = true;
   }
 
+  setDifficultyModifier(handicap = 0) {
+    this.handicap = THREE.MathUtils.clamp(handicap, 0, 0.5);
+    this.boltSpeed = BASE_BOLT_SPEED * (1 - this.handicap);
+    this.fireEvery = BASE_FIRE_EVERY / (1 - this.handicap); // atiram mais devagar
+    this.boltDmg = Math.max(1, Math.round(BASE_BOLT_DMG * (1 - this.handicap * 0.5))); // atiram mais fraco
+  }
+
   // ---- tiro pesado de esfera de plasma ------------------------------------------
   _fire(playerPos) {
     const b = this.bolts.find((x) => x.ttl <= 0);
@@ -381,7 +393,7 @@ export class BossShip {
     this._tmp.copy(playerPos).sub(this.group.position).normalize();
     b.mesh.position.copy(this.group.position).addScaledVector(this._tmp, SIZE * 0.54);
     b.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), this._tmp);
-    b.vel.copy(this._tmp).multiplyScalar(BOLT_SPEED);
+    b.vel.copy(this._tmp).multiplyScalar(this.boltSpeed || BASE_BOLT_SPEED);
     b.ttl = BOLT_TTL;
     b.mesh.visible = true;
     if (this.sfx) playHeavyCannon();
@@ -467,7 +479,7 @@ export class BossShip {
     if (!this._holdFire) {
       this._fireCd -= dt;
       if (this._fireCd <= 0) {
-        this._fireCd = FIRE_EVERY * (0.85 + Math.random() * 0.3);
+        this._fireCd = (this.fireEvery || BASE_FIRE_EVERY) * (0.85 + Math.random() * 0.3);
         this._fire(playerPos);
       }
     }
@@ -482,7 +494,7 @@ export class BossShip {
       if (playerPos && b.mesh.position.distanceTo(playerPos) < 0.28) {
         b.ttl = 0;
         b.mesh.visible = false;
-        this.onPlayerHit?.(b.mesh.position, BOLT_DMG, b.vel);
+        this.onPlayerHit?.(b.mesh.position, this.boltDmg || BASE_BOLT_DMG, b.vel);
         continue;
       }
       if (b.ttl <= 0) b.mesh.visible = false;

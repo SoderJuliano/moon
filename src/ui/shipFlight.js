@@ -338,8 +338,8 @@ export class ShipFlight {
     this.isFirstPerson = false;
     this.targetZoom = 1.0;
     this.currentZoom = 1.0;
-    this.playerHp = 8;
-    this.playerMaxHp = 8;
+    this.playerHp = 16;
+    this.playerMaxHp = 16;
     this._tmpEye = new THREE.Vector3();
 
     window.addEventListener(
@@ -385,21 +385,21 @@ export class ShipFlight {
   }
 
   // Atualiza os parâmetros físicos de voo de acordo com o perfil da nave ativa:
-  // Ônibus espacial: dobro de vida do casco (16 HP no combate), metade da velocidade de supercruise (teto 1500), aceleração ligeiramente mais rápida (3.7)
-  // XR-07 e Caça Estelar SW-X: nave balanceada (8 HP no combate, cruzeiro 3000, aceleração 3.2)
+  // Ônibus espacial: dobro de vida do casco (32 HP no combate), metade da velocidade de supercruise (teto 1500), aceleração ligeiramente mais rápida (3.7)
+  // XR-07 e Caça Estelar SW-X: nave balanceada (16 HP no combate, cruzeiro 3000, aceleração 3.2)
   _applyShipFlightProfile(shipId) {
     if (shipId === "shuttle") {
       this.accel = 3.7; // aceleração ligeiramente mais rápida
       this.supercruiseGain = 0.25; // metade do ganho de supercruise
       this.supercruiseMax = 1500; // teto de supercruise pela metade
-      this.playerHp = 16;
-      this.playerMaxHp = 16;
+      this.playerHp = 32;
+      this.playerMaxHp = 32;
     } else {
       this.accel = 3.2;
       this.supercruiseGain = 0.5;
       this.supercruiseMax = 3000;
-      this.playerHp = 8;
-      this.playerMaxHp = 8;
+      this.playerHp = 16;
+      this.playerMaxHp = 16;
     }
   }
 

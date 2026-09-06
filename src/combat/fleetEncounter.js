@@ -27,7 +27,7 @@ import { playPortalRupture } from "../ui/sfx.js";
 import { emit } from "../game/events.js";
 import { t } from "../core/i18n.js";
 
-const PLAYER_MAX_HP = 8;
+const PLAYER_MAX_HP = 16; // vida base dobrada (era 8)
 const LOCK_SECS = 2.0; // mira colada por 2s…
 const LOCK_INTERVAL = 5.0; // …e pelo menos 5s entre uma colada e outra
 const LOCK_CONE = 0.5; // rad — "virar de frente" pro inimigo
@@ -55,6 +55,7 @@ export class FleetEncounter {
     this.mode = null; // "invasion" | "boss"
     this._t = 0;
     this.playerHp = PLAYER_MAX_HP;
+    this.bossDefeats = 0; // contador de derrotas específico para esta boss fight
     this.lastResult = null; // { result, mode } — as missões leem depois da luta
     this.lastBattlePos = new THREE.Vector3(); // onde a batalha terminou (destroços)
 
@@ -134,6 +135,12 @@ export class FleetEncounter {
     document.body.appendChild(this.empAlert);
     this.empCountdown = 0;
 
+    // Badge do contador de derrotas e assistência adaptativa nos bosses
+    this.bossAssistBadge = document.createElement("div");
+    this.bossAssistBadge.className = "boss-assist-badge";
+    this.bossAssistBadge.style.display = "none";
+    document.body.appendChild(this.bossAssistBadge);
+
     // fagulhas de impacto na nave do jogador
     this.sparks = [];
     const sparkTex = radialGlowTexture("#ffb36a");
@@ -151,7 +158,7 @@ export class FleetEncounter {
   }
 
   get playerMaxHp() {
-    return this.ship?.activeShipId === "shuttle" ? 16 : PLAYER_MAX_HP;
+    return this.ship?.activeShipId === "shuttle" ? 32 : PLAYER_MAX_HP;
   }
 
   get active() {
@@ -276,7 +283,19 @@ export class FleetEncounter {
     this.mode = "boss";
     this._ensureBosses();
     this.enemies = [...this.bosses];
-    for (const b of this.bosses) b.sfx = true;
+    const handicap = Math.min(0.5, (this.bossDefeats || 0) * 0.10);
+    for (const b of this.bosses) {
+      b.sfx = true;
+      b.setDifficultyModifier(handicap);
+    }
+    if (this.bossDefeats > 0) {
+      const pct = Math.round(handicap * 100);
+      this.bossAssistBadge.innerHTML = `💀 <b>${t("fleet.bossDefeatsBadge", { count: this.bossDefeats, pct })}</b>`;
+      this.bossAssistBadge.style.display = "";
+    } else {
+      this.bossAssistBadge.style.display = "none";
+    }
+
     const shipObj = this.ship.ship;
     this._tmp.set(0, 0, -1).applyQuaternion(shipObj.quaternion);
     const portalPos = shipObj.position.clone().addScaledVector(this._tmp, 13);
@@ -386,7 +405,7 @@ export class FleetEncounter {
     this._shake = Math.max(this._shake, isStun ? 1.4 : 2.2);
 
     if (isStun) {
-      this.ship.triggerStun?.(1.0);
+      this.ship.triggerStun?.(0.55);
     }
 
     this.ship.speed *= 0.55;
@@ -412,7 +431,7 @@ export class FleetEncounter {
     this._shake = Math.max(this._shake, 2.8);
     const dist = this.ship.ship.position.distanceTo(pos);
     if (dist < 14.5) {
-      this.triggerPlayerEMP(5.0, pos);
+      this.triggerPlayerEMP(2.5, pos);
     }
   }
 
@@ -430,6 +449,19 @@ export class FleetEncounter {
     if (this.state === "idle") return;
     const mode = this.mode;
     this.lastResult = { result, mode };
+
+    if (mode === "boss") {
+      if (result === "victory") {
+        this.bossDefeats = 0; // quando vencer o contador some!
+        this.bossAssistBadge.style.display = "none";
+      } else if (result === "defeat") {
+        this.bossDefeats = (this.bossDefeats || 0) + 1;
+        this.bossAssistBadge.style.display = "none";
+      }
+    } else {
+      this.bossAssistBadge.style.display = "none";
+    }
+
     // local da batalha: um pouco à frente do jogador (onde os destroços ficam)
     this._tmp.set(0, 0, -1).applyQuaternion(this.ship.ship.quaternion);
     this.lastBattlePos.copy(this.ship.ship.position).addScaledVector(this._tmp, 4);
@@ -458,12 +490,18 @@ export class FleetEncounter {
   _showBanner() {
     const banner = document.createElement("div");
     banner.className = "mission-banner" + (this.mode === "boss" ? " boss" : (this.mode === "miniboss" ? " miniboss" : ""));
-    banner.innerHTML =
-      this.mode === "boss"
-        ? `<small>${t("fleet.capitalThreat")}</small>${t("fleet.twinsTitle")}`
-        : this.mode === "miniboss"
-          ? `<small>${t("miniboss.bannerTag")}</small>${t("miniboss.bannerTitle")}`
-          : `<small>${t("fleet.invasion")}</small>${t("fleet.scoutsTitle")}`;
+    if (this.mode === "boss") {
+      const handicap = Math.min(0.5, (this.bossDefeats || 0) * 0.10);
+      const pct = Math.round(handicap * 100);
+      const retryHtml = this.bossDefeats > 0
+        ? `<div class="banner-retry-hint">${t("fleet.bossDefeatsBanner", { count: this.bossDefeats, pct })}</div>`
+        : "";
+      banner.innerHTML = `<small>${t("fleet.capitalThreat")}</small>${t("fleet.twinsTitle")}${retryHtml}`;
+    } else if (this.mode === "miniboss") {
+      banner.innerHTML = `<small>${t("miniboss.bannerTag")}</small>${t("miniboss.bannerTitle")}`;
+    } else {
+      banner.innerHTML = `<small>${t("fleet.invasion")}</small>${t("fleet.scoutsTitle")}`;
+    }
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 5600);
     this.chip.textContent =

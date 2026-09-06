@@ -225,6 +225,8 @@ export const pt = {
   "fleet.shield": "ESCUDO",
   "fleet.hull": "CASCO",
   "fleet.invulnerable": "IMUNE",
+  "fleet.bossDefeatsBadge": "Derrotas: {count}x (Inimigos -{pct}% velocidade/dano)",
+  "fleet.bossDefeatsBanner": "Reiniciando... Derrotas nesta batalha: {count}x (Ajuste adaptativo: -{pct}% dano e cadência)",
   "miniboss.name": "BELONAVE ALIENÍGENA",
   "miniboss.bannerTag": "⚠ AMEAÇA DETECTADA",
   "miniboss.bannerTitle": "Belonave Batedora Alienígena",

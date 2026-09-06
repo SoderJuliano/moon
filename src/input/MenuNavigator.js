@@ -40,7 +40,7 @@ const CONTEXTS = [
   {
     // pausa do game e overlay Esc da exploração (mesma classe)
     root: ".modal-overlay",
-    items: (root) => [...root.querySelectorAll(".modal-btn, button")],
+    items: (root) => [...root.querySelectorAll(".modal-btn, .setting-row, input[type='checkbox'], button")],
     cancel: (root) => root.querySelector('[data-act="resume"]') || root.querySelector(".modal-btn"),
   },
   {

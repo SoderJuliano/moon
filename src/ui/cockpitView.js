@@ -209,7 +209,7 @@ export class CockpitView {
     playArmorImpact();
   }
 
-  update(dt, { speed = 0, maxSpeed = 3.3, supercruising = false, boosting = false, playerHp = 8, playerMaxHp = 8 } = {}) {
+  update(dt, { speed = 0, maxSpeed = 3.3, supercruising = false, boosting = false, playerHp = 16, playerMaxHp = 16 } = {}) {
     if (!this.active) return;
     this._time += dt;
 

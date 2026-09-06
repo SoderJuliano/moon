@@ -2843,3 +2843,80 @@ canvas {
   z-index: 3;
 }
 
+/* Checkbox e Linhas de Configuração no Menu de Pausa (Otimizado p/ Mobile & Android) */
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #dce7f5;
+  margin: 10px 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  min-height: 44px; /* Tamanho mínimo de toque ergonômico no Android */
+  -webkit-tap-highlight-color: rgba(110, 168, 255, 0.25);
+  text-align: left;
+}
+
+.setting-row:hover,
+.setting-row:active {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(110, 168, 255, 0.45);
+}
+
+.setting-row input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent, #6ea8ff);
+  touch-action: manipulation;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+/* Badge de Assistência Adaptativa / Contador de Derrotas nos Chefões */
+.boss-assist-badge {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 120, 120, 0.55);
+  border-radius: 8px;
+  background: rgba(26, 8, 14, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #ffc2cc;
+  font-size: 12px;
+  font-family: system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  box-shadow: 0 0 16px rgba(255, 60, 80, 0.35);
+  pointer-events: none;
+  animation: bossBadgePulse 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes bossBadgePulse {
+  0% { transform: translateX(-50%) scale(0.98); opacity: 0.88; }
+  100% { transform: translateX(-50%) scale(1.02); opacity: 1; }
+}
+
+.banner-retry-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #ff99aa;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  font-weight: 500;
+}
+
+

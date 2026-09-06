@@ -420,12 +420,14 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     missions.refreshHud(); // reflete na hora o chip secundário
     saveManager.saveNow();
   });
-  fpToggle.addEventListener("change", () => {
+  const onFpToggleChange = () => {
     save.settings = save.settings || {};
-    save.settings.firstPersonCockpit = fpToggle.checked;
+    save.settings.firstPersonCockpit = !!fpToggle.checked;
     ship.setFirstPerson(fpToggle.checked);
     saveManager.saveNow();
-  });
+  };
+  fpToggle.addEventListener("change", onFpToggleChange);
+  fpToggle.addEventListener("input", onFpToggleChange);
 
   // progresso das missões ATIVAS/DISPONÍVEIS (primárias e secundárias)
   function renderMissions() {

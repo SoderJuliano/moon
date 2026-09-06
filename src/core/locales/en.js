@@ -224,6 +224,8 @@ export const en = {
   "fleet.shield": "SHIELD",
   "fleet.hull": "HULL",
   "fleet.invulnerable": "IMMUNE",
+  "fleet.bossDefeatsBadge": "Defeats: {count}x (Enemies -{pct}% speed/damage)",
+  "fleet.bossDefeatsBanner": "Retrying... Defeats in this battle: {count}x (Adaptive adjustment: -{pct}% damage and cadence)",
   "miniboss.name": "ALIEN DREADNOUGHT",
   "miniboss.bannerTag": "⚠ THREAT DETECTED",
   "miniboss.bannerTitle": "Alien Vanguard Dreadnought",

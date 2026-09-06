@@ -35,7 +35,7 @@ const MOUSE_RATE = 1.7; // rad/s no máximo
 const MOUSE_DEADZONE = 0.1;
 const MOUSE_IDLE_MS = 1500; // mouse parado = sem direção (não deriva sozinho)
 
-const PLAYER_MAX_HP = 8;
+const PLAYER_MAX_HP = 16; // vida base dobrada (era 8)
 const FIGHT_TIMEOUT = 120; // s até a nave desistir e fugir
 const OPEN_SECS = 1.6; // portal abrindo (nave presa, câmera achando o portal)
 const ARRIVE_SECS = 3.2; // nave saindo do portal (cinematic)
@@ -50,7 +50,7 @@ export class CombatEncounter {
 
     this.state = "idle";
     this._t = 0;
-    this.playerHp = PLAYER_MAX_HP;
+    this.playerHp = this.playerMaxHp;
 
     this.portal = new Portal(scene);
     this.alien = new AlienShip(scene);
@@ -123,6 +123,10 @@ export class CombatEncounter {
     }
   }
 
+  get playerMaxHp() {
+    return this.ship?.activeShipId === "shuttle" ? 32 : PLAYER_MAX_HP;
+  }
+
   get active() {
     return this.state !== "idle";
   }
@@ -147,7 +151,7 @@ export class CombatEncounter {
       .addScaledVector(this._tmp2, 2.2);
     this.portal.openAt(portalPos, 1.4);
     playPortalRupture(); // o "glow glow glow BOM" grave da ruptura
-    this.playerHp = PLAYER_MAX_HP;
+    this.playerHp = this.playerMaxHp;
     this.state = "opening";
     this._t = 0;
     this.alien.load(() => {}); // baixa o GLB enquanto o portal abre
@@ -167,7 +171,7 @@ export class CombatEncounter {
     if (this.state !== "fight") return;
     this.playerHp -= 1;
     this.ship.playerHp = this.playerHp;
-    this.ship.playerMaxHp = PLAYER_MAX_HP;
+    this.ship.playerMaxHp = this.playerMaxHp;
     this.ship.triggerDamageHit?.();
     this._vigT = 1; // borda vermelha
     // a nave SENTE o tiro: sacode (impulso de rotação) e perde embalo
@@ -311,7 +315,7 @@ export class CombatEncounter {
       this.alien.updateBar(this.camera);
       this._updateMark(playerPos);
     }
-    this._hpFill.style.width = `${(this.playerHp / PLAYER_MAX_HP) * 100}%`;
+    this._hpFill.style.width = `${(this.playerHp / this.playerMaxHp) * 100}%`;
   }
 
   // direção por MOUSE (combate apenas, teclado continua valendo): a posição
