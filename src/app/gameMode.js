@@ -131,6 +131,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // nave ativa do hangar
   const activeDef = activeShipDef(save);
   ship.setModelUrl(activeDef.modelPath, activeDef.yaw, activeDef.pitch, activeDef.id, activeDef.roll || 0);
+  if (save.settings?.firstPersonCockpit) {
+    ship.setFirstPerson(true);
+  }
 
   // Canhão de plasma: nasce DESABILITADO — a missão do sinal de socorro é quem
   // desbloqueia (a tecnologia é recuperada do cruzador destruído).
@@ -394,6 +397,10 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
         <input type="checkbox" data-setting="showSecondaryHud" />
         ${t("pause.showSecondaryHud")}
       </label>
+      <label class="setting-row">
+        <input type="checkbox" data-setting="firstPersonCockpit" />
+        ${t("pause.firstPersonView")}
+      </label>
       <div class="pause-stats"></div>
       <div class="modal-row">
         <button class="modal-btn yes" data-act="resume">${t("pause.resume")}</button>
@@ -406,10 +413,17 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   const statsBox = pauseOverlay.querySelector(".pause-stats");
   const missBox = pauseOverlay.querySelector(".pause-missions");
   const secToggle = pauseOverlay.querySelector('[data-setting="showSecondaryHud"]');
+  const fpToggle = pauseOverlay.querySelector('[data-setting="firstPersonCockpit"]');
   secToggle.addEventListener("change", () => {
     save.settings = save.settings || {};
     save.settings.showSecondaryHud = secToggle.checked;
     missions.refreshHud(); // reflete na hora o chip secundário
+    saveManager.saveNow();
+  });
+  fpToggle.addEventListener("change", () => {
+    save.settings = save.settings || {};
+    save.settings.firstPersonCockpit = fpToggle.checked;
+    ship.setFirstPerson(fpToggle.checked);
     saveManager.saveNow();
   });
 
@@ -467,6 +481,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       ship.keys.clear(); // solta as teclas: nada fica "preso" ao retomar
       renderMissions();
       secToggle.checked = save.settings?.showSecondaryHud !== false;
+      fpToggle.checked = !!save.settings?.firstPersonCockpit;
       renderStats(); // estatísticas atualizadas a cada abertura da pausa
     }
     // pausa/retoma TODO o áudio de uma vez: drones dos planetas, sonificação

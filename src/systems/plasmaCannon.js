@@ -171,9 +171,12 @@ export class PlasmaCannon {
     // progressão: marco de primeiro disparo + contador (o bus deduplica/ignora)
     emit("milestone", { id: "first-shot" });
     emit("stat", { key: "shotsFired" });
-    // som de canhão SÓ quando um encontro autoriza (batalha épica) — no resto
-    // do jogo vale a regra do vácuo: disparo silencioso
-    this.sfxShot?.();
+    // som de canhão: em 1ª pessoa ou quando um encontro autoriza (batalha épica)
+    if (this.ship?.cockpitView && this.ship?.isFirstPerson) {
+      this.ship.cockpitView.playShootSfx(this.ship.activeShipId);
+    } else if (this.sfxShot) {
+      this.sfxShot();
+    }
     const ship = this.ship.ship;
     this._tmp.set(0, 0, -1).applyQuaternion(ship.quaternion); // forward
     // bolt herda o avanço da nave (senão parece que anda pra trás no boost)

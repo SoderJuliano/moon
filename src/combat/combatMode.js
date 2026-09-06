@@ -166,6 +166,9 @@ export class CombatEncounter {
   _playerHit(pos) {
     if (this.state !== "fight") return;
     this.playerHp -= 1;
+    this.ship.playerHp = this.playerHp;
+    this.ship.playerMaxHp = PLAYER_MAX_HP;
+    this.ship.triggerDamageHit?.();
     this._vigT = 1; // borda vermelha
     // a nave SENTE o tiro: sacode (impulso de rotação) e perde embalo
     this.ship.angVel.x += (Math.random() - 0.5) * 1.6;

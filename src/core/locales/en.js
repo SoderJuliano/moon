@@ -179,6 +179,7 @@ export const en = {
   "pause.key.shiftw": "supercruise",
   "pause.key.esc": "pause",
   "pause.showSecondaryHud": "Show secondary missions on HUD",
+  "pause.firstPersonView": "First-person cockpit camera",
   "pause.resume": "Continue flying",
   "pause.achievements": "Achievements",
   "pause.mainMenu": "Main menu",

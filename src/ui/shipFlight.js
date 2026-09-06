@@ -25,6 +25,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { radialGlowTexture, warpRingTexture } from "../core/textures.js";
 import { input } from "../input/InputManager.js";
 import { SHIP_MUZZLES } from "../systems/plasmaCannon.js";
+import { CockpitView } from "./cockpitView.js";
 
 // Configuração de propulsores / exaustores de motor por nave:
 export const SHIP_THRUSTERS_CONFIG = {
@@ -332,6 +333,52 @@ export class ShipFlight {
     this._lockTargetPos = new THREE.Vector3();
     this._lockBreakHold = 0;
 
+    // --- Câmera em 1ª Pessoa / Cockpit e Zoom com Scroll do Mouse ---
+    this.cockpitView = new CockpitView(document.body);
+    this.isFirstPerson = false;
+    this.targetZoom = 1.0;
+    this.currentZoom = 1.0;
+    this.playerHp = 8;
+    this.playerMaxHp = 8;
+    this._tmpEye = new THREE.Vector3();
+
+    window.addEventListener(
+      "wheel",
+      (e) => {
+        if (!this.active || this.exploding || this.intro) return;
+        // Não intercepta se o usuário estiver rolando dentro de menus/diálogos abertos
+        if (
+          e.target &&
+          e.target.closest &&
+          (e.target.closest(".modal") ||
+            e.target.closest(".modal-overlay") ||
+            e.target.closest(".ship-menu-root") ||
+            e.target.closest(".ach-overlay"))
+        ) {
+          return;
+        }
+
+        if (e.deltaY < 0) {
+          // Scroll para frente / aproximar da nave até entrar no cockpit / 1ª pessoa
+          if (this.isFirstPerson) return;
+          this.targetZoom = Math.max(0.2, this.targetZoom - 0.2);
+          if (this.targetZoom <= 0.35) {
+            this.setFirstPerson(true);
+          }
+        } else if (e.deltaY > 0) {
+          // Scroll para trás / afastar da nave
+          if (this.isFirstPerson) {
+            this.setFirstPerson(false);
+            this.targetZoom = 0.75;
+            this.currentZoom = 0.55;
+          } else {
+            this.targetZoom = Math.min(2.5, this.targetZoom + 0.2);
+          }
+        }
+      },
+      { passive: true }
+    );
+
     window.addEventListener("keydown", (e) => this._onKeyDown(e));
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
@@ -345,11 +392,32 @@ export class ShipFlight {
       this.accel = 3.7; // aceleração ligeiramente mais rápida
       this.supercruiseGain = 0.25; // metade do ganho de supercruise
       this.supercruiseMax = 1500; // teto de supercruise pela metade
+      this.playerHp = 16;
+      this.playerMaxHp = 16;
     } else {
       this.accel = 3.2;
       this.supercruiseGain = 0.5;
       this.supercruiseMax = 3000;
+      this.playerHp = 8;
+      this.playerMaxHp = 8;
     }
+  }
+
+  setFirstPerson(on) {
+    this.isFirstPerson = !!on;
+    if (this.active && !this.exploding) {
+      this.cockpitView.setActive(this.isFirstPerson, this.activeShipId);
+    }
+    if (this.isFirstPerson) {
+      this.targetZoom = 0.35;
+      this.currentZoom = 0.35;
+    } else {
+      if (this.targetZoom < 0.6) this.targetZoom = 0.8;
+    }
+  }
+
+  triggerDamageHit() {
+    this.cockpitView?.triggerDamageHit();
   }
 
   // carrega a nave 3D (GLB leve). Centraliza, gira o nariz pra -Z, escala pra
@@ -361,6 +429,7 @@ export class ShipFlight {
     const id = shipId || (url.includes("naveSW") ? "naveSW" : url.includes("onibusEspacial") ? "shuttle" : "xr07");
     this.activeShipId = id;
     this._applyShipFlightProfile(id);
+    this.cockpitView?.setShipId(id);
     new GLTFLoader().load(
       url,
       (gltf) => {
@@ -557,6 +626,9 @@ export class ShipFlight {
     }
     this.intro = { t: 0, dur: 2.2, glideSpeed: 0.4, fromPos, fromTgt };
 
+    if (this.intro.t >= 1 && this.isFirstPerson) {
+      this.cockpitView.setActive(true, this.activeShipId);
+    }
     if (this.onEngage) this.onEngage();
   }
 
@@ -631,6 +703,7 @@ export class ShipFlight {
     this.active = false;
     this.intro = null;
     this.ship.visible = false;
+    this.cockpitView.setActive(false, this.activeShipId);
     this._hideFx();
     this._restoreApproach();
     this.readout.style.display = "none";
@@ -649,6 +722,7 @@ export class ShipFlight {
     this.active = false;
     this.exploding = true;
     this.ship.visible = false;
+    this.cockpitView.setActive(false, this.activeShipId);
     this._hideFx();
     this._restoreApproach();
     this.readout.style.display = "none";
@@ -976,6 +1050,9 @@ export class ShipFlight {
       this.intro = null;
       this.speed = intro.glideSpeed;
       this.velocity.copy(this._fwd).multiplyScalar(this.speed);
+      if (this.isFirstPerson) {
+        this.cockpitView.setActive(true, this.activeShipId);
+      }
     }
   }
 
@@ -1272,24 +1349,63 @@ export class ShipFlight {
     const supercruising = !this.supercruiseDisabled && (sp > this.boostSpeed * 1.5);
     this._updateEngineGlows(spN, 1.0);
 
-    // 6) CÂMERA — orientação EXATAMENTE igual à da nave (inclui roll; sem
-    //    horizonte fixo, sem up global, sem lookAt). Chase cam rígida: a posição
-    //    fica atrás e um pouco acima em espaço LOCAL; a orientação faz slerp para
-    //    o quaternion da nave (quase travada). Roll/pitch/yaw refletem 1:1.
-    const desired = this._tmp
-      .set(0, this.trailUp, this.trailBack) // local: +Z atrás (forward é -Z), +Y acima
-      .applyQuaternion(this.ship.quaternion)
-      .add(this.ship.position);
-    // tremor sutil no boost (vibração de motor a toda potência)
-    if (boosting) {
-      const t = performance.now() * 0.05;
-      this._tmp3.set(Math.sin(t * 1.7), Math.sin(t * 2.3), Math.sin(t * 1.1)).multiplyScalar(spN * 0.012);
-      desired.add(this._tmp3);
+    // 6) CÂMERA — orientação e posição
+    this.currentZoom = THREE.MathUtils.lerp(this.currentZoom, this.targetZoom, 1 - Math.exp(-10 * dt));
+
+    if (this.isFirstPerson) {
+      // Posições da câmera em 1ª pessoa calculadas precisamente por tipo de nave:
+      // SW-X: Dorsal traseira com enquadramento perfeito dos 4 canhões nos 4 cantos da tela (0, 0.006, 0.042)
+      // Ônibus Espacial (shuttle): No cockpit olhando pelo para-brisa frontal sobre o bico (0, 0.016, -0.018)
+      // XR-07: Cockpit envidraçado tecnológico (0, 0.010, -0.008)
+      const eyeOffset =
+        this.activeShipId === "naveSW"
+          ? this._tmpEye.set(0, 0.006, 0.042)
+          : this.activeShipId === "shuttle"
+          ? this._tmpEye.set(0, 0.016, -0.018)
+          : this._tmpEye.set(0, 0.010, -0.008);
+
+      const desired = this._tmp
+        .copy(eyeOffset)
+        .applyQuaternion(this.ship.quaternion)
+        .add(this.ship.position);
+
+      if (boosting) {
+        const t = performance.now() * 0.05;
+        this._tmp3.set(Math.sin(t * 1.7), Math.sin(t * 2.3), Math.sin(t * 1.1)).multiplyScalar(spN * 0.004);
+        desired.add(this._tmp3);
+      }
+      this.camera.position.lerp(desired, 1 - Math.exp(-25 * dt));
+      this.camera.quaternion.slerp(this.ship.quaternion, 1 - Math.exp(-25 * dt));
+    } else {
+      const trailB = this.trailBack * this.currentZoom;
+      const trailU = this.trailUp * Math.sqrt(this.currentZoom);
+      const desired = this._tmp
+        .set(0, trailU, trailB) // local: +Z atrás (forward é -Z), +Y acima
+        .applyQuaternion(this.ship.quaternion)
+        .add(this.ship.position);
+
+      // tremor sutil no boost (vibração de motor a toda potência)
+      if (boosting) {
+        const t = performance.now() * 0.05;
+        this._tmp3.set(Math.sin(t * 1.7), Math.sin(t * 2.3), Math.sin(t * 1.1)).multiplyScalar(spN * 0.012);
+        desired.add(this._tmp3);
+      }
+      this.camera.position.lerp(desired, 1 - Math.exp(-this.camLag * dt));
+      this.camera.quaternion.slerp(this.ship.quaternion, 1 - Math.exp(-this.camTurnLag * dt));
     }
-    this.camera.position.lerp(desired, 1 - Math.exp(-this.camLag * dt));
-    this.camera.quaternion.slerp(this.ship.quaternion, 1 - Math.exp(-this.camTurnLag * dt));
+
     // alvo do OrbitControls à frente (só p/ retomar o controle suavemente ao sair)
     this.controls.target.copy(this.ship.position).addScaledVector(this._fwd, this.lookAhead);
+
+    // Atualiza HUD e efeitos do Cockpit / Câmera de Ação em 1ª Pessoa
+    this.cockpitView.update(dt, {
+      speed: this.speed,
+      maxSpeed: this.maxSpeed,
+      supercruising,
+      boosting,
+      playerHp: this.playerHp,
+      playerMaxHp: this.playerMaxHp,
+    });
 
     // FOV dinâmico: "punch" com a velocidade (rush de boost) + abertura no supercruise
     if (this._baseFov) {

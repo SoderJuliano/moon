@@ -369,6 +369,9 @@ export class FleetEncounter {
     // ESCUDO do jogador (se equipado e com carga): absorve — bolha azul acende
     if (this.shield?.tryAbsorb(pos)) return;
     this.playerHp -= dmg;
+    this.ship.playerHp = this.playerHp;
+    this.ship.playerMaxHp = this.playerMaxHp;
+    this.ship.triggerDamageHit?.();
     this._vigT = 1;
 
     // Empurrão cinético violento do tiro pesado

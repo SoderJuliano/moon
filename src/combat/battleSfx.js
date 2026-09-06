@@ -453,3 +453,162 @@ export function playAlienQuadShot() {
     sub.start(t); sub.stop(t + 0.1);
   }
 }
+
+// CANHÃO DO CAÇA ESTELAR (SW-X) — rajada quádrupla pesada estilo Star Wars
+export function playFighterCannonShot() {
+  const c = ctx();
+  if (!c) return;
+  const t0 = c.currentTime + 0.004;
+  const master = c.createGain();
+  master.gain.value = 0.42;
+  master.connect(c.destination);
+
+  for (let i = 0; i < 4; i++) {
+    const t = t0 + i * 0.022; // rajada rápida escalonada dos 4 canhões
+    const o = c.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(1650 + (i % 2) * 180, t);
+    o.frequency.exponentialRampToValueAtTime(180, t + 0.14);
+    const f = c.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(3400, t);
+    f.frequency.exponentialRampToValueAtTime(420, t + 0.14);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    o.connect(f); f.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.16);
+
+    const sub = c.createOscillator();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(140, t);
+    sub.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+    const gs = c.createGain();
+    gs.gain.setValueAtTime(0.3, t);
+    gs.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    sub.connect(gs); gs.connect(master);
+    sub.start(t); sub.stop(t + 0.1);
+  }
+}
+
+// CANHÃO DA NAVE BASE TECNOLÓGICA (XR-07) — disparo duplo futurista e ressonante
+export function playBaseTechShot() {
+  const c = ctx();
+  if (!c) return;
+  const t0 = c.currentTime + 0.004;
+  const master = c.createGain();
+  master.gain.value = 0.36;
+  master.connect(c.destination);
+
+  for (let i = 0; i < 2; i++) {
+    const t = t0 + i * 0.035;
+    const o = c.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(1200 + i * 220, t);
+    o.frequency.exponentialRampToValueAtTime(260, t + 0.16);
+    const f = c.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.setValueAtTime(2400, t);
+    f.frequency.exponentialRampToValueAtTime(800, t + 0.16);
+    f.Q.value = 2.2;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.45, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+    o.connect(f); f.connect(g); g.connect(master);
+    o.start(t); o.stop(t + 0.18);
+
+    const chirp = c.createOscillator();
+    chirp.type = "triangle";
+    chirp.frequency.setValueAtTime(2400, t);
+    chirp.frequency.exponentialRampToValueAtTime(320, t + 0.08);
+    const gc = c.createGain();
+    gc.gain.setValueAtTime(0.25, t);
+    gc.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    chirp.connect(gc); gc.connect(master);
+    chirp.start(t); chirp.stop(t + 0.1);
+  }
+}
+
+// CANHÃO DO ÔNIBUS ESPACIAL (Shuttle) — tiro central denso e concentrado
+export function playShuttleShot() {
+  const c = ctx();
+  if (!c) return;
+  const t = c.currentTime + 0.004;
+  const master = c.createGain();
+  master.gain.value = 0.45;
+  master.connect(c.destination);
+
+  const o = c.createOscillator();
+  o.type = "sawtooth";
+  o.frequency.setValueAtTime(740, t);
+  o.frequency.exponentialRampToValueAtTime(90, t + 0.22);
+  const f = c.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.setValueAtTime(2200, t);
+  f.frequency.exponentialRampToValueAtTime(300, t + 0.22);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.65, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+  o.connect(f); f.connect(g); g.connect(master);
+  o.start(t); o.stop(t + 0.25);
+
+  const sub = c.createOscillator();
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(160, t);
+  sub.frequency.exponentialRampToValueAtTime(35, t + 0.18);
+  const gs = c.createGain();
+  gs.gain.setValueAtTime(0.7, t);
+  gs.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  sub.connect(gs); gs.connect(master);
+  sub.start(t); sub.stop(t + 0.22);
+}
+
+// IMPACTO NA BLINDAGEM / CASCO — batida metálica seca com estalo e vibração interna
+export function playArmorImpact() {
+  const c = ctx();
+  if (!c) return;
+  const t = c.currentTime + 0.004;
+  const master = c.createGain();
+  master.gain.value = 0.55;
+  master.connect(c.destination);
+
+  // Clang metálico
+  const o = c.createOscillator();
+  o.type = "triangle";
+  o.frequency.setValueAtTime(520, t);
+  o.frequency.exponentialRampToValueAtTime(80, t + 0.28);
+  const f = c.createBiquadFilter();
+  f.type = "bandpass";
+  f.frequency.value = 1400;
+  f.Q.value = 3.5;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.7, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+  o.connect(f); f.connect(g); g.connect(master);
+  o.start(t); o.stop(t + 0.32);
+
+  // Ruído de atrito e estalo de blindagem
+  const nz = c.createBufferSource();
+  nz.buffer = noiseBuf(c);
+  const nf = c.createBiquadFilter();
+  nf.type = "bandpass";
+  nf.frequency.setValueAtTime(3200, t);
+  nf.frequency.exponentialRampToValueAtTime(400, t + 0.18);
+  nf.Q.value = 2.0;
+  const ng = c.createGain();
+  ng.gain.setValueAtTime(0.55, t);
+  ng.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  nz.connect(nf); nf.connect(ng); ng.connect(master);
+  nz.start(t); nz.stop(t + 0.22);
+
+  // Eco de choque estrutural
+  const th = c.createOscillator();
+  th.type = "sine";
+  th.frequency.setValueAtTime(110, t);
+  th.frequency.exponentialRampToValueAtTime(28, t + 0.35);
+  const gth = c.createGain();
+  gth.gain.setValueAtTime(0.8, t);
+  gth.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+  th.connect(gth); gth.connect(master);
+  th.start(t); th.stop(t + 0.4);
+}

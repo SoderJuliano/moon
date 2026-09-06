@@ -180,6 +180,7 @@ export const pt = {
   "pause.key.shiftw": "supercruise",
   "pause.key.esc": "pausa",
   "pause.showSecondaryHud": "Mostrar missões secundárias no HUD",
+  "pause.firstPersonView": "Câmera em primeira pessoa (Cockpit)",
   "pause.resume": "Continuar voando",
   "pause.achievements": "Conquistas",
   "pause.mainMenu": "Menu principal",
