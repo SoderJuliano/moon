@@ -18,6 +18,8 @@ export const en = {
   "vela.title": "VELA PULSAR",
   "vela.sub": "PSR B0833-45 • Supernova Remnant (Vela SNR)",
   "vela.hintEsc": "Press [ESC] to return to Milky Way",
+  "menu.cameraHint": "🖱️ Drag to orbit • Scroll to zoom • [ESC] resets",
+  "menu.resetCamera": "Reset camera (ESC)",
   "menu.chooseExperience": "Choose your experience",
   "menu.exploration": "Exploration",
   "menu.explorationDesc": "Observe the Solar System in realistic scale.",

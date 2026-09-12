@@ -19,6 +19,8 @@ export const pt = {
   "vela.title": "PULSAR DE VELA",
   "vela.sub": "PSR B0833-45 • Remanescente de Supernova (Vela SNR)",
   "vela.hintEsc": "Pressione [ESC] para voltar à Via Láctea",
+  "menu.cameraHint": "🖱️ Arraste para orbitar • Scroll para zoom • [ESC] reseta",
+  "menu.resetCamera": "Resetar câmera (ESC)",
   "menu.chooseExperience": "Escolha sua experiência",
   "menu.exploration": "Exploração",
   "menu.explorationDesc": "Observe o Sistema Solar em escala realista.",

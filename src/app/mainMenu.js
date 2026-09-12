@@ -16,6 +16,7 @@
 // um modo — o modo escolhido cria a própria cena via createScene().
 
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { radialGlowTexture, starfieldTexture } from "../core/textures.js";
 import { SaveManager, LocalStorageBackend, createPlayerSave } from "../game/saveManager.js";
 import { t } from "../core/i18n.js";
@@ -131,7 +132,8 @@ function buildStars(count, seed) {
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   const mat = new THREE.PointsMaterial({
-    size: 0.5,
+    size: 0.85,
+    map: radialGlowTexture("#ffffff"),
     vertexColors: true,
     transparent: true,
     opacity: 0.95,
@@ -234,9 +236,16 @@ export function startMainMenu({ onSelect }) {
 
   // âncora invisível na posição do Sistema Solar (gira junto com a galáxia)
   const sunAnchor = new THREE.Object3D();
-  sunAnchor.position.copy(armPoint(SUN_ARM, SUN_R));
+  const sunPos = armPoint(SUN_ARM, SUN_R);
+  sunAnchor.position.copy(sunPos);
   sunAnchor.position.y = 0.6;
   spinner.add(sunAnchor);
+
+  // Brilho solar sutil na galáxia para fácil localização ao aproximar a câmera
+  const sunGlow = makeGlowSprite("#ffd57e", 4.2, 0.95);
+  sunGlow.position.copy(sunPos);
+  sunGlow.position.y = 0.6;
+  spinner.add(sunGlow);
 
   // âncora e brilho sutil para o Pulsar de Vela (posicionado com espaçamento claro para não sobrepor o Sistema Solar)
   const velaAnchor = new THREE.Object3D();
@@ -249,11 +258,45 @@ export function startMainMenu({ onSelect }) {
   velaGlow.position.copy(velaPos);
   spinner.add(velaGlow);
 
+  // --- Controles de Câmera 3D (OrbitControls interativo) -----------------------
+  const HOME_CAM_POS = new THREE.Vector3(0, 150, 124);
+  const HOME_CAM_TARGET = new THREE.Vector3(0, 0, 0);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.rotateSpeed = 0.65;
+  controls.zoomSpeed = 0.85;
+  controls.panSpeed = 0.7;
+  controls.minDistance = 4;
+  controls.maxDistance = 550;
+  controls.target.copy(HOME_CAM_TARGET);
+
+  let isResettingCam = false;
+  let resetProgress = 0;
+  const resetStartPos = new THREE.Vector3();
+  const resetStartTarget = new THREE.Vector3();
+
+  function resetCamera() {
+    isResettingCam = true;
+    resetProgress = 0;
+    resetStartPos.copy(camera.position);
+    resetStartTarget.copy(controls.target);
+  }
+
+  controls.addEventListener("start", () => {
+    isResettingCam = false;
+  });
+
   // --- overlay DOM ------------------------------------------------------------
   const root = document.createElement("div");
   root.className = "mm-root";
   root.innerHTML = `
     <div class="mm-title">${t("menu.milkyWay")}</div>
+    <div class="mm-hud-hint">
+      <span class="mm-hint-text">${t("menu.cameraHint") || "🖱️ Arraste para orbitar • Scroll para zoom • [ESC] reseta"}</span>
+      <button class="mm-reset-cam-btn" type="button" aria-label="${t("menu.resetCamera") || "Resetar câmera (ESC)"}" title="${t("menu.resetCamera") || "Resetar câmera (ESC)"}">↺</button>
+    </div>
     <button class="mm-marker mm-marker-sun" type="button">
       <span class="mm-marker-ring"><span class="mm-marker-dot"></span></span>
       <span class="mm-marker-label">${t("menu.solarSystem")}</span>
@@ -368,6 +411,13 @@ export function startMainMenu({ onSelect }) {
   const panelSolar = root.querySelector(".mm-panel-solar");
   const panelVela = root.querySelector(".mm-panel-vela");
   const fade = root.querySelector(".mm-fade");
+  const hudHint = root.querySelector(".mm-hud-hint");
+  const resetCamBtn = root.querySelector(".mm-reset-cam-btn");
+
+  resetCamBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    resetCamera();
+  });
 
   function openPanel(targetPanel, otherPanel) {
     if (otherPanel) {
@@ -375,12 +425,14 @@ export function startMainMenu({ onSelect }) {
       otherPanel.hidden = true;
     }
     targetPanel.hidden = false;
+    hudHint?.classList.add("hidden");
     requestAnimationFrame(() => targetPanel.classList.add("open"));
   }
 
   function closePanels() {
     panelSolar.classList.remove("open");
     panelVela.classList.remove("open");
+    hudHint?.classList.remove("hidden");
     setTimeout(() => {
       panelSolar.hidden = true;
       panelVela.hidden = true;
@@ -388,11 +440,41 @@ export function startMainMenu({ onSelect }) {
     }, 250);
   }
 
-  markerSun.addEventListener("click", () => openPanel(panelSolar, panelVela));
-  markerVela.addEventListener("click", () => openPanel(panelVela, panelSolar));
+  markerSun.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openPanel(panelSolar, panelVela);
+  });
+  markerVela.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openPanel(panelVela, panelSolar);
+  });
 
-  // clicar fora dos painéis (no espaço) fecha
-  renderer.domElement.addEventListener("click", closePanels);
+  // Distinguir clique rápido no espaço (fecha painéis) de arrastar para orbitar
+  let pointerDownPos = { x: 0, y: 0 };
+  const onPointerDown = (e) => {
+    pointerDownPos = { x: e.clientX, y: e.clientY };
+  };
+  const onPointerUp = (e) => {
+    const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+    if (dist < 6) {
+      closePanels();
+    }
+  };
+  renderer.domElement.addEventListener("pointerdown", onPointerDown);
+  renderer.domElement.addEventListener("pointerup", onPointerUp);
+
+  function onKeyDown(e) {
+    if (e.key === "Escape") {
+      const isSolarOpen = panelSolar && !panelSolar.hidden && panelSolar.classList.contains("open");
+      const isVelaOpen = panelVela && !panelVela.hidden && panelVela.classList.contains("open");
+      if (isSolarOpen || isVelaOpen) {
+        closePanels();
+      } else {
+        resetCamera();
+      }
+    }
+  }
+  window.addEventListener("keydown", onKeyDown);
 
   let choosing = false;
   function launch(mode, opts) {
@@ -741,19 +823,55 @@ export function startMainMenu({ onSelect }) {
     raf = requestAnimationFrame(animate);
     const dt = Math.min(clock.getDelta(), 0.05);
 
+    if (isResettingCam) {
+      resetProgress += dt * 2.8;
+      if (resetProgress >= 1) {
+        resetProgress = 1;
+        isResettingCam = false;
+        camera.position.copy(HOME_CAM_POS);
+        controls.target.copy(HOME_CAM_TARGET);
+      } else {
+        const ease = 1 - Math.pow(1 - resetProgress, 3);
+        camera.position.lerpVectors(resetStartPos, HOME_CAM_POS, ease);
+        controls.target.lerpVectors(resetStartTarget, HOME_CAM_TARGET, ease);
+      }
+      controls.update();
+    } else {
+      controls.update();
+    }
+
     spinner.rotation.y += SPIN_RATE * dt; // rotação contínua e calma
     coreMid.material.opacity = 0.76 + Math.sin(performance.now() * 0.0008) * 0.06;
 
-    // os marcadores acompanham os braços: projeta as âncoras 3D para a tela
-    sunAnchor.getWorldPosition(_v).project(camera);
-    const xSun = (_v.x * 0.5 + 0.5) * window.innerWidth;
-    const ySun = (0.5 - _v.y * 0.5) * window.innerHeight;
-    markerSun.style.transform = `translate(${xSun}px, ${ySun}px)`;
+    // os marcadores acompanham os braços em 3D: projeta as âncoras para a tela se estiverem no campo visual frontal
+    const camDir = new THREE.Vector3();
+    camera.getWorldDirection(camDir);
 
-    velaAnchor.getWorldPosition(_v).project(camera);
-    const xVela = (_v.x * 0.5 + 0.5) * window.innerWidth;
-    const yVela = (0.5 - _v.y * 0.5) * window.innerHeight;
-    markerVela.style.transform = `translate(${xVela}px, ${yVela}px)`;
+    sunAnchor.getWorldPosition(_v);
+    const camToSun = _v.clone().sub(camera.position);
+    const sunInFront = camToSun.dot(camDir) > 0;
+    _v.project(camera);
+    if (sunInFront && _v.z <= 1) {
+      const xSun = (_v.x * 0.5 + 0.5) * window.innerWidth;
+      const ySun = (0.5 - _v.y * 0.5) * window.innerHeight;
+      markerSun.style.display = "";
+      markerSun.style.transform = `translate(${xSun}px, ${ySun}px)`;
+    } else {
+      markerSun.style.display = "none";
+    }
+
+    velaAnchor.getWorldPosition(_v);
+    const camToVela = _v.clone().sub(camera.position);
+    const velaInFront = camToVela.dot(camDir) > 0;
+    _v.project(camera);
+    if (velaInFront && _v.z <= 1) {
+      const xVela = (_v.x * 0.5 + 0.5) * window.innerWidth;
+      const yVela = (0.5 - _v.y * 0.5) * window.innerHeight;
+      markerVela.style.display = "";
+      markerVela.style.transform = `translate(${xVela}px, ${yVela}px)`;
+    } else {
+      markerVela.style.display = "none";
+    }
 
     renderer.render(scene, camera);
 
@@ -767,12 +885,16 @@ export function startMainMenu({ onSelect }) {
   function dispose() {
     cancelAnimationFrame(raf);
     window.removeEventListener("resize", onResize);
+    window.removeEventListener("keydown", onKeyDown);
+    renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+    renderer.domElement.removeEventListener("pointerup", onPointerUp);
+    controls.dispose();
     for (const pts of [stars, cloudFine, cloudSoft]) {
       pts.geometry.dispose();
       pts.material.map?.dispose();
       pts.material.dispose();
     }
-    for (const s of [diskGlow, coreOuter, coreMid, coreInner, velaGlow]) {
+    for (const s of [diskGlow, coreOuter, coreMid, coreInner, velaGlow, sunGlow]) {
       s.material.map?.dispose();
       s.material.dispose();
     }
