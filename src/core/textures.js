@@ -410,3 +410,65 @@ export function starfieldTexture(seed = 99) {
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
+
+// --- Textura de estrela de alta nitidez com núcleo focado e halo cristalino ---
+export function sharpStarTexture({ withSpikes = false } = {}) {
+  const size = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d");
+  const half = size / 2;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Halo luminoso radial suave
+  const halo = ctx.createRadialGradient(half, half, 0, half, half, half);
+  halo.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+  halo.addColorStop(0.12, "rgba(255, 255, 255, 1.0)");
+  halo.addColorStop(0.28, "rgba(240, 248, 255, 0.85)");
+  halo.addColorStop(0.52, "rgba(180, 215, 255, 0.3)");
+  halo.addColorStop(0.8, "rgba(130, 180, 255, 0.06)");
+  halo.addColorStop(1.0, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(half, half, half, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Núcleo super focado e puro de alta intensidade
+  const core = ctx.createRadialGradient(half, half, 0, half, half, half * 0.32);
+  core.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+  core.addColorStop(0.45, "rgba(255, 255, 255, 1.0)");
+  core.addColorStop(0.85, "rgba(255, 255, 255, 0.95)");
+  core.addColorStop(1.0, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(half, half, half * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (withSpikes) {
+    ctx.lineWidth = 1.0;
+    const spikeH = ctx.createLinearGradient(0, half, size, half);
+    spikeH.addColorStop(0, "rgba(255, 255, 255, 0)");
+    spikeH.addColorStop(0.5, "rgba(255, 255, 255, 0.95)");
+    spikeH.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.strokeStyle = spikeH;
+    ctx.beginPath();
+    ctx.moveTo(half * 0.1, half);
+    ctx.lineTo(half * 1.9, half);
+    ctx.stroke();
+
+    const spikeV = ctx.createLinearGradient(half, 0, half, size);
+    spikeV.addColorStop(0, "rgba(255, 255, 255, 0)");
+    spikeV.addColorStop(0.5, "rgba(255, 255, 255, 0.95)");
+    spikeV.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.strokeStyle = spikeV;
+    ctx.beginPath();
+    ctx.moveTo(half, half * 0.1);
+    ctx.lineTo(half, half * 1.9);
+    ctx.stroke();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}

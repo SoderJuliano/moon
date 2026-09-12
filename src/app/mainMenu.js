@@ -17,7 +17,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { radialGlowTexture, starfieldTexture } from "../core/textures.js";
+import { sharpStarTexture, radialGlowTexture } from "../core/textures.js";
 import { SaveManager, LocalStorageBackend, createPlayerSave } from "../game/saveManager.js";
 import { t } from "../core/i18n.js";
 import { buildCatalog } from "../game/discoveryRegistry.js";
@@ -59,26 +59,24 @@ function diskColor(t, out) {
   return out;
 }
 
-// Sorteia um ponto do disco. Retorna o quão "dentro de um braço" ele caiu
-// (0..1) — braços são só regiões MAIS CLARAS da mesma nuvem, então isso vira
-// modulação de brilho, não estrutura separada.
+// Sorteia um ponto do disco com espessura volumétrica 3D natural
 function sampleDisk(rand, gauss, p) {
   const r = rand() * GALAXY_RADIUS; // uniforme em r ⇒ denso no centro, raro na borda
   let armBoost = 0;
   let a;
-  if (rand() < 0.45) {
-    // braços LARGOS e difusos: são só ondulações de brilho na nuvem,
-    // nunca fitas separadas (a maior parte do disco é preenchimento)
+  if (rand() < 0.5) {
+    // braços espirais com densidade ondulatória
     const arm = (rand() * ARMS) | 0;
-    const jitter = gauss() * (0.22 + 0.24 * (r / GALAXY_RADIUS));
+    const jitter = gauss() * (0.2 + 0.22 * (r / GALAXY_RADIUS));
     a = armAngle(arm, r) + jitter;
-    armBoost = Math.max(0, 1 - Math.abs(jitter) * 1.7);
+    armBoost = Math.max(0, 1 - Math.abs(jitter) * 1.8);
   } else {
-    a = rand() * Math.PI * 2; // preenchimento entre braços (disco contínuo)
+    a = rand() * Math.PI * 2; // preenchimento contínuo do disco interbraços
   }
-  const rr = Math.max(0, r + gauss() * (2 + r * 0.05));
-  // disco fino, engrossando de leve rumo ao bojo
-  const y = gauss() * (1.2 + 3.5 * Math.max(0, 1 - r / 18));
+  const rr = Math.max(0, r + gauss() * (2.2 + r * 0.05));
+  // Espessura volumétrica 3D natural: disco fino nas pontas e encorpado no interior/bojo
+  const diskHeight = 2.4 + 6.0 * Math.max(0, 1 - r / 22);
+  const y = gauss() * diskHeight;
   p.set(Math.cos(a) * rr, y, Math.sin(a) * rr);
   return armBoost;
 }
@@ -90,7 +88,7 @@ function edgeFade(t) {
   return (1 - k * k * 0.9) * (0.55 + 0.45 * (1 - t));
 }
 
-// Granulado de estrelas: bojo denso + disco inteiro, brilho puxado pelos braços
+// Granulado denso de estrelas com foco nítido e núcleo cristalino
 function buildStars(count, seed) {
   const rand = makeRng(seed);
   const gauss = () => rand() + rand() + rand() - 1.5; // ~normal, ±1.5
@@ -103,11 +101,11 @@ function buildStars(count, seed) {
 
   for (let i = 0; i < count; i++) {
     let armBoost = 0;
-    if (rand() < 0.24) {
-      // bojo: elipsoide achatado, denso e quente
-      const r = Math.abs(gauss()) * 13;
+    if (rand() < 0.22) {
+      // bojo: elipsoide denso, quente e volumétrico
+      const r = Math.abs(gauss()) * 14;
       const a = rand() * Math.PI * 2;
-      p.set(Math.cos(a) * r, gauss() * Math.max(1.2, 4.5 - r * 0.2), Math.sin(a) * r);
+      p.set(Math.cos(a) * r, gauss() * Math.max(1.8, 6.0 - r * 0.25), Math.sin(a) * r);
     } else {
       armBoost = sampleDisk(rand, gauss, p);
     }
@@ -117,11 +115,11 @@ function buildStars(count, seed) {
 
     const t = Math.min(Math.hypot(p.x, p.z) / GALAXY_RADIUS, 1);
     diskColor(t, c);
-    let bright = (0.34 + 0.42 * armBoost + rand() * 0.28) * edgeFade(t);
-    if (t < 0.28) bright += (1 - t / 0.28) * 0.5; // bojo mais luminoso
-    if (armBoost > 0.6 && rand() < 0.07) {
-      c.lerp(knot, 0.7); // nós azulados de formação estelar nos braços
-      bright = 1.1;
+    let bright = (0.42 + 0.45 * armBoost + rand() * 0.3) * edgeFade(t);
+    if (t < 0.28) bright += (1 - t / 0.28) * 0.55; // bojo mais luminoso
+    if (armBoost > 0.6 && rand() < 0.08) {
+      c.lerp(knot, 0.75); // nós azulados de formação estelar nos braços
+      bright = 1.25;
     }
     colors[i * 3] = c.r * bright;
     colors[i * 3 + 1] = c.g * bright;
@@ -132,8 +130,8 @@ function buildStars(count, seed) {
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   const mat = new THREE.PointsMaterial({
-    size: 0.85,
-    map: radialGlowTexture("#ffffff"),
+    size: 0.68,
+    map: sharpStarTexture(),
     vertexColors: true,
     transparent: true,
     opacity: 0.95,
@@ -146,8 +144,60 @@ function buildStars(count, seed) {
   return pts;
 }
 
-// Nuvem difusa: pontos grandes com sprite radial e cor por vértice — é ela que
-// faz o disco parecer uma névoa luminosa contínua, e não pontos soltos.
+// Estrelas gigantes, sistemas luminosos e aglomerados brilhantes com difração
+function buildMajorStars(count, seed) {
+  const rand = makeRng(seed);
+  const gauss = () => rand() + rand() + rand() - 1.5;
+
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const p = new THREE.Vector3();
+  const c = new THREE.Color();
+  const spectralPalette = [
+    new THREE.Color("#9bc5ff"), // O/B supergigante azul
+    new THREE.Color("#c7deff"), // A branca brilhante
+    new THREE.Color("#ffffff"), // Branca pura
+    new THREE.Color("#ffeed2"), // F/G solar
+    new THREE.Color("#ffd199"), // K âmbar
+    new THREE.Color("#ff9977"), // M gigante vermelha
+    new THREE.Color("#70e5ff"), // Hiper-luminosa ciano
+  ];
+
+  for (let i = 0; i < count; i++) {
+    const armBoost = sampleDisk(rand, gauss, p);
+    positions[i * 3] = p.x;
+    positions[i * 3 + 1] = p.y;
+    positions[i * 3 + 2] = p.z;
+
+    const t = Math.min(Math.hypot(p.x, p.z) / GALAXY_RADIUS, 1);
+    const col = spectralPalette[(rand() * spectralPalette.length) | 0];
+    c.copy(col);
+    const bright = (0.7 + 0.6 * armBoost + rand() * 0.4) * edgeFade(t);
+
+    colors[i * 3] = c.r * bright;
+    colors[i * 3 + 1] = c.g * bright;
+    colors[i * 3 + 2] = c.b * bright;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 1.35,
+    map: sharpStarTexture({ withSpikes: true }),
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.98,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  return pts;
+}
+
+// Nuvem difusa: pontos grandes com sprite radial e cor por vértice — névoa luminosa contínua
 function buildCloud(count, seed, size, opacity) {
   const rand = makeRng(seed);
   const gauss = () => rand() + rand() + rand() - 1.5;
@@ -189,6 +239,53 @@ function buildCloud(count, seed, size, opacity) {
   return pts;
 }
 
+// Campo 3D de estrelas profundas do cosmos (substitui a imagem estática plana 2D)
+// Fica a r = 1400..1800 em 3D, garantindo paralaxe real e ficando fisicamente ATRÁS da galáxia
+function buildCosmicSkybox(count = 10000, seed = 777) {
+  const rand = makeRng(seed);
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+  const c = new THREE.Color();
+
+  for (let i = 0; i < count; i++) {
+    const theta = rand() * Math.PI * 2;
+    const phi = Math.acos(2 * rand() - 1);
+    const r = 1400 + rand() * 400; // Esfera distante
+
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    positions[i * 3 + 2] = r * Math.cos(phi);
+
+    const starType = rand();
+    if (starType < 0.6) c.setRGB(0.85, 0.92, 1.0);
+    else if (starType < 0.85) c.setRGB(1.0, 1.0, 1.0);
+    else c.setRGB(1.0, 0.86, 0.72);
+
+    const brightness = 0.25 + rand() * 0.75;
+    colors[i * 3] = c.r * brightness;
+    colors[i * 3 + 1] = c.g * brightness;
+    colors[i * 3 + 2] = c.b * brightness;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 2.2,
+    map: sharpStarTexture(),
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: true,
+    sizeAttenuation: false, // Pontos fixos distantes no infinito
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  return pts;
+}
+
 function makeGlowSprite(color, scale, opacity) {
   const s = new THREE.Sprite(
     new THREE.SpriteMaterial({
@@ -206,7 +303,11 @@ function makeGlowSprite(color, scale, opacity) {
 export function startMainMenu({ onSelect }) {
   // --- cena própria do menu -------------------------------------------------
   const scene = new THREE.Scene();
-  scene.background = starfieldTexture(42);
+  scene.background = new THREE.Color("#010206"); // Vácuo estelar cósmico profundo real
+
+  // Campo 3D de estrelas cósmicas distantes (esfera celeste a r=1600, elimina a ilusão 2D)
+  const cosmicSkybox = buildCosmicSkybox(10000, 777);
+  scene.add(cosmicSkybox);
 
   // vista de cima, com leve inclinação (como nas ilustrações — dá profundidade)
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
@@ -221,10 +322,12 @@ export function startMainMenu({ onSelect }) {
   const spinner = new THREE.Group();
   scene.add(spinner);
 
-  const stars = buildStars(45000, 1234);
-  const cloudFine = buildCloud(4600, 5678, 6.5, 0.13); // névoa "de perto"
-  const cloudSoft = buildCloud(2600, 8765, 14, 0.07); // véu largo por baixo
-  spinner.add(stars, cloudFine, cloudSoft);
+  // Estrutura estelar em camadas: poeira de fundo densa + supergigantes luminosas com difração + névoas
+  const stars = buildStars(65000, 1234);
+  const majorStars = buildMajorStars(15000, 9876);
+  const cloudFine = buildCloud(4600, 5678, 3.8, 0.11); // névoa fina refinada
+  const cloudSoft = buildCloud(2600, 8765, 8.0, 0.05); // véu largo suave
+  spinner.add(stars, majorStars, cloudFine, cloudSoft);
 
   // núcleo: um grande brilho quente em camadas dominando o centro (como nas
   // fotos, ele toma ~1/3 do diâmetro) + um véu azulado cobrindo o disco todo
@@ -268,8 +371,8 @@ export function startMainMenu({ onSelect }) {
   controls.rotateSpeed = 0.65;
   controls.zoomSpeed = 0.85;
   controls.panSpeed = 0.7;
-  controls.minDistance = 4;
-  controls.maxDistance = 550;
+  controls.minDistance = 0.8; // Permite entrar profundamente e preencher a tela com estrelas
+  controls.maxDistance = 600;
   controls.target.copy(HOME_CAM_TARGET);
 
   let isResettingCam = false;
@@ -843,6 +946,15 @@ export function startMainMenu({ onSelect }) {
     spinner.rotation.y += SPIN_RATE * dt; // rotação contínua e calma
     coreMid.material.opacity = 0.76 + Math.sin(performance.now() * 0.0008) * 0.06;
 
+    // Foco adaptativo: ao se aproximar ou entrar na galáxia, atenua as névoas volumétricas
+    // para destacar a pureza cristalina e o brilho nítido das estrelas individuais
+    const camDist = camera.position.distanceTo(controls.target);
+    const cloudFade = THREE.MathUtils.clamp((camDist - 10) / 45, 0.10, 1.0);
+    cloudFine.material.opacity = 0.11 * cloudFade;
+    cloudSoft.material.opacity = 0.05 * cloudFade;
+    diskGlow.material.opacity = 0.10 * cloudFade;
+    coreOuter.material.opacity = 0.32 * cloudFade;
+
     // os marcadores acompanham os braços em 3D: projeta as âncoras para a tela se estiverem no campo visual frontal
     const camDir = new THREE.Vector3();
     camera.getWorldDirection(camDir);
@@ -889,7 +1001,7 @@ export function startMainMenu({ onSelect }) {
     renderer.domElement.removeEventListener("pointerdown", onPointerDown);
     renderer.domElement.removeEventListener("pointerup", onPointerUp);
     controls.dispose();
-    for (const pts of [stars, cloudFine, cloudSoft]) {
+    for (const pts of [cosmicSkybox, stars, majorStars, cloudFine, cloudSoft]) {
       pts.geometry.dispose();
       pts.material.map?.dispose();
       pts.material.dispose();
@@ -898,7 +1010,7 @@ export function startMainMenu({ onSelect }) {
       s.material.map?.dispose();
       s.material.dispose();
     }
-    scene.background?.dispose?.();
+    scene.background = null;
     renderer.dispose();
     renderer.domElement.remove();
     root.remove();
