@@ -2935,6 +2935,19 @@ canvas {
   background: #ffffff;
   box-shadow: 0 0 10px #00e5ff, 0 0 18px rgba(0, 229, 255, 0.8);
 }
+.mm-marker-vela .mm-marker-label {
+  opacity: 0;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  color: #bdf5ff;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.6), 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+.mm-marker-vela:hover .mm-marker-label,
+.mm-marker-vela:focus-visible .mm-marker-label {
+  opacity: 1;
+  transform: translateX(0);
+}
 @keyframes mm-pulse-vela {
   0% {
     transform: scale(0.5);

@@ -258,7 +258,7 @@ export function startMainMenu({ onSelect }) {
       <span class="mm-marker-ring"><span class="mm-marker-dot"></span></span>
       <span class="mm-marker-label">${t("menu.solarSystem")}</span>
     </button>
-    <button class="mm-marker mm-marker-vela" type="button">
+    <button class="mm-marker mm-marker-vela" type="button" aria-label="${t("menu.velaPulsar") || "Pulsar de Vela"}" title="${t("menu.velaPulsar") || "Pulsar de Vela"}">
       <span class="mm-marker-ring mm-marker-ring-vela"><span class="mm-marker-dot mm-marker-dot-vela"></span></span>
       <span class="mm-marker-label">${t("menu.velaPulsar") || "Pulsar de Vela"}</span>
     </button>
