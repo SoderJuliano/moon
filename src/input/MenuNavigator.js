@@ -44,13 +44,13 @@ const CONTEXTS = [
     cancel: (root) => root.querySelector('[data-act="resume"]') || root.querySelector(".modal-btn"),
   },
   {
-    // menu principal (galáxia): painel fechado = só o marcador do Sistema Solar
+    // menu principal (galáxia): painel fechado = marcadores de pontos de interesse
     root: ".mm-root",
     items: (root) => {
       const panel = root.querySelector(".mm-panel.open");
       if (panel) return [...panel.querySelectorAll(".mm-option, .mm-save-btn")];
-      const marker = root.querySelector(".mm-marker");
-      return marker ? [marker] : [];
+      const markers = root.querySelectorAll(".mm-marker");
+      return [...markers];
     },
     cancel: (root) => root.querySelector(MM_BACK),
   },

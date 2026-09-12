@@ -238,16 +238,31 @@ export function startMainMenu({ onSelect }) {
   sunAnchor.position.y = 0.6;
   spinner.add(sunAnchor);
 
+  // âncora e brilho sutil para o Pulsar de Vela (posicionado com espaçamento claro para não sobrepor o Sistema Solar)
+  const velaAnchor = new THREE.Object3D();
+  const velaPos = armPoint(SUN_ARM, SUN_R + 12).clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.48);
+  velaAnchor.position.copy(velaPos);
+  velaAnchor.position.y = 0.7;
+  spinner.add(velaAnchor);
+
+  const velaGlow = makeGlowSprite("#00e5ff", 4.5, 0.95);
+  velaGlow.position.copy(velaPos);
+  spinner.add(velaGlow);
+
   // --- overlay DOM ------------------------------------------------------------
   const root = document.createElement("div");
   root.className = "mm-root";
   root.innerHTML = `
     <div class="mm-title">${t("menu.milkyWay")}</div>
-    <button class="mm-marker" type="button">
+    <button class="mm-marker mm-marker-sun" type="button">
       <span class="mm-marker-ring"><span class="mm-marker-dot"></span></span>
       <span class="mm-marker-label">${t("menu.solarSystem")}</span>
     </button>
-    <div class="mm-panel" hidden>
+    <button class="mm-marker mm-marker-vela" type="button">
+      <span class="mm-marker-ring mm-marker-ring-vela"><span class="mm-marker-dot mm-marker-dot-vela"></span></span>
+      <span class="mm-marker-label">${t("menu.velaPulsar") || "Pulsar de Vela"}</span>
+    </button>
+    <div class="mm-panel mm-panel-solar" hidden>
       <div class="mm-panel-title">${t("menu.solarSystem")}</div>
       <div class="mm-panel-sub">${t("menu.chooseExperience")}</div>
       <div class="mm-view-modes">
@@ -317,25 +332,67 @@ export function startMainMenu({ onSelect }) {
         <button class="mm-save-btn" type="button" data-profile="back">${t("menu.back")}</button>
       </div>
     </div>
+    <div class="mm-panel mm-panel-vela" hidden>
+      <div class="mm-panel-title">${t("menu.velaPulsar") || "Pulsar de Vela"}</div>
+      <div class="mm-panel-sub">${t("menu.velaSubtitle") || "Estrela de Nêutrons • PSR B0833-45"}</div>
+      <div class="mm-vela-stats-box">
+        <div class="mm-vela-row">
+          <span class="mm-vela-k">${t("menu.velaType") || "Tipo"}:</span>
+          <span class="mm-vela-v">${t("menu.velaTypeValue") || "Estrela de Nêutrons (Pulsar)"}</span>
+        </div>
+        <div class="mm-vela-row">
+          <span class="mm-vela-k">${t("menu.velaDistance") || "Distância"}:</span>
+          <span class="mm-vela-v">${t("menu.velaDistanceValue") || "~950 a 1.000 anos-luz"}</span>
+        </div>
+        <div class="mm-vela-row">
+          <span class="mm-vela-k">${t("menu.velaRotation") || "Rotação"}:</span>
+          <span class="mm-vela-v">${t("menu.velaRotationValue") || "11,2 rot/s (89 ms)"}</span>
+        </div>
+        <div class="mm-vela-row">
+          <span class="mm-vela-k">${t("menu.velaConstellation") || "Constelação"}:</span>
+          <span class="mm-vela-v">${t("menu.velaConstellationValue") || "Vela (Hemisfério Sul)"}</span>
+        </div>
+      </div>
+      <div class="mm-view-modes">
+        <button class="mm-option mm-option-vela" type="button" data-mode="vela">
+          <span class="mm-option-name">${t("menu.velaWatch") || "🔭 Observar Pulsar de Vela"}</span>
+          <span class="mm-option-desc">${t("menu.velaWatchDesc") || "Modo 3D com radiação e áudio em tempo real."}</span>
+        </button>
+      </div>
+    </div>
     <div class="mm-fade"></div>`;
   document.body.appendChild(root);
 
-  const marker = root.querySelector(".mm-marker");
-  const panel = root.querySelector(".mm-panel");
+  const markerSun = root.querySelector(".mm-marker-sun");
+  const markerVela = root.querySelector(".mm-marker-vela");
+  const panelSolar = root.querySelector(".mm-panel-solar");
+  const panelVela = root.querySelector(".mm-panel-vela");
   const fade = root.querySelector(".mm-fade");
 
-  marker.addEventListener("click", () => {
-    panel.hidden = false;
-    requestAnimationFrame(() => panel.classList.add("open"));
-  });
-  // clicar fora do painel (no espaço) fecha — e volta pra tela de modos
-  renderer.domElement.addEventListener("click", () => {
-    panel.classList.remove("open");
+  function openPanel(targetPanel, otherPanel) {
+    if (otherPanel) {
+      otherPanel.classList.remove("open");
+      otherPanel.hidden = true;
+    }
+    targetPanel.hidden = false;
+    requestAnimationFrame(() => targetPanel.classList.add("open"));
+  }
+
+  function closePanels() {
+    panelSolar.classList.remove("open");
+    panelVela.classList.remove("open");
     setTimeout(() => {
-      panel.hidden = true;
+      panelSolar.hidden = true;
+      panelVela.hidden = true;
       showScreen("modes");
     }, 250);
-  });
+  }
+
+  markerSun.addEventListener("click", () => openPanel(panelSolar, panelVela));
+  markerVela.addEventListener("click", () => openPanel(panelVela, panelSolar));
+
+  // clicar fora dos painéis (no espaço) fecha
+  renderer.domElement.addEventListener("click", closePanels);
 
   let choosing = false;
   function launch(mode, opts) {
@@ -446,6 +503,7 @@ export function startMainMenu({ onSelect }) {
 
   root.querySelector('[data-mode="exploration"]').addEventListener("click", () => launch("exploration"));
   root.querySelector('[data-mode="game"]').addEventListener("click", () => showScreen("game"));
+  root.querySelector('[data-mode="vela"]')?.addEventListener("click", () => launch("vela"));
   views.game.querySelector('[data-game="back"]').addEventListener("click", () => showScreen("modes"));
 
   // NOVO JOGO: pede um nome; se já existe (ou há legado), confirma sobrescrever
@@ -686,11 +744,16 @@ export function startMainMenu({ onSelect }) {
     spinner.rotation.y += SPIN_RATE * dt; // rotação contínua e calma
     coreMid.material.opacity = 0.76 + Math.sin(performance.now() * 0.0008) * 0.06;
 
-    // o marcador acompanha o braço: projeta a âncora 3D para a tela
+    // os marcadores acompanham os braços: projeta as âncoras 3D para a tela
     sunAnchor.getWorldPosition(_v).project(camera);
-    const x = (_v.x * 0.5 + 0.5) * window.innerWidth;
-    const y = (0.5 - _v.y * 0.5) * window.innerHeight;
-    marker.style.transform = `translate(${x}px, ${y}px)`;
+    const xSun = (_v.x * 0.5 + 0.5) * window.innerWidth;
+    const ySun = (0.5 - _v.y * 0.5) * window.innerHeight;
+    markerSun.style.transform = `translate(${xSun}px, ${ySun}px)`;
+
+    velaAnchor.getWorldPosition(_v).project(camera);
+    const xVela = (_v.x * 0.5 + 0.5) * window.innerWidth;
+    const yVela = (0.5 - _v.y * 0.5) * window.innerHeight;
+    markerVela.style.transform = `translate(${xVela}px, ${yVela}px)`;
 
     renderer.render(scene, camera);
 
@@ -709,7 +772,7 @@ export function startMainMenu({ onSelect }) {
       pts.material.map?.dispose();
       pts.material.dispose();
     }
-    for (const s of [diskGlow, coreOuter, coreMid, coreInner]) {
+    for (const s of [diskGlow, coreOuter, coreMid, coreInner, velaGlow]) {
       s.material.map?.dispose();
       s.material.dispose();
     }
