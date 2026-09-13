@@ -305,8 +305,15 @@ export function startMainMenu({ onSelect }) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#010206"); // Vácuo estelar cósmico profundo real
 
+  const isMobile = window.innerWidth <= 768 || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 1);
+  const skyboxCount = isMobile ? 5000 : 10000;
+  const starsCount = isMobile ? 35000 : 65000;
+  const majorCount = isMobile ? 8000 : 15000;
+  const cloudFineCount = isMobile ? 2500 : 4600;
+  const cloudSoftCount = isMobile ? 1500 : 2600;
+
   // Campo 3D de estrelas cósmicas distantes (esfera celeste a r=1600, elimina a ilusão 2D)
-  const cosmicSkybox = buildCosmicSkybox(10000, 777);
+  const cosmicSkybox = buildCosmicSkybox(skyboxCount, 777);
   scene.add(cosmicSkybox);
 
   // vista de cima, com leve inclinação (como nas ilustrações — dá profundidade)
@@ -322,11 +329,11 @@ export function startMainMenu({ onSelect }) {
   const spinner = new THREE.Group();
   scene.add(spinner);
 
-  // Estrutura estelar em camadas: poeira de fundo densa + supergigantes luminosas com difração + névoas
-  const stars = buildStars(65000, 1234);
-  const majorStars = buildMajorStars(15000, 9876);
-  const cloudFine = buildCloud(4600, 5678, 3.8, 0.11); // névoa fina refinada
-  const cloudSoft = buildCloud(2600, 8765, 8.0, 0.05); // véu largo suave
+  // Estrutura estelar em camadas com escalabilidade adaptativa mobile/desktop
+  const stars = buildStars(starsCount, 1234);
+  const majorStars = buildMajorStars(majorCount, 9876);
+  const cloudFine = buildCloud(cloudFineCount, 5678, 3.8, 0.11); // névoa fina refinada
+  const cloudSoft = buildCloud(cloudSoftCount, 8765, 8.0, 0.05); // véu largo suave
   spinner.add(stars, majorStars, cloudFine, cloudSoft);
 
   // núcleo: um grande brilho quente em camadas dominando o centro (como nas
