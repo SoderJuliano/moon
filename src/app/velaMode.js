@@ -666,10 +666,11 @@ export function startVelaMode({ onExit } = {}) {
   const overlay = document.createElement("div");
   overlay.className = "vela-overlay";
   overlay.innerHTML = `
-    <div class="vela-top-hud">
+    <div class="vela-top-hud" id="vela-info-card">
       <div class="vela-title-row">
         <span class="vela-beacon-dot" aria-hidden="true"></span>
         <h1 class="vela-title">${t("vela.title") || "PULSAR DE VELA"}</h1>
+        <button type="button" class="vela-close-btn" id="vela-close-btn" aria-label="Fechar informações" title="Fechar informações (H / I)">✕</button>
       </div>
       <div class="vela-subtitle">${t("vela.sub") || "PSR B0833-45 • Remanescente de Supernova (Vela SNR)"}</div>
       <div class="vela-stats-grid">
@@ -687,9 +688,36 @@ export function startVelaMode({ onExit } = {}) {
         </div>
       </div>
     </div>
+    <button type="button" class="vela-reopen-btn" id="vela-reopen-btn" aria-label="Mostrar informações" title="Mostrar informações (H / I)">ⓘ</button>
     <div class="vela-fade-layer"></div>
   `;
   document.body.appendChild(overlay);
+
+  const infoCard = overlay.querySelector("#vela-info-card");
+  const closeBtn = overlay.querySelector("#vela-close-btn");
+  const reopenBtn = overlay.querySelector("#vela-reopen-btn");
+
+  function setInfoCardVisible(visible) {
+    if (infoCard && reopenBtn) {
+      if (visible) {
+        infoCard.classList.remove("hidden");
+        reopenBtn.classList.remove("show");
+      } else {
+        infoCard.classList.add("hidden");
+        reopenBtn.classList.add("show");
+      }
+    }
+  }
+
+  closeBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setInfoCardVisible(false);
+  });
+
+  reopenBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setInfoCardVisible(true);
+  });
 
   // Iniciar áudio sonificado
   const audio = createPulsarAudio();
@@ -729,6 +757,9 @@ export function startVelaMode({ onExit } = {}) {
       handleExit();
     } else if (e.key === "m" || e.key === "M") {
       audio.toggleMute();
+    } else if (e.key === "h" || e.key === "H" || e.key === "i" || e.key === "I") {
+      const isHidden = infoCard?.classList.contains("hidden");
+      setInfoCardVisible(isHidden);
     }
   }
   window.addEventListener("keydown", onKeyDown);

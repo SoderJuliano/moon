@@ -178,31 +178,88 @@ const BlackHoleShader = {
     #define TWO_PI 6.28318530718
     #define R_BOUND 36.0
 
-    // Função de ruído procedural pseudo-aleatório
-    float hash(vec2 p) {
-      p = fract(p * vec2(123.34, 456.21));
-      p += dot(p, p + 45.32);
-      return fract(p.x * p.y);
+    // Simplex 3D noise (Ashima Arts / Stefan Gustavson) - Ultra-rápido, suave e 100% contínuo
+    vec4 permute(vec4 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
+    vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+    float snoise(vec3 v) {
+      const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+      const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+      // Primeiro canto
+      vec3 i  = floor(v + dot(v, C.yyy));
+      vec3 x0 = v - i + dot(i, C.xxx);
+
+      // Outros cantos
+      vec3 g = step(x0.yzx, x0.xyz);
+      vec3 l = 1.0 - g;
+      vec3 i1 = min(g.xyz, l.zxy);
+      vec3 i2 = max(g.xyz, l.zxy);
+
+      vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+      vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+      vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+
+      // Permutações
+      i = mod(i, 289.0);
+      vec4 p = permute(permute(permute(
+                 i.z + vec4(0.0, i1.z, i2.z, 1.0))
+               + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+               + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+      // Gradientes
+      float n_ = 0.142857142857;
+      vec3 ns = n_ * D.wyz - D.xzx;
+
+      vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+      vec4 x_ = floor(j * ns.z);
+      vec4 y_ = floor(j - 7.0 * x_);
+
+      vec4 x = x_ * ns.x + ns.yyyy;
+      vec4 y = y_ * ns.x + ns.yyyy;
+      vec4 h = 1.0 - abs(x) - abs(y);
+
+      vec4 b0 = vec4(x.xy, y.xy);
+      vec4 b1 = vec4(x.zw, y.zw);
+
+      vec4 s0 = floor(b0) * 2.0 + 1.0;
+      vec4 s1 = floor(b1) * 2.0 + 1.0;
+      vec4 sh = -step(h, vec4(0.0));
+
+      vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+      vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+      vec3 p0 = vec3(a0.xy, h.x);
+      vec3 p1 = vec3(a0.zw, h.y);
+      vec3 p2 = vec3(a1.xy, h.z);
+      vec3 p3 = vec3(a1.zw, h.w);
+
+      // Normalizar gradientes
+      vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+      p0 *= norm.x;
+      p1 *= norm.y;
+      p2 *= norm.z;
+      p3 *= norm.w;
+
+      // Mistura ponderada
+      vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+      m = m * m;
+      return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
     }
 
-    float noise(vec2 p) {
-      vec2 i = floor(p);
-      vec2 f = fract(p);
-      f = f * f * (3.0 - 2.0 * f);
-      float a = hash(i);
-      float b = hash(i + vec2(1.0, 0.0));
-      float c = hash(i + vec2(0.0, 1.0));
-      float d = hash(i + vec2(1.0, 1.0));
-      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-    }
-
-    // FBM (Fractal Brownian Motion) para turbulência do plasma
-    float fbm(vec2 p) {
+    // FBM 3D contínuo com rotação decorrelacionada
+    float fbm3D(vec3 p) {
       float v = 0.0;
       float a = 0.5;
-      for (int i = 0; i < 4; i++) {
-        v += a * noise(p);
-        p = p * 2.04 + vec2(1.6, 3.2);
+      mat3 rot = mat3(
+        0.00,  0.80,  0.60,
+       -0.80,  0.36, -0.48,
+       -0.60, -0.48,  0.64
+      );
+      for (int i = 0; i < 3; i++) {
+        v += a * (snoise(p) * 0.5 + 0.5);
+        p = rot * p * 2.05 + vec3(1.2, 2.3, 3.4);
         a *= 0.5;
       }
       return v;
@@ -231,19 +288,21 @@ const BlackHoleShader = {
       return col;
     }
 
-    // Campo de estrelas cósmicas procedurais de fundo com distorção gravitacional
+    // Campo de estrelas cósmicas procedurais em esfera 3D perfeita (sem costuras nos polos ou meridianos)
     vec3 getBackgroundStars(vec3 dir) {
-      vec2 skyCoord = vec2(atan(dir.z, dir.x) / TWO_PI + 0.5, dir.y * 0.5 + 0.5);
-      float starGrid = hash(floor(skyCoord * 450.0));
+      vec3 d = normalize(dir);
+      float s1 = snoise(d * 48.0);
       float star = 0.0;
-      if (starGrid > 0.988) {
-        vec2 starCenter = (floor(skyCoord * 450.0) + 0.5) / 450.0;
-        float d = length(skyCoord - starCenter) * 450.0;
-        star = smoothstep(0.45, 0.0, d) * (0.6 + 0.4 * fract(starGrid * 842.1));
+      if (s1 > 0.74) {
+        star = pow((s1 - 0.74) / 0.26, 3.4) * 1.9;
+      }
+      float s2 = snoise(d * 125.0);
+      if (s2 > 0.80) {
+        star += pow((s2 - 0.80) / 0.20, 4.0) * 1.4;
       }
 
-      // Brilho difuso galáctico ao redor
-      float galaxyGlow = pow(max(0.0, 1.0 - abs(dir.y)), 4.0) * 0.04;
+      // Brilho difuso galáctico ao redor do plano equatorial cósmico
+      float galaxyGlow = pow(max(0.0, 1.0 - abs(d.y)), 5.0) * 0.05;
       vec3 nebColor = vec3(0.04, 0.08, 0.18) * galaxyGlow + vec3(star * 0.95, star * 0.96, star * 1.05);
       return nebColor;
     }
@@ -326,16 +385,31 @@ const BlackHoleShader = {
             float omega = 2.8 / pow(hitR, 1.25);
             float rotPhi = phi - uTime * omega;
 
-            // Turbulência de plasma via FBM
-            vec2 discCoord = vec2(rotPhi * 3.2, hitR * 0.95);
-            float plasmaNoise = fbm(discCoord);
-            
-            // Grânulos e filamentos de matéria superaquecida em alta rotação (sofrem curvatura gravitacional!)
-            float fineSparks = pow(fbm(discCoord * 3.5 + vec2(uTime * 1.2, 0.0)), 2.8) * 1.5;
-            
-            // Densidade radial suave nas bordas
+            // Coordenadas harmônicas 3D estritamente periódicas em rotPhi (2π)
+            // Isso elimina 100% de qualquer costura, corte ou emenda no disco de acreção
+            float spiral1 = rotPhi + 0.38 * hitR;
+            vec3 coord1 = vec3(cos(spiral1) * 2.4, sin(spiral1) * 2.4, hitR * 0.72);
+
+            float spiral2 = 2.0 * rotPhi - 0.55 * hitR + uTime * 0.25;
+            vec3 coord2 = vec3(cos(spiral2) * 4.2, sin(spiral2) * 4.2, hitR * 1.35);
+
+            float spiral3 = 4.0 * rotPhi + 0.85 * hitR - uTime * 0.45;
+            vec3 coord3 = vec3(cos(spiral3) * 7.0, sin(spiral3) * 7.0, hitR * 2.5);
+
+            float n1 = fbm3D(coord1);
+            float n2 = fbm3D(coord2);
+            float n3 = snoise(coord3) * 0.5 + 0.5;
+
+            // Ondulações e anéis concêntricos finos gerados por cisalhamento diferencial
+            float ringlets1 = sin(hitR * 5.2 + n1 * 3.2) * 0.5 + 0.5;
+            float ringlets2 = sin(hitR * 11.5 + 2.0 * rotPhi) * 0.5 + 0.5;
+
+            float plasmaNoise = n1 * 0.52 + n2 * 0.34 + ringlets1 * 0.14;
+            float fineSparks = pow(n3, 3.2) * 2.2 * ringlets2;
+
+            // Densidade radial suave nas bordas (fade in suave no ISCO e fade out suave no raio externo)
             float radialDensity = smoothstep(rIn, rIn + 0.85, hitR) * (1.0 - smoothstep(rOut - 3.2, rOut, hitR));
-            float density = (pow(plasmaNoise, 1.35) * 2.2 + fineSparks) * radialDensity;
+            float density = (pow(plasmaNoise, 1.35) * 2.3 + fineSparks) * radialDensity;
 
             // Efeito Doppler Relativístico (Beaming)
             vec3 vPlasma = vec3(-sin(phi), 0.0, cos(phi));
@@ -449,10 +523,11 @@ export function startSgrAMode({ onExit } = {}) {
   const overlay = document.createElement("div");
   overlay.className = "vela-overlay sgra-overlay";
   overlay.innerHTML = `
-    <div class="vela-top-hud sgra-top-hud">
+    <div class="vela-top-hud sgra-top-hud" id="sgra-info-card">
       <div class="vela-title-row">
         <span class="sgra-beacon-dot" aria-hidden="true"></span>
         <h1 class="vela-title">${t("sgra.title") || "SAGITÁRIO A*"}</h1>
+        <button type="button" class="vela-close-btn" id="sgra-close-btn" aria-label="Fechar informações" title="Fechar informações (H / I)">✕</button>
       </div>
       <div class="vela-subtitle">${t("sgra.sub") || "Buraco Negro Supermassivo • Sombra do Horizonte de Eventos"}</div>
       <div class="vela-stats-grid">
@@ -478,9 +553,36 @@ export function startSgrAMode({ onExit } = {}) {
         </div>
       </div>
     </div>
+    <button type="button" class="vela-reopen-btn sgra-reopen-btn" id="sgra-reopen-btn" aria-label="Mostrar informações" title="Mostrar informações (H / I)">ⓘ</button>
     <div class="vela-fade-layer"></div>
   `;
   document.body.appendChild(overlay);
+
+  const infoCard = overlay.querySelector("#sgra-info-card");
+  const closeBtn = overlay.querySelector("#sgra-close-btn");
+  const reopenBtn = overlay.querySelector("#sgra-reopen-btn");
+
+  function setInfoCardVisible(visible) {
+    if (infoCard && reopenBtn) {
+      if (visible) {
+        infoCard.classList.remove("hidden");
+        reopenBtn.classList.remove("show");
+      } else {
+        infoCard.classList.add("hidden");
+        reopenBtn.classList.add("show");
+      }
+    }
+  }
+
+  closeBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setInfoCardVisible(false);
+  });
+
+  reopenBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setInfoCardVisible(true);
+  });
 
   // Iniciar áudio gravitacional
   const audio = createBlackHoleAudio();
@@ -520,6 +622,9 @@ export function startSgrAMode({ onExit } = {}) {
       handleExit();
     } else if (e.key === "m" || e.key === "M") {
       audio.toggleMute();
+    } else if (e.key === "h" || e.key === "H" || e.key === "i" || e.key === "I") {
+      const isHidden = infoCard?.classList.contains("hidden");
+      setInfoCardVisible(isHidden);
     }
   }
   window.addEventListener("keydown", onKeyDown);
