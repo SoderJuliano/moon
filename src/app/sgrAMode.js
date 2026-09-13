@@ -148,8 +148,6 @@ const BlackHoleShader = {
   uniforms: {
     uTime: { value: 0 },
     uCameraPos: { value: new THREE.Vector3() },
-    uViewMatrixInverse: { value: new THREE.Matrix4() },
-    uProjectionMatrixInverse: { value: new THREE.Matrix4() },
     uResolution: { value: new THREE.Vector2() },
     uRs: { value: 1.65 }, // Raio de Schwarzschild do buraco negro
     uRin: { value: 4.25 }, // Raio interno do disco (ISCO / photon orbit)
@@ -172,8 +170,6 @@ const BlackHoleShader = {
 
     uniform float uTime;
     uniform vec3 uCameraPos;
-    uniform mat4 uViewMatrixInverse;
-    uniform mat4 uProjectionMatrixInverse;
     uniform vec2 uResolution;
     uniform float uRs;
     uniform float uRin;
@@ -181,6 +177,7 @@ const BlackHoleShader = {
 
     #define PI 3.14159265359
     #define TWO_PI 6.28318530718
+    #define R_BOUND 36.0
 
     // Função de ruído procedural pseudo-aleatório
     float hash(vec2 p) {
@@ -206,7 +203,7 @@ const BlackHoleShader = {
       float a = 0.5;
       for (int i = 0; i < 4; i++) {
         v += a * noise(p);
-        p = p * 2.02 + vec2(1.6, 3.2);
+        p = p * 2.04 + vec2(1.6, 3.2);
         a *= 0.5;
       }
       return v;
@@ -214,20 +211,22 @@ const BlackHoleShader = {
 
     // Gradiente de cor de plasma superaquecido (de branco incandescente a âmbar/vermelho escuro)
     vec3 plasmaColor(float t, float doppler) {
-      vec3 core = vec3(1.0, 0.98, 0.92);   // Branco superquente
-      vec3 mid = vec3(1.0, 0.62, 0.18);    // Dourado / Âmbar
-      vec3 outer = vec3(0.85, 0.22, 0.04); // Laranja avermelhado
-      vec3 cold = vec3(0.35, 0.05, 0.02);  // Borda fria
+      vec3 core = vec3(1.0, 0.98, 0.94);   // Branco superquente incandescente
+      vec3 mid = vec3(1.0, 0.65, 0.20);    // Dourado / Âmbar
+      vec3 outer = vec3(0.92, 0.28, 0.05); // Laranja avermelhado
+      vec3 cold = vec3(0.38, 0.06, 0.02);  // Borda fria
+      vec3 deep = vec3(0.12, 0.01, 0.01);
 
-      vec3 col = mix(cold, outer, smoothstep(0.0, 0.35, t));
-      col = mix(col, mid, smoothstep(0.35, 0.72, t));
-      col = mix(col, core, smoothstep(0.72, 1.0, t));
+      vec3 col = mix(deep, cold, smoothstep(0.0, 0.25, t));
+      col = mix(col, outer, smoothstep(0.25, 0.55, t));
+      col = mix(col, mid, smoothstep(0.55, 0.82, t));
+      col = mix(col, core, smoothstep(0.82, 1.0, t));
 
-      // Modulação de cor por Doppler relativístico
+      // Modulação de cor por Doppler relativístico e redshift
       if (doppler > 1.0) {
-        col = mix(col, vec3(0.85, 0.95, 1.2) * col, min(1.0, (doppler - 1.0) * 0.8));
+        col = mix(col, vec3(0.88, 0.96, 1.25) * col, min(1.0, (doppler - 1.0) * 0.75));
       } else {
-        col = mix(col, vec3(1.1, 0.45, 0.3) * col, min(1.0, (1.0 - doppler) * 0.7));
+        col = mix(col, vec3(1.15, 0.45, 0.28) * col, min(1.0, (1.0 - doppler) * 0.8));
       }
 
       return col;
@@ -245,7 +244,7 @@ const BlackHoleShader = {
       }
 
       // Brilho difuso galáctico ao redor
-      float galaxyGlow = pow(max(0.0, 1.0 - abs(dir.y)), 4.0) * 0.035;
+      float galaxyGlow = pow(max(0.0, 1.0 - abs(dir.y)), 4.0) * 0.04;
       vec3 nebColor = vec3(0.04, 0.08, 0.18) * galaxyGlow + vec3(star * 0.95, star * 0.96, star * 1.05);
       return nebColor;
     }
@@ -255,110 +254,146 @@ const BlackHoleShader = {
       vec3 rayOrigin = uCameraPos;
       vec3 rayDir = normalize(vWorldPosition - uCameraPos);
 
-      // Trajetória do raio de luz curvada pela gravidade de Schwarzschild (Geodesic Marching)
+      // Avanço analítico instantâneo para a esfera delimitadora de raio R_BOUND
+      // Isso economiza dezenas de passos no vácuo e garante precisão máxima
+      float bProj = dot(rayOrigin, rayDir);
+      float cDist = dot(rayOrigin, rayOrigin) - R_BOUND * R_BOUND;
+      float discr = bProj * bProj - cDist;
+
       vec3 pos = rayOrigin;
       vec3 dir = rayDir;
+
+      if (length(rayOrigin) > R_BOUND) {
+        if (discr < 0.0 || (-bProj - sqrt(discr)) < 0.0) {
+          // O raio nunca entra na esfera de influência gravitacional
+          vec3 bg = getBackgroundStars(rayDir);
+          gl_FragColor = vec4(bg, 1.0);
+          return;
+        }
+        float tEnter = -bProj - sqrt(discr);
+        pos = rayOrigin + rayDir * tEnter;
+      }
 
       vec3 accumulatedColor = vec3(0.0);
       float accumulatedAlpha = 0.0;
 
-      // Parâmetros do Buraco Negro
-      float rs = uRs;
-      float rShadow = rs * 1.55; // Raio da sombra do horizonte de eventos aparente
+      float rs = uRs; // Raio de Schwarzschild (~1.65)
+      float rIn = uRin; // Raio interno do disco (ISCO ~4.25)
+      float rOut = uRout; // Raio externo (~24.0)
 
-      const int MAX_STEPS = 64;
-      float stepSize = 0.35;
-
+      const int MAX_STEPS = 160;
       bool hitEventHorizon = false;
+      float minDistance = 1000.0;
 
       for (int i = 0; i < MAX_STEPS; i++) {
         float r = length(pos);
+        minDistance = min(minDistance, r);
 
-        // Se atingiu o horizonte de eventos (buraco negro absorve 100% da luz)
-        if (r < rs * 1.05) {
+        // 1. Horizonte de eventos (absorção total da luz)
+        if (r <= rs * 1.04) {
           hitEventHorizon = true;
           break;
         }
 
-        // Se afastou demais do sistema
-        if (r > uRout * 1.8 && dot(pos, dir) > 0.0) {
+        // 2. Se o raio escapou para fora da esfera do sistema
+        if (r > R_BOUND && dot(pos, dir) > 0.0) {
           break;
         }
 
-        // 1. Deflexão gravitacional de Einstein sobre o vetor de direção da luz
-        // Aceleração em direção ao centro: a = -1.5 * rs / r^3 * (pos - dot(pos, dir) * dir)
-        vec3 gravityForce = - (1.5 * rs / (r * r * r)) * (pos - dot(pos, dir) * dir);
-        dir = normalize(dir + gravityForce * stepSize);
+        // 3. Deflexão Gravitacional de Schwarzschild em Geodésica Nula
+        // Momento angular orbital constante: L = pos x dir
+        vec3 L = cross(pos, dir);
+        float L2 = dot(L, L);
+        vec3 accel = - (1.5 * rs * L2 / pow(r, 5.0)) * pos;
 
-        // Posição anterior para testar travessia do plano equatorial (y = 0)
+        // Passo adaptativo de alta precisão
+        float stepSize = clamp(r * 0.055, 0.06, 0.85);
+        dir = normalize(dir + accel * stepSize);
+
         vec3 prevPos = pos;
         pos += dir * stepSize;
 
-        // 2. Interseção com o disco de acreção (plano y = 0)
-        // O disco reside no plano XZ com espessura suave
-        if ((prevPos.y * pos.y <= 0.0) || (abs(pos.y) < 0.65)) {
-          // Ponto de interseção interpolado no plano y = 0
-          float tPlane = prevPos.y / (prevPos.y - pos.y + 0.00001);
+        // 4. Interseção com o Plano do Disco de Acreção Equatorial (y = 0)
+        // Ocorre tanto na frente (visão direta) quanto atrás (lente curvada sobre/sob a sombra)
+        if (prevPos.y * pos.y <= 0.0) {
+          float tPlane = prevPos.y / (prevPos.y - pos.y + 1e-6);
           vec3 hitP = mix(prevPos, pos, clamp(tPlane, 0.0, 1.0));
           float hitR = length(hitP.xz);
 
-          if (hitR >= uRin && hitR <= uRout) {
-            // Ângulo azimutal no disco de acreção
+          if (hitR >= rIn && hitR <= rOut) {
             float phi = atan(hitP.z, hitP.x);
 
             // Velocidade orbital Kepleriana: omega(r) = sqrt(GM / r^3)
-            float omega = 3.2 / pow(hitR, 1.25);
-            float rotatedPhi = phi - uTime * omega;
+            float omega = 2.8 / pow(hitR, 1.25);
+            float rotPhi = phi - uTime * omega;
 
-            // Turbulência de plasma via FBM com estiramento azimutal
-            vec2 discCoord = vec2(rotatedPhi * 2.5, hitR * 0.85);
+            // Turbulência de plasma via FBM
+            vec2 discCoord = vec2(rotPhi * 3.2, hitR * 0.95);
             float plasmaNoise = fbm(discCoord);
-            float density = smoothstep(uRin, uRin + 1.2, hitR) * (1.0 - smoothstep(uRout - 3.5, uRout, hitR));
-            density *= pow(plasmaNoise, 1.6) * 1.8;
+            
+            // Densidade radial suave nas bordas
+            float radialDensity = smoothstep(rIn, rIn + 0.85, hitR) * (1.0 - smoothstep(rOut - 3.2, rOut, hitR));
+            float density = pow(plasmaNoise, 1.35) * radialDensity * 2.2;
 
-            // Efeito Doppler Relativístico (Beaming):
-            // Vetor velocidade do plasma v = (-sin(phi), 0, cos(phi))
+            // Efeito Doppler Relativístico (Beaming)
             vec3 vPlasma = vec3(-sin(phi), 0.0, cos(phi));
-            float beta = 0.58 * sqrt(uRin / hitR); // Velocidade relativística v/c
+            float beta = clamp(0.55 * sqrt(rIn / hitR), 0.0, 0.85); // Velocidade relativística v/c
             float cosTheta = dot(normalize(vPlasma), -dir);
-            // Fator de Doppler: delta = 1 / (gamma * (1 - beta * cosTheta))
             float gamma = 1.0 / sqrt(max(0.01, 1.0 - beta * beta));
             float doppler = 1.0 / (gamma * (1.0 - beta * cosTheta));
-            float beaming = pow(doppler, 3.2);
+            float beaming = pow(doppler, 3.4);
 
-            // Brilho e cor da amostra
-            float tempFactor = (1.0 - (hitR - uRin) / (uRout - uRin));
-            vec3 col = plasmaColor(tempFactor, doppler) * density * beaming * 1.7;
+            // Redshift gravitacional de Schwarzschild
+            float gravRedshift = sqrt(max(0.01, 1.0 - rs / hitR));
+            float totalShift = doppler * gravRedshift;
 
-            // Espessura e opacidade
-            float heightFalloff = exp(-abs(hitP.y) * 2.8);
-            float sampleAlpha = clamp(density * heightFalloff * 0.75, 0.0, 1.0);
+            // Gradiente de temperatura e cor
+            float tempFactor = pow((rOut - hitR) / (rOut - rIn), 0.72);
+            vec3 col = plasmaColor(tempFactor, totalShift) * density * beaming * 1.8;
 
-            accumulatedColor += col * (1.0 - accumulatedAlpha) * sampleAlpha;
-            accumulatedAlpha += sampleAlpha * (1.0 - accumulatedAlpha);
+            // Espessura e atenuação óptica por ângulo de incidência
+            float cosIncidence = max(0.12, abs(dir.y));
+            float optThickness = (0.24 + 0.02 * hitR) / cosIncidence;
+            float sampleAlpha = clamp(1.0 - exp(-density * optThickness * 1.2), 0.0, 1.0);
 
-            if (accumulatedAlpha > 0.98) break;
+            accumulatedColor += (1.0 - accumulatedAlpha) * col * sampleAlpha;
+            accumulatedAlpha += (1.0 - accumulatedAlpha) * sampleAlpha;
+
+            if (accumulatedAlpha > 0.985) break;
           }
         }
 
-        // Ajuste dinâmico do passo (menor perto do centro para precisão, maior longe)
-        stepSize = clamp(r * 0.08, 0.12, 1.4);
+        // 5. Brilho coronal volumétrico contínuo (atmosfera ionizada ao redor do disco)
+        float coronalR = length(pos.xz);
+        if (coronalR >= rIn && coronalR <= rOut * 1.1) {
+          float scaleHeight = 0.22 + 0.035 * coronalR;
+          float hNorm = abs(pos.y) / scaleHeight;
+          if (hNorm < 2.8) {
+            float coronaDens = exp(-hNorm * hNorm * 1.8) * smoothstep(rIn, rIn + 1.2, coronalR) * (1.0 - smoothstep(rOut - 2.0, rOut * 1.1, coronalR)) * 0.08;
+            float tempF = (rOut - coronalR) / (rOut - rIn);
+            vec3 coronaCol = plasmaColor(tempF, 1.0) * coronaDens * stepSize;
+            accumulatedColor += (1.0 - accumulatedAlpha) * coronaCol;
+            accumulatedAlpha += (1.0 - accumulatedAlpha) * (coronaDens * stepSize * 0.75);
+          }
+        }
       }
 
-      // 3. Anel de Fótons (Photon Ring) finíssimo e super brilhante próximo a rShadow
-      float closestR = length(pos - dot(pos, dir) * dir);
-      float photonRing = exp(-pow((closestR - rShadow * 1.02) * 12.0, 2.0)) * 2.2;
-      vec3 photonCol = vec3(1.0, 0.92, 0.75) * photonRing;
-      accumulatedColor += photonCol * (1.0 - accumulatedAlpha);
+      // 6. Anel de Fótons (Photon Ring) relativístico para raios que orbitam perto de r = 1.5 rs
+      if (!hitEventHorizon && minDistance < rs * 2.4 && minDistance > rs * 1.05) {
+        float ringDist = abs(minDistance - rs * 1.54);
+        float ringIntensity = exp(-ringDist * ringDist * 16.0) * 1.8;
+        vec3 ringCol = vec3(1.0, 0.94, 0.82) * ringIntensity;
+        accumulatedColor += (1.0 - accumulatedAlpha) * ringCol;
+        accumulatedAlpha += (1.0 - accumulatedAlpha) * clamp(ringIntensity, 0.0, 1.0);
+      }
 
-      // 4. Se o raio caiu no horizonte de eventos, é preto absoluto
+      // 7. Se o raio caiu no Horizonte de Eventos, o fundo é absorção total (preto absoluto)
       if (hitEventHorizon) {
-        // Absorção total
         gl_FragColor = vec4(accumulatedColor, 1.0);
         return;
       }
 
-      // 5. Fundo cósmico com distorção gravitacional de Einstein
+      // 8. Fundo cósmico com deflexão gravitacional de Einstein
       vec3 bgStars = getBackgroundStars(dir);
       vec3 finalCol = accumulatedColor + bgStars * (1.0 - clamp(accumulatedAlpha, 0.0, 1.0));
 
@@ -394,7 +429,7 @@ export function startSgrAMode({ onExit } = {}) {
 
   // --- Malha de Renderização Volumétrica do Buraco Negro ---------------------
   // Esfera de raio grande envolvendo o buraco negro e o disco de acreção
-  const bhGeo = new THREE.SphereGeometry(60, 64, 64);
+  const bhGeo = new THREE.SphereGeometry(120, 64, 64);
   const bhMat = new THREE.ShaderMaterial({
     uniforms: THREE.UniformsUtils.clone(BlackHoleShader.uniforms),
     vertexShader: BlackHoleShader.vertexShader,
@@ -408,14 +443,8 @@ export function startSgrAMode({ onExit } = {}) {
   const blackHoleMesh = new THREE.Mesh(bhGeo, bhMat);
   scene.add(blackHoleMesh);
 
-  // Esfera física interna do Horizonte de Eventos (opacidade total para depth buffer)
-  const horizonGeo = new THREE.SphereGeometry(1.65, 32, 32);
-  const horizonMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  const horizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
-  scene.add(horizonMesh);
-
   // --- Partículas de Plasma e Poeira Orbital --------------------------------
-  const PARTICLE_COUNT = 900;
+  const PARTICLE_COUNT = 850;
   const partGeo = new THREE.BufferGeometry();
   const partPositions = new Float32Array(PARTICLE_COUNT * 3);
   const partColors = new Float32Array(PARTICLE_COUNT * 3);
@@ -430,7 +459,7 @@ export function startSgrAMode({ onExit } = {}) {
   const tempColor = new THREE.Color();
 
   for (let i = 0; i < PARTICLE_COUNT; i++) {
-    const r = 4.3 + Math.pow(Math.random(), 1.6) * 20.0;
+    const r = 5.2 + Math.pow(Math.random(), 1.6) * 20.0;
     const angle = Math.random() * Math.PI * 2;
     const speed = (2.2 / Math.sqrt(r)) * (0.85 + Math.random() * 0.3);
     const vOffset = (Math.random() - 0.5) * (0.2 + r * 0.04);
@@ -444,7 +473,7 @@ export function startSgrAMode({ onExit } = {}) {
     partPositions[i * 3 + 1] = vOffset;
     partPositions[i * 3 + 2] = Math.sin(angle) * r;
 
-    const tNorm = (r - 4.3) / 20.0;
+    const tNorm = (r - 5.2) / 20.0;
     if (tNorm < 0.35) {
       tempColor.copy(colCore).lerp(colMid, tNorm / 0.35);
     } else {
@@ -651,8 +680,6 @@ export function startSgrAMode({ onExit } = {}) {
 
     bhGeo.dispose();
     bhMat.dispose();
-    horizonGeo.dispose();
-    horizonMat.dispose();
     partGeo.dispose();
     partMat.dispose();
 
