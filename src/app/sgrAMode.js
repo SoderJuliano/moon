@@ -13,7 +13,6 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { starDotTexture } from "../core/textures.js";
 import { t } from "../core/i18n.js";
 
 // --- Sintetizador de Áudio Gravitacional (Web Audio API) --------------------
@@ -331,9 +330,12 @@ const BlackHoleShader = {
             vec2 discCoord = vec2(rotPhi * 3.2, hitR * 0.95);
             float plasmaNoise = fbm(discCoord);
             
+            // Grânulos e filamentos de matéria superaquecida em alta rotação (sofrem curvatura gravitacional!)
+            float fineSparks = pow(fbm(discCoord * 3.5 + vec2(uTime * 1.2, 0.0)), 2.8) * 1.5;
+            
             // Densidade radial suave nas bordas
             float radialDensity = smoothstep(rIn, rIn + 0.85, hitR) * (1.0 - smoothstep(rOut - 3.2, rOut, hitR));
-            float density = pow(plasmaNoise, 1.35) * radialDensity * 2.2;
+            float density = (pow(plasmaNoise, 1.35) * 2.2 + fineSparks) * radialDensity;
 
             // Efeito Doppler Relativístico (Beaming)
             vec3 vPlasma = vec3(-sin(phi), 0.0, cos(phi));
@@ -443,64 +445,6 @@ export function startSgrAMode({ onExit } = {}) {
   const blackHoleMesh = new THREE.Mesh(bhGeo, bhMat);
   scene.add(blackHoleMesh);
 
-  // --- Partículas de Plasma e Poeira Orbital --------------------------------
-  const PARTICLE_COUNT = 850;
-  const partGeo = new THREE.BufferGeometry();
-  const partPositions = new Float32Array(PARTICLE_COUNT * 3);
-  const partColors = new Float32Array(PARTICLE_COUNT * 3);
-  const partRadii = new Float32Array(PARTICLE_COUNT);
-  const partAngles = new Float32Array(PARTICLE_COUNT);
-  const partSpeeds = new Float32Array(PARTICLE_COUNT);
-  const partVerticalOffsets = new Float32Array(PARTICLE_COUNT);
-
-  const colCore = new THREE.Color("#fff2d6");
-  const colMid = new THREE.Color("#ff9e2c");
-  const colOuter = new THREE.Color("#d93b0b");
-  const tempColor = new THREE.Color();
-
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    const r = 5.2 + Math.pow(Math.random(), 1.6) * 20.0;
-    const angle = Math.random() * Math.PI * 2;
-    const speed = (2.2 / Math.sqrt(r)) * (0.85 + Math.random() * 0.3);
-    const vOffset = (Math.random() - 0.5) * (0.2 + r * 0.04);
-
-    partRadii[i] = r;
-    partAngles[i] = angle;
-    partSpeeds[i] = speed;
-    partVerticalOffsets[i] = vOffset;
-
-    partPositions[i * 3] = Math.cos(angle) * r;
-    partPositions[i * 3 + 1] = vOffset;
-    partPositions[i * 3 + 2] = Math.sin(angle) * r;
-
-    const tNorm = (r - 5.2) / 20.0;
-    if (tNorm < 0.35) {
-      tempColor.copy(colCore).lerp(colMid, tNorm / 0.35);
-    } else {
-      tempColor.copy(colMid).lerp(colOuter, (tNorm - 0.35) / 0.65);
-    }
-
-    partColors[i * 3] = tempColor.r;
-    partColors[i * 3 + 1] = tempColor.g;
-    partColors[i * 3 + 2] = tempColor.b;
-  }
-
-  partGeo.setAttribute("position", new THREE.BufferAttribute(partPositions, 3));
-  partGeo.setAttribute("color", new THREE.BufferAttribute(partColors, 3));
-
-  const partMat = new THREE.PointsMaterial({
-    map: starDotTexture(),
-    vertexColors: true,
-    size: 0.9,
-    transparent: true,
-    opacity: 0.85,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    sizeAttenuation: true,
-  });
-  const plasmaParticles = new THREE.Points(partGeo, partMat);
-  scene.add(plasmaParticles);
-
   // --- Interface Stealth HUD ------------------------------------------------
   const overlay = document.createElement("div");
   overlay.className = "vela-overlay sgra-overlay";
@@ -605,18 +549,6 @@ export function startSgrAMode({ onExit } = {}) {
     bhMat.uniforms.uTime.value = elapsedTime;
     bhMat.uniforms.uCameraPos.value.copy(camera.position);
 
-    // 2. Atualizar partículas orbitais de plasma
-    const posArray = partGeo.attributes.position.array;
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      partAngles[i] += partSpeeds[i] * dt;
-      const angle = partAngles[i];
-      const r = partRadii[i];
-      posArray[i * 3] = Math.cos(angle) * r;
-      posArray[i * 3 + 1] = partVerticalOffsets[i];
-      posArray[i * 3 + 2] = Math.sin(angle) * r;
-    }
-    partGeo.attributes.position.needsUpdate = true;
-
     renderer.render(scene, camera);
 
     if (!hiddenLoading) {
@@ -642,8 +574,6 @@ export function startSgrAMode({ onExit } = {}) {
 
     bhGeo.dispose();
     bhMat.dispose();
-    partGeo.dispose();
-    partMat.dispose();
 
     renderer.dispose();
     renderer.domElement.remove();
