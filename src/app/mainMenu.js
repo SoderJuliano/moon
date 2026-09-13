@@ -559,6 +559,15 @@ export function startMainMenu({ onSelect }) {
     openPanel(panelVela, panelSolar);
   });
 
+  // Isola a rolagem e cliques dentro dos painéis para não interferir na órbita 3D
+  for (const p of [panelSolar, panelVela]) {
+    if (p) {
+      p.addEventListener("pointerdown", (e) => e.stopPropagation());
+      p.addEventListener("click", (e) => e.stopPropagation());
+      p.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
+    }
+  }
+
   // Distinguir clique rápido no espaço (fecha painéis) de arrastar para orbitar
   let pointerDownPos = { x: 0, y: 0 };
   const onPointerDown = (e) => {

@@ -171,33 +171,49 @@ canvas {
 /* painel de escolha da experiência */
 .mm-panel {
   position: absolute;
-  right: clamp(24px, 6vw, 90px);
+  right: clamp(20px, 4vw, 70px);
   top: 50%;
   transform: translateY(-50%) translateX(16px);
-  width: min(330px, calc(100vw - 48px));
+  width: min(370px, calc(100vw - 32px));
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
   pointer-events: auto;
-  background: rgba(8, 12, 22, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 22, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  backdrop-filter: blur(16px);
-  padding: 26px 24px 22px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  padding: 22px 20px 18px;
   opacity: 0;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 168, 255, 0.3) transparent;
+}
+.mm-panel::-webkit-scrollbar {
+  width: 4px;
+}
+.mm-panel::-webkit-scrollbar-thumb {
+  background: rgba(110, 168, 255, 0.35);
+  border-radius: 4px;
 }
 .mm-panel.open {
   opacity: 1;
   transform: translateY(-50%) translateX(0);
 }
 .mm-panel-title {
-  font-size: 19px;
-  letter-spacing: 0.3em;
+  font-size: 17px;
+  letter-spacing: 0.25em;
   text-transform: uppercase;
   color: #f2f6ff;
+  line-height: 1.25;
 }
 .mm-panel-sub {
-  margin: 6px 0 20px;
-  font-size: 11.5px;
-  letter-spacing: 0.14em;
+  margin: 5px 0 14px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #8fa3c8;
 }
@@ -210,15 +226,15 @@ canvas {
   border-left: 2px solid rgba(110, 168, 255, 0.35);
   border-radius: 10px;
   color: var(--text);
-  padding: 14px 16px;
+  padding: 12px 14px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   transition: background 0.18s, border-color 0.18s, transform 0.18s;
 }
 .mm-option + .mm-option {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .mm-option:hover {
   background: rgba(110, 168, 255, 0.1);
@@ -226,16 +242,51 @@ canvas {
   transform: translateX(3px);
 }
 .mm-option-name {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: #dfe9ff;
 }
 .mm-option-desc {
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 11.5px;
+  line-height: 1.4;
   color: #9fb0cc;
+}
+
+@media (max-width: 640px), (max-height: 660px) {
+  .mm-panel {
+    right: 50%;
+    top: auto;
+    bottom: 12px;
+    transform: translateX(50%) translateY(16px);
+    width: min(390px, calc(100vw - 20px));
+    max-height: calc(88dvh);
+    padding: 16px 16px 12px;
+    border-radius: 14px;
+  }
+  .mm-panel.open {
+    transform: translateX(50%) translateY(0);
+  }
+  .mm-panel-title {
+    font-size: 15px;
+    letter-spacing: 0.18em;
+  }
+  .mm-panel-sub {
+    margin: 3px 0 10px;
+    font-size: 10.5px;
+  }
+  .mm-option {
+    padding: 10px 12px;
+    gap: 3px;
+  }
+  .mm-option-name {
+    font-size: 12.5px;
+  }
+  .mm-option-desc {
+    font-size: 11px;
+    line-height: 1.35;
+  }
 }
 
 /* fade pra preto ao escolher um modo */
@@ -3016,12 +3067,12 @@ canvas {
 .mm-vela-stats-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 6px;
+  margin-bottom: 14px;
   background: rgba(0, 229, 255, 0.04);
   border: 1px solid rgba(0, 229, 255, 0.12);
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 .mm-vela-row {
   display: flex;
