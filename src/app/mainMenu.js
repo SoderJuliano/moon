@@ -368,6 +368,15 @@ export function startMainMenu({ onSelect }) {
   velaGlow.position.copy(velaPos);
   spinner.add(velaGlow);
 
+  // âncora e brilho para Sagitário A* no centro galáctico (0, 0, 0)
+  const sgraAnchor = new THREE.Object3D();
+  sgraAnchor.position.set(0, 0.4, 0);
+  spinner.add(sgraAnchor);
+
+  const sgraGlow = makeGlowSprite("#ff8800", 3.8, 0.95);
+  sgraGlow.position.set(0, 0.4, 0);
+  spinner.add(sgraGlow);
+
   // --- Controles de Câmera 3D (OrbitControls interativo) -----------------------
   const HOME_CAM_POS = new THREE.Vector3(0, 150, 124);
   const HOME_CAM_TARGET = new THREE.Vector3(0, 0, 0);
@@ -414,6 +423,10 @@ export function startMainMenu({ onSelect }) {
     <button class="mm-marker mm-marker-vela" type="button" aria-label="${t("menu.velaPulsar") || "Pulsar de Vela"}" title="${t("menu.velaPulsar") || "Pulsar de Vela"}">
       <span class="mm-marker-ring mm-marker-ring-vela"><span class="mm-marker-dot mm-marker-dot-vela"></span></span>
       <span class="mm-marker-label">${t("menu.velaPulsar") || "Pulsar de Vela"}</span>
+    </button>
+    <button class="mm-marker mm-marker-sgra" type="button" aria-label="${t("menu.sgrAPer") || "Sagitário A*"}" title="${t("menu.sgrAPer") || "Sagitário A*"}">
+      <span class="mm-marker-ring mm-marker-ring-sgra"><span class="mm-marker-dot mm-marker-dot-sgra"></span></span>
+      <span class="mm-marker-label">${t("menu.sgrAPer") || "Sagitário A*"}</span>
     </button>
     <div class="mm-panel mm-panel-solar" hidden>
       <div class="mm-panel-title">${t("menu.solarSystem")}</div>
@@ -513,13 +526,48 @@ export function startMainMenu({ onSelect }) {
         </button>
       </div>
     </div>
+    <div class="mm-panel mm-panel-sgra" hidden>
+      <div class="mm-panel-title">${t("menu.sgrAPer") || "Sagitário A*"}</div>
+      <div class="mm-panel-sub">${t("menu.sgrASubtitle") || "Buraco Negro Supermassivo • Centro Galáctico"}</div>
+      <div class="mm-sgra-stats-box">
+        <div class="mm-sgra-row">
+          <span class="mm-sgra-k">${t("menu.sgrAType") || "Tipo"}:</span>
+          <span class="mm-sgra-v">${t("menu.sgrATypeValue") || "Buraco Negro Supermassivo (SMBH)"}</span>
+        </div>
+        <div class="mm-sgra-row">
+          <span class="mm-sgra-k">${t("menu.sgrADistance") || "Distância"}:</span>
+          <span class="mm-sgra-v">${t("menu.sgrADistanceValue") || "~26.673 anos-luz (Centro)"}</span>
+        </div>
+        <div class="mm-sgra-row">
+          <span class="mm-sgra-k">${t("menu.sgrAMass") || "Massa Real"}:</span>
+          <span class="mm-sgra-v">${t("menu.sgrAMassValue") || "~4,154 milhões M☉ (8,26 × 10³⁶ kg)"}</span>
+        </div>
+        <div class="mm-sgra-row">
+          <span class="mm-sgra-k">${t("menu.sgrARadius") || "Raio Schwarzschild (rs)"}:</span>
+          <span class="mm-sgra-v">${t("menu.sgrARadiusValue") || "~12,27 milhões km (~0,08 UA)"}</span>
+        </div>
+        <div class="mm-sgra-row">
+          <span class="mm-sgra-k">${t("menu.sgrAShadow") || "Raio da Sombra"}:</span>
+          <span class="mm-sgra-v">${t("menu.sgrAShadowValue") || "~31,9 milhões km (~52 μas)"}</span>
+        </div>
+      </div>
+      <div class="mm-view-modes">
+        <button class="mm-option mm-option-sgra" type="button" data-mode="sgra">
+          <span class="mm-option-name">${t("menu.sgrAWatch") || "Observar Sagitário A*"}</span>
+          <span class="mm-option-desc">${t("menu.sgrAWatchDesc") || "Simulação 3D com curvatura gravitacional e disco de acreção."}</span>
+        </button>
+      </div>
+    </div>
     <div class="mm-fade"></div>`;
   document.body.appendChild(root);
 
   const markerSun = root.querySelector(".mm-marker-sun");
   const markerVela = root.querySelector(".mm-marker-vela");
+  const markerSgrA = root.querySelector(".mm-marker-sgra");
   const panelSolar = root.querySelector(".mm-panel-solar");
   const panelVela = root.querySelector(".mm-panel-vela");
+  const panelSgrA = root.querySelector(".mm-panel-sgra");
+  const allPanels = [panelSolar, panelVela, panelSgrA];
   const fade = root.querySelector(".mm-fade");
   const hudHint = root.querySelector(".mm-hud-hint");
   const resetCamBtn = root.querySelector(".mm-reset-cam-btn");
@@ -529,38 +577,48 @@ export function startMainMenu({ onSelect }) {
     resetCamera();
   });
 
-  function openPanel(targetPanel, otherPanel) {
-    if (otherPanel) {
-      otherPanel.classList.remove("open");
-      otherPanel.hidden = true;
+  function openPanel(targetPanel) {
+    for (const p of allPanels) {
+      if (p && p !== targetPanel) {
+        p.classList.remove("open");
+        p.hidden = true;
+      }
     }
-    targetPanel.hidden = false;
-    hudHint?.classList.add("hidden");
-    requestAnimationFrame(() => targetPanel.classList.add("open"));
+    if (targetPanel) {
+      targetPanel.hidden = false;
+      hudHint?.classList.add("hidden");
+      requestAnimationFrame(() => targetPanel.classList.add("open"));
+    }
   }
 
   function closePanels() {
-    panelSolar.classList.remove("open");
-    panelVela.classList.remove("open");
+    for (const p of allPanels) {
+      if (p) p.classList.remove("open");
+    }
     hudHint?.classList.remove("hidden");
     setTimeout(() => {
-      panelSolar.hidden = true;
-      panelVela.hidden = true;
+      for (const p of allPanels) {
+        if (p) p.hidden = true;
+      }
       showScreen("modes");
     }, 250);
   }
 
   markerSun.addEventListener("click", (e) => {
     e.stopPropagation();
-    openPanel(panelSolar, panelVela);
+    openPanel(panelSolar);
   });
   markerVela.addEventListener("click", (e) => {
     e.stopPropagation();
-    openPanel(panelVela, panelSolar);
+    openPanel(panelVela);
+  });
+  markerSgrA?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    openPanel(panelSgrA);
   });
 
   // Isola a rolagem e cliques dentro dos painéis para não interferir na órbita 3D
-  for (const p of [panelSolar, panelVela]) {
+  for (const p of allPanels) {
     if (p) {
       p.addEventListener("pointerdown", (e) => e.stopPropagation());
       p.addEventListener("click", (e) => e.stopPropagation());
@@ -584,9 +642,8 @@ export function startMainMenu({ onSelect }) {
 
   function onKeyDown(e) {
     if (e.key === "Escape") {
-      const isSolarOpen = panelSolar && !panelSolar.hidden && panelSolar.classList.contains("open");
-      const isVelaOpen = panelVela && !panelVela.hidden && panelVela.classList.contains("open");
-      if (isSolarOpen || isVelaOpen) {
+      const isAnyPanelOpen = allPanels.some((p) => p && !p.hidden && p.classList.contains("open"));
+      if (isAnyPanelOpen) {
         closePanels();
       } else {
         resetCamera();
@@ -705,6 +762,7 @@ export function startMainMenu({ onSelect }) {
   root.querySelector('[data-mode="exploration"]').addEventListener("click", () => launch("exploration"));
   root.querySelector('[data-mode="game"]').addEventListener("click", () => showScreen("game"));
   root.querySelector('[data-mode="vela"]')?.addEventListener("click", () => launch("vela"));
+  root.querySelector('[data-mode="sgra"]')?.addEventListener("click", () => launch("sgra"));
   views.game.querySelector('[data-game="back"]').addEventListener("click", () => showScreen("modes"));
 
   // NOVO JOGO: pede um nome; se já existe (ou há legado), confirma sobrescrever
@@ -1005,6 +1063,23 @@ export function startMainMenu({ onSelect }) {
       markerVela.style.display = "none";
     }
 
+    if (markerSgrA) {
+      sgraAnchor.getWorldPosition(_v);
+      const camToSgrA = _v.clone().sub(camera.position);
+      const sgraInFront = camToSgrA.dot(camDir) > 0;
+      _v.project(camera);
+      if (sgraInFront && _v.z <= 1) {
+        const rawXSgrA = (_v.x * 0.5 + 0.5) * window.innerWidth;
+        const rawYSgrA = (0.5 - _v.y * 0.5) * window.innerHeight;
+        const xSgrA = Math.max(14, Math.min(window.innerWidth - 170, rawXSgrA));
+        const ySgrA = Math.max(20, Math.min(window.innerHeight - 36, rawYSgrA));
+        markerSgrA.style.display = "";
+        markerSgrA.style.transform = `translate(${xSgrA}px, ${ySgrA}px)`;
+      } else {
+        markerSgrA.style.display = "none";
+      }
+    }
+
     renderer.render(scene, camera);
 
     if (!loadingHidden) {
@@ -1026,7 +1101,7 @@ export function startMainMenu({ onSelect }) {
       pts.material.map?.dispose();
       pts.material.dispose();
     }
-    for (const s of [diskGlow, coreOuter, coreMid, coreInner, velaGlow, sunGlow]) {
+    for (const s of [diskGlow, coreOuter, coreMid, coreInner, velaGlow, sunGlow, sgraGlow]) {
       s.material.map?.dispose();
       s.material.dispose();
     }

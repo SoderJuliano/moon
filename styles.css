@@ -323,12 +323,14 @@ canvas {
   .mm-panel-sub {
     display: none;
   }
-  .mm-vela-stats-box {
+  .mm-vela-stats-box,
+  .mm-sgra-stats-box {
     margin-bottom: 8px;
     padding: 6px 8px;
     gap: 3px;
   }
-  .mm-vela-row {
+  .mm-vela-row,
+  .mm-sgra-row {
     font-size: 10.5px;
   }
 }
@@ -3429,5 +3431,122 @@ canvas {
     padding: 2px 4px;
   }
 }
+
+/* ==========================================================================
+   SAGITÁRIO A* (Menu & Observatório 3D)
+   ========================================================================== */
+
+/* Marcador Sgr A* no Menu da Galáxia */
+.mm-marker-ring-sgra {
+  border-color: rgba(255, 170, 51, 0.9);
+}
+.mm-marker-ring-sgra::after {
+  border-color: rgba(255, 170, 51, 0.5);
+  animation: mm-pulse-sgra 2.2s ease-out infinite;
+}
+.mm-marker-dot-sgra {
+  background: #ffcc66;
+  box-shadow: 0 0 10px #ff8800, 0 0 18px rgba(255, 136, 0, 0.85);
+}
+.mm-marker-sgra .mm-marker-label {
+  opacity: 0;
+  transform: translateX(-4px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  color: #ffe6b8;
+  text-shadow: 0 0 8px rgba(255, 136, 0, 0.6), 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+.mm-marker-sgra:hover .mm-marker-label,
+.mm-marker-sgra:focus-visible .mm-marker-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+@keyframes mm-pulse-sgra {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.mm-panel-sgra {
+  border-color: rgba(255, 150, 40, 0.25);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 136, 0, 0.12);
+}
+.mm-sgra-stats-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  background: rgba(255, 140, 30, 0.04);
+  border: 1px solid rgba(255, 150, 40, 0.14);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.mm-sgra-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.mm-sgra-k {
+  color: #c4a682;
+  flex-shrink: 0;
+}
+.mm-sgra-v {
+  color: #ffe8cc;
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+.mm-option-sgra {
+  border-left-color: #ffaa33;
+}
+.mm-option-sgra:hover {
+  background: rgba(255, 136, 0, 0.12);
+  border-color: rgba(255, 170, 51, 0.6);
+}
+
+/* Modo Observatório 3D de Sgr A* (HUD) */
+.sgra-top-hud {
+  border-color: rgba(255, 150, 40, 0.28);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 136, 0, 0.1);
+  scrollbar-color: rgba(255, 150, 40, 0.3) transparent;
+}
+.sgra-top-hud::-webkit-scrollbar-thumb {
+  background: rgba(255, 150, 40, 0.35);
+}
+.sgra-beacon-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffaa33;
+  box-shadow: 0 0 10px #ff8800, 0 0 18px rgba(255, 136, 0, 0.85);
+  animation: beaconPulseSgra 1.4s infinite alternate ease-in-out;
+}
+@keyframes beaconPulseSgra {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.3); opacity: 1; }
+}
+.sgra-bottom-hud {
+  border-color: rgba(255, 150, 40, 0.25);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 136, 0, 0.08);
+}
+.sgra-bottom-hud .vela-hint:hover {
+  background: rgba(255, 136, 0, 0.14);
+}
+.sgra-bottom-hud .vela-hint:focus-visible {
+  outline: 2px solid rgba(255, 170, 51, 0.6);
+}
+
 
 

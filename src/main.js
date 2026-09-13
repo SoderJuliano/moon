@@ -23,6 +23,9 @@ async function startMode(mode, opts) {
   } else if (mode === "vela") {
     const { startVelaMode } = await import("./app/velaMode.js");
     startVelaMode({ onExit: () => startMainMenu({ onSelect: startMode }) });
+  } else if (mode === "sgra") {
+    const { startSgrAMode } = await import("./app/sgrAMode.js");
+    startSgrAMode({ onExit: () => startMainMenu({ onSelect: startMode }) });
   } else {
     const { startExplorationMode } = await import("./app/explorationMode.js");
     startExplorationMode();
@@ -30,5 +33,5 @@ async function startMode(mode, opts) {
 }
 
 const requested = new URLSearchParams(location.search).get("mode");
-if (requested === "game" || requested === "exploration" || requested === "vela") startMode(requested);
+if (requested === "game" || requested === "exploration" || requested === "vela" || requested === "sgra") startMode(requested);
 else startMainMenu({ onSelect: startMode });
