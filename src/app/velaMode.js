@@ -687,16 +687,6 @@ export function startVelaMode({ onExit } = {}) {
         </div>
       </div>
     </div>
-    <div class="vela-bottom-hud">
-      <button type="button" class="vela-hint vela-btn-esc" id="vela-exit-btn" aria-label="${t("vela.hintEsc") || "Voltar à Via Láctea"}" title="${t("vela.hintEsc") || "Voltar à Via Láctea"}">
-        <span class="vela-kbd">ESC</span>
-        <span class="vela-hint-text">${t("vela.backToMilkyWay") || "Voltar à Via Láctea"}</span>
-      </button>
-      <button type="button" class="vela-hint vela-audio-hint vela-btn-audio" id="vela-mute-btn" aria-label="Alternar áudio do pulsar (M)" title="Alternar áudio do pulsar (M)">
-        <span class="vela-kbd">M</span>
-        <span class="vela-mute-text">${t("vela.audioActive") || "Áudio: Ativo (11.2 Hz)"}</span>
-      </button>
-    </div>
     <div class="vela-fade-layer"></div>
   `;
   document.body.appendChild(overlay);
@@ -713,33 +703,6 @@ export function startVelaMode({ onExit } = {}) {
   window.addEventListener("click", resumeAudio);
   window.addEventListener("keydown", resumeAudio);
   window.addEventListener("touchstart", resumeAudio);
-
-  const muteText = overlay.querySelector(".vela-mute-text");
-  function updateMuteDisplay() {
-    if (muteText) {
-      muteText.textContent = audio.isMuted()
-        ? (t("vela.audioMuted") || "Áudio: Silenciado")
-        : (t("vela.audioActive") || "Áudio: Ativo (11.2 Hz)");
-    }
-  }
-
-  // Interatividade dos botões do HUD
-  const exitBtn = overlay.querySelector("#vela-exit-btn");
-  if (exitBtn) {
-    exitBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      handleExit();
-    });
-  }
-
-  const muteBtn = overlay.querySelector("#vela-mute-btn");
-  if (muteBtn) {
-    muteBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      audio.toggleMute();
-      updateMuteDisplay();
-    });
-  }
 
   // --- Saída suave (Exit) ----------------------------------------------------
   let isDisposing = false;
@@ -766,7 +729,6 @@ export function startVelaMode({ onExit } = {}) {
       handleExit();
     } else if (e.key === "m" || e.key === "M") {
       audio.toggleMute();
-      updateMuteDisplay();
     }
   }
   window.addEventListener("keydown", onKeyDown);

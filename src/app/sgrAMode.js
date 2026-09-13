@@ -534,16 +534,6 @@ export function startSgrAMode({ onExit } = {}) {
         </div>
       </div>
     </div>
-    <div class="vela-bottom-hud sgra-bottom-hud">
-      <button type="button" class="vela-hint vela-btn-esc" id="sgra-exit-btn" aria-label="${t("sgra.hintEsc") || "Voltar à Via Láctea"}" title="${t("sgra.hintEsc") || "Voltar à Via Láctea"}">
-        <span class="vela-kbd">ESC</span>
-        <span class="vela-hint-text">${t("sgra.backToMilkyWay") || "Voltar à Via Láctea"}</span>
-      </button>
-      <button type="button" class="vela-hint vela-audio-hint vela-btn-audio" id="sgra-mute-btn" aria-label="Alternar áudio gravitacional (M)" title="Alternar áudio gravitacional (M)">
-        <span class="vela-kbd">M</span>
-        <span class="sgra-mute-text">${t("sgra.audioActive") || "Áudio Gravitacional: Ativo (Infrassom QPO)"}</span>
-      </button>
-    </div>
     <div class="vela-fade-layer"></div>
   `;
   document.body.appendChild(overlay);
@@ -560,33 +550,6 @@ export function startSgrAMode({ onExit } = {}) {
   window.addEventListener("click", resumeAudio);
   window.addEventListener("keydown", resumeAudio);
   window.addEventListener("touchstart", resumeAudio);
-
-  const muteText = overlay.querySelector(".sgra-mute-text");
-  function updateMuteDisplay() {
-    if (muteText) {
-      muteText.textContent = audio.isMuted()
-        ? (t("sgra.audioMuted") || "Áudio Gravitacional: Silenciado")
-        : (t("sgra.audioActive") || "Áudio Gravitacional: Ativo (Infrassom QPO)");
-    }
-  }
-
-  // Interatividade dos botões do HUD
-  const exitBtn = overlay.querySelector("#sgra-exit-btn");
-  if (exitBtn) {
-    exitBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      handleExit();
-    });
-  }
-
-  const muteBtn = overlay.querySelector("#sgra-mute-btn");
-  if (muteBtn) {
-    muteBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      audio.toggleMute();
-      updateMuteDisplay();
-    });
-  }
 
   // --- Saída suave (Exit) ----------------------------------------------------
   let isDisposing = false;
@@ -613,7 +576,6 @@ export function startSgrAMode({ onExit } = {}) {
       handleExit();
     } else if (e.key === "m" || e.key === "M") {
       audio.toggleMute();
-      updateMuteDisplay();
     }
   }
   window.addEventListener("keydown", onKeyDown);

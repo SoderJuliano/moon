@@ -3157,7 +3157,7 @@ canvas {
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-start;
   padding: clamp(14px, 2.5vw, 28px) clamp(14px, 3vw, 32px);
   padding-top: max(clamp(14px, 2.5vw, 28px), env(safe-area-inset-top));
