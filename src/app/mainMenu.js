@@ -980,8 +980,10 @@ export function startMainMenu({ onSelect }) {
     const sunInFront = camToSun.dot(camDir) > 0;
     _v.project(camera);
     if (sunInFront && _v.z <= 1) {
-      const xSun = (_v.x * 0.5 + 0.5) * window.innerWidth;
-      const ySun = (0.5 - _v.y * 0.5) * window.innerHeight;
+      const rawXSun = (_v.x * 0.5 + 0.5) * window.innerWidth;
+      const rawYSun = (0.5 - _v.y * 0.5) * window.innerHeight;
+      const xSun = Math.max(14, Math.min(window.innerWidth - 170, rawXSun));
+      const ySun = Math.max(20, Math.min(window.innerHeight - 36, rawYSun));
       markerSun.style.display = "";
       markerSun.style.transform = `translate(${xSun}px, ${ySun}px)`;
     } else {
@@ -993,8 +995,10 @@ export function startMainMenu({ onSelect }) {
     const velaInFront = camToVela.dot(camDir) > 0;
     _v.project(camera);
     if (velaInFront && _v.z <= 1) {
-      const xVela = (_v.x * 0.5 + 0.5) * window.innerWidth;
-      const yVela = (0.5 - _v.y * 0.5) * window.innerHeight;
+      const rawXVela = (_v.x * 0.5 + 0.5) * window.innerWidth;
+      const rawYVela = (0.5 - _v.y * 0.5) * window.innerHeight;
+      const xVela = Math.max(14, Math.min(window.innerWidth - 170, rawXVela));
+      const yVela = Math.max(20, Math.min(window.innerHeight - 36, rawYVela));
       markerVela.style.display = "";
       markerVela.style.transform = `translate(${xVela}px, ${yVela}px)`;
     } else {
