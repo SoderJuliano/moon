@@ -668,7 +668,7 @@ export function startVelaMode({ onExit } = {}) {
   overlay.innerHTML = `
     <div class="vela-top-hud">
       <div class="vela-title-row">
-        <span class="vela-beacon-dot"></span>
+        <span class="vela-beacon-dot" aria-hidden="true"></span>
         <h1 class="vela-title">${t("vela.title") || "PULSAR DE VELA"}</h1>
       </div>
       <div class="vela-subtitle">${t("vela.sub") || "PSR B0833-45 • Remanescente de Supernova (Vela SNR)"}</div>
@@ -679,21 +679,23 @@ export function startVelaMode({ onExit } = {}) {
         </div>
         <div class="vela-stat-item">
           <span class="vela-stat-label">${t("menu.velaDistance") || "Distância"}:</span>
-          <span class="vela-stat-val">~950 - 1.000 anos-luz</span>
+          <span class="vela-stat-val">${t("menu.velaDistanceValue") || "~950 a 1.000 anos-luz"}</span>
         </div>
         <div class="vela-stat-item">
-          <span class="vela-stat-label">${t("menu.velaRotation") || "Frequência Real"}:</span>
-          <span class="vela-stat-val">11,195 rotações/seg (89,3 ms)</span>
+          <span class="vela-stat-label">${t("menu.velaRotation") || "Rotação"}:</span>
+          <span class="vela-stat-val">${t("menu.velaRotationValue") || "11,2 rotações/seg (89 ms)"}</span>
         </div>
       </div>
     </div>
     <div class="vela-bottom-hud">
-      <div class="vela-hint">
-        <span class="vela-kbd">ESC</span> ${t("vela.hintEsc") || "Voltar à Via Láctea"}
-      </div>
-      <div class="vela-hint vela-audio-hint">
-        <span class="vela-kbd">M</span> <span class="vela-mute-text">Áudio: Ativo (11.2 Hz)</span>
-      </div>
+      <button type="button" class="vela-hint vela-btn-esc" id="vela-exit-btn" aria-label="${t("vela.hintEsc") || "Voltar à Via Láctea"}" title="${t("vela.hintEsc") || "Voltar à Via Láctea"}">
+        <span class="vela-kbd">ESC</span>
+        <span class="vela-hint-text">${t("vela.backToMilkyWay") || "Voltar à Via Láctea"}</span>
+      </button>
+      <button type="button" class="vela-hint vela-audio-hint vela-btn-audio" id="vela-mute-btn" aria-label="Alternar áudio do pulsar (M)" title="Alternar áudio do pulsar (M)">
+        <span class="vela-kbd">M</span>
+        <span class="vela-mute-text">${t("vela.audioActive") || "Áudio: Ativo (11.2 Hz)"}</span>
+      </button>
     </div>
     <div class="vela-fade-layer"></div>
   `;
@@ -715,8 +717,28 @@ export function startVelaMode({ onExit } = {}) {
   const muteText = overlay.querySelector(".vela-mute-text");
   function updateMuteDisplay() {
     if (muteText) {
-      muteText.textContent = audio.isMuted() ? "Áudio: Silenciado" : "Áudio: Ativo (11.2 Hz)";
+      muteText.textContent = audio.isMuted()
+        ? (t("vela.audioMuted") || "Áudio: Silenciado")
+        : (t("vela.audioActive") || "Áudio: Ativo (11.2 Hz)");
     }
+  }
+
+  // Interatividade dos botões do HUD
+  const exitBtn = overlay.querySelector("#vela-exit-btn");
+  if (exitBtn) {
+    exitBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      handleExit();
+    });
+  }
+
+  const muteBtn = overlay.querySelector("#vela-mute-btn");
+  if (muteBtn) {
+    muteBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      audio.toggleMute();
+      updateMuteDisplay();
+    });
   }
 
   // --- Saída suave (Exit) ----------------------------------------------------
