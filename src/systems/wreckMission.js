@@ -174,7 +174,7 @@ export class WreckMission {
 
     const toast = document.createElement("div");
     toast.className = "weapon-toast";
-    toast.innerHTML = "⚡ ARMAS ONLINE<br /><small>segure <b>ESPAÇO</b> para disparar</small>";
+    toast.innerHTML = "ARMAS ONLINE<br /><small>segure <b>ESPAÇO</b> para disparar</small>";
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 6500);
 

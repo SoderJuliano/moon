@@ -19,7 +19,7 @@ export const MATERIALS = ["Gelo", "Ferro", "Cobre", "Níquel", "Silício", "Tit�
 // ficha por material: cor VIVA (usada na UI/rótulo), glifo curto e uma nota de
 // sabor. A cor do 3D é derivada desta (normalizada) em materialTint().
 export const MATERIAL_INFO = {
-  Gelo: { color: 0xbfe4ff, glyph: "❄", note: "voláteis e água congelada" },
+  Gelo: { color: 0xbfe4ff, glyph: "H2O", note: "voláteis e água congelada" },
   Ferro: { color: 0xc06a42, glyph: "Fe", note: "óxidos metálicos densos" },
   Cobre: { color: 0x37b08c, glyph: "Cu", note: "veios metálicos esverdeados" },
   Níquel: { color: 0x9fa889, glyph: "Ni", note: "liga ferro-níquel" },

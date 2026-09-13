@@ -404,7 +404,7 @@ export function startMainMenu({ onSelect }) {
   root.innerHTML = `
     <div class="mm-title">${t("menu.milkyWay")}</div>
     <div class="mm-hud-hint">
-      <span class="mm-hint-text">${t("menu.cameraHint") || "🖱️ Arraste para orbitar • Scroll para zoom • [ESC] reseta"}</span>
+      <span class="mm-hint-text">${t("menu.cameraHint") || "Arraste para orbitar • Scroll para zoom • [ESC] reseta"}</span>
       <button class="mm-reset-cam-btn" type="button" aria-label="${t("menu.resetCamera") || "Resetar câmera (ESC)"}" title="${t("menu.resetCamera") || "Resetar câmera (ESC)"}">↺</button>
     </div>
     <button class="mm-marker mm-marker-sun" type="button">
@@ -508,7 +508,7 @@ export function startMainMenu({ onSelect }) {
       </div>
       <div class="mm-view-modes">
         <button class="mm-option mm-option-vela" type="button" data-mode="vela">
-          <span class="mm-option-name">${t("menu.velaWatch") || "🔭 Observar Pulsar de Vela"}</span>
+          <span class="mm-option-name">${t("menu.velaWatch") || "Observar Pulsar de Vela"}</span>
           <span class="mm-option-desc">${t("menu.velaWatchDesc") || "Modo 3D com radiação e áudio em tempo real."}</span>
         </button>
       </div>

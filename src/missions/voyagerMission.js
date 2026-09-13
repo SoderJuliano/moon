@@ -124,7 +124,7 @@ export function createVoyagerMission(scene, voyagersSystem) {
 
       if (ph === "briefing") {
         if (nearStation(ctx)) {
-          ctx.mgr.stationSay(t("mission.voyager.dialogCollect"), 9, `🧑‍🚀 ${t("mission.voyager.astronaut")}`);
+          ctx.mgr.stationSay(t("mission.voyager.dialogCollect"), 9, t("mission.voyager.astronaut"));
           ctx.mgr.setPhase(this.id, "maintenance");
         }
         return;
@@ -213,7 +213,7 @@ export function createVoyagerMission(scene, voyagersSystem) {
       removeMarkers(ctx);
       collectBtn.style.display = "none";
 
-      ctx.mgr.stationSay(t("mission.voyager.dialogReturn"), 9, `🧑‍🚀 ${t("mission.voyager.astronaut")}`);
+      ctx.mgr.stationSay(t("mission.voyager.dialogReturn"), 9, t("mission.voyager.astronaut"));
       
       // Recompensa de Prestígio (+15)
       ctx.save.prestige = Math.min(100, (ctx.save.prestige || 0) + 15);

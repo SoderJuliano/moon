@@ -57,8 +57,8 @@ export class ShipMenu {
             </div>
             <div class="ship-canvas-container"></div>
             <div class="ship-render-hint">
-              <span>🖱️ Drag to Rotate</span>
-              <span>🔍 Scroll to Zoom</span>
+              <span>Drag to Rotate</span>
+              <span>Scroll to Zoom</span>
             </div>
             <div class="ship-activate-row"></div>
             <div class="panel-section-title ships-title">${t("sectionShips")}</div>
@@ -131,15 +131,15 @@ export class ShipMenu {
       } else if (!isUnlocked) {
         if (def.id === "naveSW") {
           const combatProg = getCombatKillsProgress(this.save);
-          badgeHtml = `<span class="ship-car-badge locked">🔒 ${combatProg.kills} / 20</span>`;
+          badgeHtml = `<span class="ship-car-badge locked">${combatProg.kills} / 20</span>`;
         } else {
-          badgeHtml = `<span class="ship-car-badge locked">🔒 ${prog.percentage}% / 80%</span>`;
+          badgeHtml = `<span class="ship-car-badge locked">${prog.percentage}% / 80%</span>`;
         }
       }
 
       html += `
         <div class="ship-car-card ${viewing ? "selected" : ""} ${active ? "active" : ""} ${!isUnlocked ? "locked" : ""}" data-id="${def.id}">
-          <span class="ship-car-name">${!isUnlocked ? "🔒 " : ""}${info.name}</span>
+          <span class="ship-car-name">${info.name}</span>
           <span class="ship-car-reg">${info.registry}</span>
           ${badgeHtml}
         </div>`;
@@ -178,7 +178,7 @@ export class ShipMenu {
       return;
     }
 
-    row.innerHTML = `<button class="activate-ship-btn">🚀 ${t("activateShip")}</button>`;
+    row.innerHTML = `<button class="activate-ship-btn">${t("activateShip")}</button>`;
     row.querySelector(".activate-ship-btn").onclick = () => this._activate(this.viewShipId);
   }
 

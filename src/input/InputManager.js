@@ -149,9 +149,7 @@ class InputManager {
       this._toast.className = "gamepad-toast";
       document.body.appendChild(this._toast);
     }
-    // "Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e...)" → só o nome
-    const name = String(deviceId || "").replace(/\s*\(.*$/, "");
-    this._toast.innerHTML = `<span class="gamepad-toast-icon">🎮</span><div><strong>${title}</strong><small>${name}</small></div>`;
+    this._toast.innerHTML = `<span class="gamepad-toast-icon">◆</span><div><strong>${title}</strong><small>${name}</small></div>`;
     this._toast.classList.add("show");
     clearTimeout(this._toastTimer);
     this._toastTimer = setTimeout(() => this._toast?.classList.remove("show"), 3500);

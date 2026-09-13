@@ -611,7 +611,7 @@ export class FleetEncounter {
       if (secs > 0) {
         this.empAlert.className = "emp-alert active";
         this.empAlert.innerHTML = `
-          <div class="emp-alert-icon">⚡</div>
+          <div class="emp-alert-icon">!</div>
           <div class="emp-alert-body">
             <div class="emp-alert-title">${t("combat.empAlertTitle")}</div>
             <div class="emp-alert-sub">${t("combat.empAlertSub", { secs })}</div>

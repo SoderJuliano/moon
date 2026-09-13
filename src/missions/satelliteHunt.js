@@ -172,7 +172,7 @@ export function createSatelliteHuntMission(scene) {
   let talkT = -1; // conversa com o astronauta em curso (-1 = não começou)
   let talkLine = 0;
 
-  const speaker = () => `🧑‍🚀 ${t("mission.hunt.astronaut")}`;
+  const speaker = () => t("mission.hunt.astronaut");
 
   // painel de recompensa: a nave nova (mesmo padrão do scanner/escudo)
   const reward = document.createElement("div");
@@ -185,7 +185,7 @@ export function createSatelliteHuntMission(scene) {
       <div class="scan-reward-box">
         <small>${t("mission.hunt.rewardTag")}</small>
         <b>${t("mission.hunt.rewardName")}</b>
-        <div class="hunt-reward-icon">🚀</div>
+        <div class="hunt-reward-icon">✦</div>
         <p>${t("mission.hunt.rewardDesc")}</p>
         <div class="mission-avail-row">
           <button class="modal-btn yes" data-act="hangar">${t("mission.hunt.rewardOpen")}</button>
