@@ -108,30 +108,48 @@ function addRing(mesh, ring) {
 }
 
 const textureLoader = new THREE.TextureLoader();
+const textureCache = new Map();
+
+function getOrCreateTexture(url, onLoad) {
+  if (!url) return null;
+  if (textureCache.has(url)) {
+    const cached = textureCache.get(url);
+    if (cached.image && onLoad) {
+      onLoad(cached);
+    }
+    return cached;
+  }
+  const tex = textureLoader.load(url, (loaded) => {
+    loaded.colorSpace = THREE.SRGBColorSpace;
+    loaded.anisotropy = 8;
+    if (onLoad) onLoad(loaded);
+  });
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  textureCache.set(url, tex);
+  return tex;
+}
 
 // Troca o mapa entre a textura procedural (fantasia) e a real/NASA (real),
 // carregando a real sob demanda na primeira vez que o modo real é usado.
 function makeTextureSwitcher(mesh, ringMesh, descriptor) {
   const proceduralMap = mesh.material.map;
   const proceduralRingMap = ringMesh ? ringMesh.material.map : null;
-  let realMap = null;
-  let realRingMap = null;
-
-  function loadReal(url) {
-    const t = textureLoader.load(url);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
-    return t;
-  }
 
   return (currentMode) => {
     const wantReal = currentMode === "real";
 
     if (descriptor.realTextureUrl) {
       if (wantReal) {
-        if (!realMap) realMap = loadReal(descriptor.realTextureUrl);
-        if (mesh.material.map !== realMap) {
-          mesh.material.map = realMap;
+        getOrCreateTexture(descriptor.realTextureUrl, (tex) => {
+          if (mesh.material.map !== tex) {
+            mesh.material.map = tex;
+            mesh.material.needsUpdate = true;
+          }
+        });
+        const cached = textureCache.get(descriptor.realTextureUrl);
+        if (cached && cached.image && mesh.material.map !== cached) {
+          mesh.material.map = cached;
           mesh.material.needsUpdate = true;
         }
       } else if (mesh.material.map !== proceduralMap) {
@@ -142,12 +160,17 @@ function makeTextureSwitcher(mesh, ringMesh, descriptor) {
 
     if (ringMesh && descriptor.ring && descriptor.ring.realTextureUrl) {
       if (wantReal) {
-        if (!realRingMap) {
-          realRingMap = loadReal(descriptor.ring.realTextureUrl);
-          realRingMap.wrapS = THREE.ClampToEdgeWrapping;
-        }
-        if (ringMesh.material.map !== realRingMap) {
-          ringMesh.material.map = realRingMap;
+        getOrCreateTexture(descriptor.ring.realTextureUrl, (tex) => {
+          tex.wrapS = THREE.ClampToEdgeWrapping;
+          if (ringMesh.material.map !== tex) {
+            ringMesh.material.map = tex;
+            ringMesh.material.needsUpdate = true;
+          }
+        });
+        const cached = textureCache.get(descriptor.ring.realTextureUrl);
+        if (cached && cached.image && ringMesh.material.map !== cached) {
+          cached.wrapS = THREE.ClampToEdgeWrapping;
+          ringMesh.material.map = cached;
           ringMesh.material.needsUpdate = true;
         }
       } else if (ringMesh.material.map !== proceduralRingMap) {
@@ -168,53 +191,47 @@ function approach(current, target, dt) {
 const _lodPos = new THREE.Vector3();
 
 // LOD por distância (reutilizado por planetas e luas): textura pesada (NASA/2k)
-// só quando a câmera chega perto; de longe volta pra procedural e DESCARTA a
-// hi-res (libera VRAM no tablet). Vale em QUALQUER modo. Limiar generoso com
-// piso absoluto pra valer também pra corpos pequenos (Marte/Lua), cujo raio é
-// minúsculo.
+// só quando a câmera chega perto; de longe volta pra procedural.
+// Não descarta a procedural antes do carregamento terminar para evitar telas pretas/piscamento.
 function makeDetailLOD(mesh, descriptor) {
   const proceduralMap = mesh.material.map;
-  let hiresMap = null;
-  let on = false;
+  let isHiresActive = false;
+
   return function (cameraPos, currentMode) {
     if (!descriptor.hiresTextureUrl) return;
-    // Corpos que TAMBÉM têm realTextureUrl (Júpiter/Saturno): no modo real quem
-    // manda no mapa é o switcher (textura pesada SEMPRE, mesmo de longe). O LOD
-    // se retira — senão, ao afastar, ele devolveria a procedural por cima.
+    // Corpos que usam realTextureUrl no modo real: o switcher gerencia o mapa permanentemente
     if (descriptor.realTextureUrl && currentMode === "real") {
-      if (on) {
-        on = false; // o mapa já foi trocado pelo switcher; só solta a cópia do LOD
-        if (hiresMap) {
-          hiresMap.dispose();
-          hiresMap = null;
-        }
-      }
+      isHiresActive = false;
       return;
     }
     mesh.getWorldPosition(_lodPos);
     const dist = cameraPos.distanceTo(_lodPos);
     const r = mesh.scale.x;
-    const onAt = Math.max(16, r * 7 + 6);
-    const offAt = Math.max(26, r * 12 + 12); // histerese pra não piscar
-    if (!on && dist < onAt) {
-      if (!hiresMap) {
-        hiresMap = textureLoader.load(descriptor.hiresTextureUrl, () => {
+    const onAt = Math.max(16, r * 8 + 6);
+    const offAt = Math.max(28, r * 14 + 14); // histerese pra não piscar
+
+    if (!isHiresActive && dist < onAt) {
+      isHiresActive = true;
+      const cached = textureCache.get(descriptor.hiresTextureUrl);
+      if (cached && cached.image) {
+        if (mesh.material.map !== cached) {
+          mesh.material.map = cached;
           mesh.material.needsUpdate = true;
+        }
+      } else {
+        getOrCreateTexture(descriptor.hiresTextureUrl, (loadedTex) => {
+          if (isHiresActive && mesh.material.map !== loadedTex) {
+            mesh.material.map = loadedTex;
+            mesh.material.needsUpdate = true;
+          }
         });
-        hiresMap.colorSpace = THREE.SRGBColorSpace;
-        hiresMap.anisotropy = 8;
       }
-      mesh.material.map = hiresMap;
-      mesh.material.needsUpdate = true;
-      on = true;
-    } else if (on && dist > offAt) {
-      mesh.material.map = proceduralMap;
-      mesh.material.needsUpdate = true;
-      on = false;
-      if (hiresMap) {
-        hiresMap.dispose();
-        hiresMap = null;
+    } else if (isHiresActive && dist > offAt) {
+      if (mesh.material.map !== proceduralMap) {
+        mesh.material.map = proceduralMap;
+        mesh.material.needsUpdate = true;
       }
+      isHiresActive = false;
     }
   };
 }

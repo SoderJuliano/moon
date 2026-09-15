@@ -13,6 +13,7 @@ export default {
   lumpy: true,
   shapeScale: [1.0, 0.75, 0.8],
   menuColor: "#8b8175",
+  realTextureUrl: "textures/2k_deimos.png",
   hiresTextureUrl: "textures/2k_deimos.png",
   makeTexture() {
     return rockyTexture({ base: "#8b8175", dark: "#5d544b", light: "#baa896", seed: 66, craters: 60 });

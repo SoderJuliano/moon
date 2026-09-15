@@ -35,7 +35,11 @@ export class CameraRig {
   // início; o ALVO continua sendo recalculado a cada frame (o corpo se move).
   flyToBody(body, distanceMul = 4) {
     body.worldPosition(this._tmp);
-    const dist = Math.max(0.06, body.radius * distanceMul);
+    const minD = Math.max(0.006, body.radius * 1.5);
+    const dist = Math.max(minD, body.radius * distanceMul);
+    if (this.controls) {
+      this.controls.minDistance = Math.max(0.002, body.radius * 1.15);
+    }
     const dir = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
     if (dir.lengthSq() < 1e-4) dir.set(0, 0.45, 1);
     dir.normalize();

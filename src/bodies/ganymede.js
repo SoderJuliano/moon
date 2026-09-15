@@ -13,6 +13,7 @@ export default {
   L0: 40,
   rotDays: 7.155,
   menuColor: "#97897a",
+  realTextureUrl: "textures/2k_ganymede.jpg",
   hiresTextureUrl: "textures/2k_ganymede.jpg", // carrega de perto (LOD), qualquer modo
   makeTexture() {
     return rockyTexture({ base: "#8f8577", dark: "#5f574a", light: "#b6ab98", seed: 63, craters: 70 });

@@ -78,7 +78,7 @@ export function createScene() {
   const camera = new THREE.PerspectiveCamera(
     55,
     window.innerWidth / window.innerHeight,
-    0.02,
+    0.002,
     10_000_000
   );
   camera.position.set(0, 120, 320);
@@ -99,7 +99,7 @@ export function createScene() {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.minDistance = 0.05; // chega bem perto de luas minúsculas no modo real
+  controls.minDistance = 0.002; // chega bem perto de luas minúsculas no modo real
   controls.maxDistance = 10_000_000;
 
   // --- Iluminação ---------------------------------------------------------

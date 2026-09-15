@@ -17,6 +17,7 @@ export default {
   // Y é o eixo polar (o mais curto — o giro rápido achatou o corpo).
   shapeScale: [1, 0.44, 0.73],
   menuColor: "#e6e0d4",
+  realTextureUrl: "textures/2k_haumea.jpg",
   hiresTextureUrl: "textures/2k_haumea.jpg", // SolarSystemScope (LOD na aproximação)
   makeTexture() {
     return icyTexture({ base: "#e6e0d4", dark: "#a89f8d", light: "#ffffff", seed: 111 });

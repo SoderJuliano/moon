@@ -13,6 +13,7 @@ export default {
   lumpy: true,
   shapeScale: [1.0, 0.7, 0.85],
   menuColor: "#a1938b",
+  realTextureUrl: "textures/2k_phobos.png",
   hiresTextureUrl: "textures/2k_phobos.png",
   makeTexture() {
     return rockyTexture({ base: "#a1938b", dark: "#6e625a", light: "#d6c9c0", seed: 55, craters: 80 });

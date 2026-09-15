@@ -13,6 +13,7 @@ export default {
   L0: 300,
   rotDays: 4.518,
   menuColor: "#c2bfb8",
+  realTextureUrl: "textures/2k_rhea.jpg",
   hiresTextureUrl: "textures/2k_rhea.jpg", // carrega de perto (LOD), qualquer modo
   makeTexture() {
     return rockyTexture({ base: "#b6b3ab", dark: "#7c7970", light: "#dcd8ce", seed: 85, craters: 90 });

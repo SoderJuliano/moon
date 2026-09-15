@@ -12,6 +12,7 @@ export default {
   L0: 0,
   rotDays: 25, // rotação do Sol ~25 dias
   menuColor: "#ffcc55",
+  realTextureUrl: "textures/2k_sun.jpg",
   hiresTextureUrl: "textures/2k_sun.jpg", // fotosfera real, carregada só de perto (LOD)
   makeTexture() {
     return starTexture({ core: "#fff6d0", mid: "#ffcc55", edge: "#ff8a2b", seed: 7 });

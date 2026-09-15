@@ -14,6 +14,7 @@ export default {
   L0: 240,
   rotDays: 3.551,
   menuColor: "#dcd2bd",
+  realTextureUrl: "textures/2k_europa.jpg",
   hiresTextureUrl: "textures/2k_europa.jpg", // carrega de perto (LOD), qualquer modo
   makeTexture() {
     return rockyTexture({ base: "#d9cdb6", dark: "#a89a7e", light: "#f2ead6", seed: 52, craters: 8 });

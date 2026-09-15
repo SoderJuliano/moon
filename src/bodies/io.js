@@ -14,6 +14,7 @@ export default {
   L0: 120, // fase inicial (arbitrária, só pra distribuir as luas)
   rotDays: 1.769,
   menuColor: "#d9c26a",
+  realTextureUrl: "textures/2k_io.jpg",
   hiresTextureUrl: "textures/2k_io.jpg",
   makeTexture() {
     return rockyTexture({ base: "#c9a94e", dark: "#8a6a2a", light: "#e8d488", seed: 44, craters: 30 });

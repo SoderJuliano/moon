@@ -13,7 +13,8 @@ export default {
   rotDays: -6.39, // retrógrado
   menuColor: "#cbb79c",
   // mapa REAL (New Horizons/NASA); hemisfério sul nunca fotografado preenchido
-  // com o mapa do Steve Albers (SOS). Carregada por LOD na aproximação.
+  // com o mapa do Steve Albers (SOS). Carregada no modo real e por LOD.
+  realTextureUrl: "textures/2k_pluto.jpg",
   hiresTextureUrl: "textures/2k_pluto.jpg",
   makeTexture() {
     return icyTexture({ base: "#cbb79c", dark: "#7e6b54", light: "#efe3cf", seed: 101 });

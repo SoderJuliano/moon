@@ -13,6 +13,7 @@ export default {
   rotDays: -243.0, // retrógrado, dia mais longo que o ano
   roughness: 1,
   menuColor: "#d9b36b",
+  realTextureUrl: "textures/2k_venus_surface.jpg",
   hiresTextureUrl: "textures/2k_venus_surface.jpg", // carregada só de perto (LOD)
   makeTexture() {
     return gasGiantTexture({

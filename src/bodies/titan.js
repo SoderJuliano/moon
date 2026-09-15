@@ -13,6 +13,7 @@ export default {
   L0: 200,
   rotDays: 15.945,
   menuColor: "#d99a4e",
+  realTextureUrl: "textures/2k_titan.jpg",
   hiresTextureUrl: "textures/2k_titan.jpg",
   makeTexture() {
     return rockyTexture({ base: "#c98a3e", dark: "#8a5a26", light: "#e0b060", seed: 71, craters: 12 });

@@ -13,6 +13,7 @@ export default {
   L0: 60,
   rotDays: 1.370,
   menuColor: "#eef2f5",
+  realTextureUrl: "textures/2k_enceladus.jpg",
   hiresTextureUrl: "textures/2k_enceladus.jpg", // carrega de perto (LOD), qualquer modo
   makeTexture() {
     return rockyTexture({ base: "#e8edf0", dark: "#c2ccd2", light: "#ffffff", seed: 74, craters: 12 });

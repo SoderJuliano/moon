@@ -12,6 +12,7 @@ export default {
   axialTilt: 25.19,
   rotDays: 1.026,
   menuColor: "#c1440e",
+  realTextureUrl: "textures/2k_mars.jpg",
   hiresTextureUrl: "textures/2k_mars.jpg", // carregada só de perto (LOD por distância)
   makeTexture() {
     return rockyTexture({ base: "#c1440e", dark: "#7a2b09", light: "#e08552", seed: 41, craters: 50 });

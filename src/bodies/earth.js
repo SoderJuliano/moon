@@ -17,6 +17,7 @@ export default {
   rotDays: 0.997,
   roughness: 0.8,
   menuColor: "#3b7fd4",
+  realTextureUrl: "textures/4k_earth.jpg",
   hiresTextureUrl: "textures/4k_earth.jpg", // NASA Blue Marble (LOD na aproximação)
   makeTexture() {
     const tex = loader.load("earth.jpg");
