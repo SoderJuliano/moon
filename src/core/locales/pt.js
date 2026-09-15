@@ -213,6 +213,7 @@ export const pt = {
   "game.shipMenuHint": "<div><span class=\"key\">C</span> abre painel da nave</div>",
   "pause.title": "Pausado",
   "pause.desc": "A nave fica parada no espaço enquanto você decide.",
+  "pause.controlsTitle": "Comandos da nave",
   "pause.key.w": "acelera",
   "pause.key.s": "ré",
   "pause.key.ad": "vira",

@@ -478,6 +478,8 @@ canvas {
   justify-content: center;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(3px);
+  padding: 12px;
+  box-sizing: border-box;
 }
 .modal {
   background: var(--panel);
@@ -487,6 +489,7 @@ canvas {
   max-width: 340px;
   text-align: center;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
 }
 .modal h3 {
   margin: 0 0 8px;
@@ -892,14 +895,95 @@ canvas {
   transition: width 0.12s ease-out;
 }
 
-/* seção "Teclado" dentro do menu de pausa */
+/* ==== Menu de Pausa (Tablet, Paisagem / Landscape e Telas Largas) ==== */
+.modal.pause-modal {
+  width: min(720px, 94vw);
+  max-width: 720px;
+  max-height: min(90vh, 92dvh);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 22px 16px;
+  text-align: left;
+  box-sizing: border-box;
+  background: rgba(12, 18, 30, 0.96);
+  border: 1px solid rgba(80, 110, 160, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.75), 0 0 30px rgba(40, 70, 120, 0.2);
+}
+
+.pause-header {
+  text-align: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.pause-header h3 {
+  margin: 0 0 3px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #f0f4fc;
+}
+
+.pause-header p {
+  margin: 0;
+  font-size: 12px;
+  color: #9fb0cc;
+  line-height: 1.4;
+}
+
+.pause-body {
+  display: grid;
+  grid-template-columns: 1fr 1.12fr;
+  gap: 12px 16px;
+  align-items: start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 168, 255, 0.35) transparent;
+  flex: 1;
+}
+
+.pause-body::-webkit-scrollbar {
+  width: 5px;
+}
+.pause-body::-webkit-scrollbar-thumb {
+  background: rgba(110, 168, 255, 0.35);
+  border-radius: 3px;
+}
+
+.pause-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pause-section {
+  background: rgba(16, 24, 40, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.pause-stats-title {
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8fa2c0;
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+/* seção "Teclado / Controles" dentro do menu de pausa */
 .key-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px 14px;
-  margin: 0 0 16px;
+  gap: 5px 8px;
+  margin: 0;
   text-align: left;
-  font-size: 12px;
+  font-size: 11.5px;
   color: #b9c4d6;
 }
 .key {
@@ -914,6 +998,117 @@ canvas {
   font-size: 11px;
   font-weight: 600;
   text-align: center;
+}
+
+.pause-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pause-settings .setting-row {
+  margin: 0;
+  font-size: 12px;
+}
+
+.pause-modal .pause-missions,
+.pause-modal .pause-stats {
+  margin: 0;
+}
+
+.pause-modal .modal-row.pause-actions {
+  flex-direction: row;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.pause-modal .pause-actions .modal-btn {
+  flex: 1;
+  text-align: center;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* Telas com altura reduzida (emuladores baixos / celulares em paisagem) */
+@media (max-height: 520px) {
+  .modal.pause-modal {
+    padding: 10px 14px 10px;
+    max-height: 96dvh;
+    max-width: 620px;
+  }
+  .pause-header {
+    margin-bottom: 6px;
+  }
+  .pause-header h3 {
+    font-size: 15px;
+    margin: 0;
+  }
+  .pause-header p {
+    font-size: 11px;
+  }
+  .pause-body {
+    gap: 8px 12px;
+    padding-right: 4px;
+  }
+  .pause-col {
+    gap: 8px;
+  }
+  .pause-section {
+    padding: 6px 9px;
+  }
+  .pause-stats-title {
+    font-size: 9.5px;
+    margin-bottom: 5px;
+  }
+  .pause-modal .key-list {
+    font-size: 10.5px;
+    gap: 3px 6px;
+  }
+  .key {
+    font-size: 10px;
+    padding: 0 3px;
+  }
+  .pstat {
+    font-size: 11px;
+    padding: 1px 0;
+  }
+  .pmiss {
+    font-size: 11px;
+    padding: 1.5px 0;
+  }
+  .pause-settings .setting-row {
+    font-size: 11px;
+  }
+  .pause-modal .modal-row.pause-actions {
+    margin-top: 8px;
+    padding-top: 6px;
+    gap: 6px;
+  }
+  .pause-modal .pause-actions .modal-btn {
+    padding: 6px 8px;
+    font-size: 11.5px;
+  }
+}
+
+/* Telas estreitas em modo retrato (mobile portrait) */
+@media (max-width: 580px) and (orientation: portrait), (max-width: 480px) {
+  .modal.pause-modal {
+    width: min(380px, 94vw);
+    padding: 14px 16px;
+  }
+  .pause-body {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .pause-modal .modal-row.pause-actions {
+    flex-direction: column;
+    gap: 6px;
+  }
 }
 
 /* ==== Progressão: popup de descoberta ==== */

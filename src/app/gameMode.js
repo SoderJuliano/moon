@@ -379,30 +379,43 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   pauseOverlay.className = "modal-overlay";
   pauseOverlay.style.display = "none";
   pauseOverlay.innerHTML = `
-    <div class="modal">
-      <h3>${t("pause.title")}</h3>
-      <p>${t("pause.desc")}</p>
-      <div class="key-list">
-        <div><span class="key">W</span>/<span class="key">↑</span> ${t("pause.key.w")}</div>
-        <div><span class="key">S</span>/<span class="key">↓</span> ${t("pause.key.s")}</div>
-        <div><span class="key">A</span><span class="key">D</span> (←→) ${t("pause.key.ad")}</div>
-        <div><span class="key">X</span> ${t("pause.key.x")}</div>
-        <div><span class="key">Z</span> ${t("pause.key.z")}</div>
-        <div><span class="key">Q</span><span class="key">E</span> ${t("pause.key.qe")}</div>
-        <div><span class="key">Shift</span>+<span class="key">W</span> ${t("pause.key.shiftw")}</div>
-        <div><span class="key">Esc</span> ${t("pause.key.esc")}</div>
+    <div class="modal pause-modal">
+      <div class="pause-header">
+        <h3>${t("pause.title")}</h3>
+        <p>${t("pause.desc")}</p>
       </div>
-      <div class="pause-missions"></div>
-      <label class="setting-row">
-        <input type="checkbox" data-setting="showSecondaryHud" />
-        ${t("pause.showSecondaryHud")}
-      </label>
-      <label class="setting-row">
-        <input type="checkbox" data-setting="firstPersonCockpit" />
-        ${t("pause.firstPersonView")}
-      </label>
-      <div class="pause-stats"></div>
-      <div class="modal-row">
+      <div class="pause-body">
+        <div class="pause-col">
+          <div class="pause-section">
+            <div class="pause-stats-title">${t("pause.controlsTitle")}</div>
+            <div class="key-list">
+              <div><span class="key">W</span>/<span class="key">↑</span> ${t("pause.key.w")}</div>
+              <div><span class="key">S</span>/<span class="key">↓</span> ${t("pause.key.s")}</div>
+              <div><span class="key">A</span><span class="key">D</span> (←→) ${t("pause.key.ad")}</div>
+              <div><span class="key">X</span> ${t("pause.key.x")}</div>
+              <div><span class="key">Z</span> ${t("pause.key.z")}</div>
+              <div><span class="key">Q</span><span class="key">E</span> ${t("pause.key.qe")}</div>
+              <div><span class="key">Shift</span>+<span class="key">W</span> ${t("pause.key.shiftw")}</div>
+              <div><span class="key">Esc</span> ${t("pause.key.esc")}</div>
+            </div>
+          </div>
+          <div class="pause-section pause-settings">
+            <label class="setting-row">
+              <input type="checkbox" data-setting="showSecondaryHud" />
+              ${t("pause.showSecondaryHud")}
+            </label>
+            <label class="setting-row">
+              <input type="checkbox" data-setting="firstPersonCockpit" />
+              ${t("pause.firstPersonView")}
+            </label>
+          </div>
+        </div>
+        <div class="pause-col">
+          <div class="pause-section pause-missions"></div>
+          <div class="pause-section pause-stats"></div>
+        </div>
+      </div>
+      <div class="modal-row pause-actions">
         <button class="modal-btn yes" data-act="resume">${t("pause.resume")}</button>
         <button class="modal-btn" data-act="achievements">${t("pause.achievements")}</button>
         <button class="modal-btn" data-act="menu">${t("pause.mainMenu")}</button>
@@ -434,8 +447,10 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     const list = missions.progressList();
     if (!list.length) {
       missBox.innerHTML = "";
+      missBox.style.display = "none";
       return;
     }
+    missBox.style.display = "";
     const rows = list
       .map((m) => {
         const tag = m.kind === "secondary" ? t("mission.tagSec") : t("mission.tagPri");

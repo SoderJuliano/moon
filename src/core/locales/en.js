@@ -212,6 +212,7 @@ export const en = {
   "game.shipMenuHint": "<div><span class=\"key\">C</span> opens ship panel</div>",
   "pause.title": "Paused",
   "pause.desc": "The ship remains stationary in space while you decide.",
+  "pause.controlsTitle": "Ship controls",
   "pause.key.w": "accelerate",
   "pause.key.s": "reverse",
   "pause.key.ad": "turn",
