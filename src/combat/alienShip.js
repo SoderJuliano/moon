@@ -25,6 +25,30 @@ const PLAYER_HIT_RADIUS = 0.1; // raio de acerto contra a nave do jogador
 const STRAFE_DIST = 3.2; // distância de combate preferida
 const CHASE_SPEED = 2.2; // u/s de correção de posição
 
+function buildProceduralScoutMesh() {
+  const root = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x24112e, metalness: 0.8, roughness: 0.3 });
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xd05aff });
+
+  const bodyGeo = new THREE.ConeGeometry(0.06, 0.22, 5);
+  bodyGeo.rotateX(Math.PI / 2);
+  const body = new THREE.Mesh(bodyGeo, mat);
+  body.scale.set(1.4, 0.45, 1.0);
+  root.add(body);
+
+  const wingGeo = new THREE.BoxGeometry(0.18, 0.015, 0.09);
+  const wings = new THREE.Mesh(wingGeo, mat);
+  wings.position.set(0, 0, -0.02);
+  root.add(wings);
+
+  const eyeGeo = new THREE.SphereGeometry(0.02, 8, 8);
+  const eye = new THREE.Mesh(eyeGeo, glowMat);
+  eye.position.set(0, 0.015, 0.05);
+  root.add(eye);
+
+  return root;
+}
+
 export class AlienShip {
   constructor(scene) {
     this.scene = scene;
@@ -37,6 +61,9 @@ export class AlienShip {
     this.idTag = "alien"; // id no canhão — instâncias múltiplas (invasão) trocam
     this.loaded = false;
     this._loading = false;
+    this._hasModel = false;
+    this._fallbackModel = null;
+    this._loadCallbacks = [];
     this.onDestroyed = null; // setado pelo CombatEncounter
     this.onPlayerHit = null; // (posMundo) => void
 
@@ -71,25 +98,91 @@ export class AlienShip {
     this._fill = this.bar.querySelector(".enemy-hp-fill");
   }
 
+  _disposeHierarchy(obj) {
+    if (!obj) return;
+    obj.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m?.dispose());
+        } else {
+          child.material?.dispose();
+        }
+      }
+    });
+  }
+
+  ensureReady() {
+    if (this._hasModel || this.loaded) {
+      this.loaded = true;
+      return;
+    }
+    this._fallbackModel = buildProceduralScoutMesh();
+    this.group.add(this._fallbackModel);
+    this._hasModel = true;
+    this.loaded = true;
+  }
+
   load(onDone) {
     if (this.loaded) {
       onDone?.();
       return;
     }
-    if (this._loading) return;
+    if (this._loading) {
+      if (onDone) this._loadCallbacks.push(onDone);
+      return;
+    }
     this._loading = true;
-    new GLTFLoader().load("models/alienSpaceship.glb", (gltf) => {
-      const model = gltf.scene;
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const scale = SIZE / Math.max(size.x, size.y, size.z);
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.copy(center).multiplyScalar(-scale);
-      model.scale.setScalar(scale);
-      this.group.add(model);
+    if (onDone) this._loadCallbacks.push(onDone);
+
+    const finishLoading = () => {
       this.loaded = true;
-      onDone?.();
-    });
+      const cbs = this._loadCallbacks;
+      this._loadCallbacks = [];
+      for (const cb of cbs) cb();
+    };
+
+    const activateFallback = (reason) => {
+      console.warn(`[AlienShip] Ativando batedor procedural: ${reason}`);
+      this.ensureReady();
+      finishLoading();
+    };
+
+    const loadTimer = setTimeout(() => {
+      if (!this._hasModel) {
+        activateFallback("timeout de carregamento excedido (>3.5s)");
+      }
+    }, 3500);
+
+    new GLTFLoader().load(
+      "models/alienSpaceship.glb",
+      (gltf) => {
+        clearTimeout(loadTimer);
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const scale = SIZE / Math.max(size.x, size.y, size.z);
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.copy(center).multiplyScalar(-scale);
+        model.scale.setScalar(scale);
+
+        if (this._fallbackModel) {
+          this.group.remove(this._fallbackModel);
+          this._disposeHierarchy(this._fallbackModel);
+          this._fallbackModel = null;
+        }
+
+        this.group.add(model);
+        this._hasModel = true;
+        finishLoading();
+      },
+      undefined,
+      (err) => {
+        clearTimeout(loadTimer);
+        console.error("[AlienShip] Falha ao carregar GLTF:", err);
+        activateFallback(`erro no GLTFLoader: ${err?.message || err}`);
+      }
+    );
   }
 
   spawnAt(pos) {

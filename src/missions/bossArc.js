@@ -25,11 +25,13 @@ import { TowController } from "./towController.js";
 import { emit } from "../game/events.js";
 import { resolveAssetUrl } from "../game/remoteAssets.js";
 import { t } from "../core/i18n.js";
+import { formatDistance } from "../ui/spaceMarkers.js";
 
 const SCAN_DIST = 30; // u do casco pra "escanear" o cruzador
 const REPORT_DIST = 4; // u da Estação pra reportar
 const INVASION_DELAY = 20; // s após reportar → batedores
-const BOSS_DELAY = 30; // s após a invasão → os Gêmeos (e entre tentativas)
+const BOSS_COUNTDOWN = 6.0; // s na órbita da Lua antes dos Gêmeos emergirem
+const MOON_TARGET_MARKER_ID = "twins-moon-target";
 const DEBRIS_LOAD_DIST = 80; // lazy-load do GLB de 88MB só chegando perto
 const DEBRIS_PROMPT = 2.4;
 const DELIVER_DIST = 6.0;
@@ -103,23 +105,73 @@ export function createGhostSignalMission() {
 
 // ---- Missão 2: Os Gêmeos do Ocaso (invasão de treino + boss fight) ---------------
 export function createTwinsMission() {
+  const _vMoon = new THREE.Vector3();
   return {
     id: "twins",
-    title: t("mission.twins.title"),
+    get title() {
+      return t("mission.twins.title");
+    },
     kind: "primary",
     firstPhase: "invasion-wait",
     objective: "",
     _cd: INVASION_DELAY,
+    _moonMarkerAdded: false,
+    _moonAlertPlayed: false,
+
+    _nearMoon(ctx) {
+      const moon = ctx.bodyById?.get("moon");
+      if (!moon) return false;
+      moon.worldPosition(_vMoon);
+      const dist = ctx.ship?.ship?.position?.distanceTo(_vMoon) ?? Infinity;
+      const r = Math.max(16, moon.radius || 16);
+      return dist < r + 45;
+    },
+
+    _moonDist(ctx) {
+      const moon = ctx.bodyById?.get("moon");
+      if (!moon) return Infinity;
+      moon.worldPosition(_vMoon);
+      return ctx.ship?.ship?.position?.distanceTo(_vMoon) ?? Infinity;
+    },
+
+    _setMoonMarker(ctx, enabled) {
+      if (!ctx.markers) return;
+      if (enabled) {
+        if (this._moonMarkerAdded) return;
+        ctx.markers.add({
+          id: MOON_TARGET_MARKER_ID,
+          name: t("mission.twins.marker"),
+          color: "#ff4433",
+          kind: "objective",
+          getWorldPosition: (v) => {
+            const moon = ctx.bodyById?.get("moon");
+            if (moon) return moon.worldPosition(v);
+            return v.set(0, 0, 0);
+          },
+        });
+        this._moonMarkerAdded = true;
+      } else {
+        if (!this._moonMarkerAdded) return;
+        ctx.markers.remove(MOON_TARGET_MARKER_ID);
+        this._moonMarkerAdded = false;
+      }
+    },
 
     onStart(ctx, restoring) {
       const ph = ctx.mgr.phase(this.id) || "invasion-wait";
       // retomada no meio de uma fase de combate: rearma a espera correspondente
       if (ph === "invasion") ctx.mgr.setPhase(this.id, "invasion-wait");
       if (ph === "boss") ctx.mgr.setPhase(this.id, "boss-wait");
-      this._cd = ph.startsWith("boss") ? BOSS_DELAY : INVASION_DELAY;
+      this._cd = ph.startsWith("boss") ? BOSS_COUNTDOWN : INVASION_DELAY;
+      this._moonAlertPlayed = false;
+      this._moonMarkerAdded = false;
       // os GLBs ORIGINAIS dos Gêmeos começam a baixar/compilar JÁ — a espera
-      // e a invasão de treino inteiras escondem o carregamento
+      // e a viagem até a Lua inteiras escondem o carregamento
       ctx.fleet?.preloadBosses?.();
+    },
+
+    onComplete(ctx) {
+      this._setMoonMarker(ctx, false);
     },
 
     update(dt, ctx) {
@@ -144,10 +196,11 @@ export function createTwinsMission() {
         if (!fleet.active && fleet.lastResult?.mode === "invasion") {
           if (fleet.lastResult.result === "victory") {
             ctx.mgr.stationSay(t("mission.twins.invasionVictoryDialog"), 7);
-            this._cd = BOSS_DELAY;
+            this._cd = BOSS_COUNTDOWN;
+            this._moonAlertPlayed = false;
             ctx.mgr.setPhase(this.id, "boss-wait");
           } else {
-            this._cd = BOSS_DELAY; // caiu: os batedores voltam pra revanche
+            this._cd = INVASION_DELAY; // caiu: os batedores voltam pra revanche
             ctx.mgr.setPhase(this.id, "invasion-wait");
           }
         }
@@ -155,16 +208,34 @@ export function createTwinsMission() {
       }
 
       if (ph === "boss-wait") {
-        this.objective = t("mission.twins.objBossWait");
-        this._cd -= dt;
-        if (this._cd <= 0 && !fleet.active) {
-          fleet.triggerBoss();
-          ctx.mgr.setPhase(this.id, "boss");
+        // Garante que o download e a compilação continuem durante o voo
+        ctx.fleet?.preloadBosses?.();
+
+        if (!this._nearMoon(ctx)) {
+          this._setMoonMarker(ctx, true);
+          const dist = this._moonDist(ctx);
+          const distStr = isFinite(dist) ? ` (${formatDistance(dist)})` : "";
+          this.objective = t("mission.twins.objBossGotoMoon") + distStr;
+          this._cd = BOSS_COUNTDOWN;
+          this._moonAlertPlayed = false;
+        } else {
+          this._setMoonMarker(ctx, false);
+          if (!this._moonAlertPlayed) {
+            this._moonAlertPlayed = true;
+            ctx.mgr.stationSay(t("mission.twins.moonArrivalDialog"), 6);
+          }
+          this._cd -= dt;
+          this.objective = t("mission.twins.objBossWait", { s: Math.max(1, Math.ceil(this._cd)) });
+          if (this._cd <= 0 && !fleet.active) {
+            fleet.triggerBoss();
+            ctx.mgr.setPhase(this.id, "boss");
+          }
         }
         return;
       }
 
       if (ph === "boss") {
+        this._setMoonMarker(ctx, false);
         this.objective = t("mission.twins.objBoss");
         if (!fleet.active && fleet.lastResult?.mode === "boss") {
           if (fleet.lastResult.result === "victory") {
@@ -184,7 +255,8 @@ export function createTwinsMission() {
             ctx.mgr.makeAvailable("sat-hunt"); // o astronauta quer conversar
 
           } else {
-            this._cd = BOSS_DELAY; // caiu: eles continuam no sistema — revanche
+            this._cd = BOSS_COUNTDOWN; // caiu: voltam pra revanche na Lua
+            this._moonAlertPlayed = false;
             ctx.mgr.setPhase(this.id, "boss-wait");
           }
         }

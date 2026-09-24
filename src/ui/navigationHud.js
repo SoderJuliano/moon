@@ -44,6 +44,7 @@ export class NavigationHud {
     this.viewer = viewer || camera;
     this.margin = margin;
     this.visible = false;
+    this.filter = null; // (target) => boolean — para filtrar alvos específicos (ex: só bosses no combate)
     this._pool = new Map(); // id -> { el, dot, name, dist, arrow, shown }
     this._textTimer = 0;
 
@@ -52,6 +53,10 @@ export class NavigationHud {
     this.root.className = "nav-hud";
     this.root.style.display = "none";
     document.body.appendChild(this.root);
+  }
+
+  setFilter(fn) {
+    this.filter = fn || null;
   }
 
   _injectStyle() {
@@ -79,10 +84,15 @@ export class NavigationHud {
     if (!this.visible) return;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const { onScreen, offScreen } = this.system.compute(this.camera, this.viewer.position, {
+    let { onScreen, offScreen } = this.system.compute(this.camera, this.viewer.position, {
       maxOnScreen: 12,
       maxOffScreen: 6,
     });
+
+    if (this.filter) {
+      onScreen = onScreen.filter((m) => this.filter(m.target));
+      offScreen = offScreen.filter((m) => this.filter(m.target));
+    }
 
     this._textTimer -= dt;
     const refreshText = this._textTimer <= 0;

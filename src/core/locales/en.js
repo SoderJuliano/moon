@@ -335,14 +335,17 @@ export const en = {
   "mission.ghost.objDecoding": "Decoding the logbook...",
   "mission.ghost.reportDialog": "Understood. If the signal was heard... they are ALREADY coming. Prepare the ship.",
 
-  // ---- Mission: The Twilight Twins ----
-  "mission.twins.title": "The Twilight Twins",
+  // ---- Mission: Protect the Moon (The Twilight Twins) ----
+  "mission.twins.title": "Protect the Moon",
   "mission.twins.objInvasionWait": "⚠ Jump signatures detected — scouts approaching...",
   "mission.twins.objInvasion": "Repel the alien scouts",
-  "mission.twins.invasionVictoryDialog": "Scouts neutralized... but sensors report TWO capital signatures. It's THEM.",
-  "mission.twins.objBossWait": "⚠ MAXIMUM ALERT — the Twilight Twins have entered the system...",
-  "mission.twins.objBoss": "Destroy the cruisers ECLIPSE and VORTEX",
-  "mission.twins.bossVictoryDialog": "You... brought down both?! The graveyard signal has finally silenced. The system is yours, pilot.",
+  "mission.twins.invasionVictoryDialog": "Scouts neutralized! Sensors detect the TWIN capital cruisers converging on the MOON. Fly to the Moon immediately to intercept them!",
+  "mission.twins.objBossGotoMoon": "Protect the Moon: fly to lunar orbit",
+  "mission.twins.moonArrivalDialog": "Pilot, you reached the Moon! Gravitational sensors spiking... The Twins are tearing spacetime!",
+  "mission.twins.objBossWait": "⚠ MAXIMUM ALERT — The Twins emerge at the Moon in {s}s...",
+  "mission.twins.objBoss": "Protect the Moon: destroy the cruisers ECLIPSE and VORTEX",
+  "mission.twins.bossVictoryDialog": "You... brought down both over the Moon?! The graveyard signal has finally silenced. The Moon and the solar system are safe, pilot.",
+  "mission.twins.marker": "Target: Moon (Twins Interception)",
 
   // ---- Mission: Battle Debris ----
   "mission.debris.grab": "Tow debris",

@@ -165,6 +165,7 @@ export class ShipFlight {
 
     // --- empuxo linear: escalar com inércia + DIREÇÃO que segue o nariz -------
     this.maxSpeed = 3.3; // cruzeiro ~7% da luz
+    this.combatBoostSpeed = 7.8; // pós-combustor tático em combate (Shift+W): permite ultrapassar chefes e manobrar
     this.boostSpeed = 14; // boost ~30% da luz (Shift+W)
     this.accel = 3.2; // ganho/perda do empuxo (escalar)
     this.reverseFrac = 1 / 192; // ré no máximo 1/192 do avanço (mais controle em aproximações finas)
@@ -233,14 +234,14 @@ export class ShipFlight {
 
     // partículas de velocidade: poeira/estrelas passando voando perto da nave
     // (só aparecem em alta velocidade). Estáticas no mundo; a nave as atravessa.
-    this.streakCount = 50;
+    this.streakCount = 35;
     this.streakPos = new Float32Array(this.streakCount * 3);
     const streakGeo = new THREE.BufferGeometry();
     streakGeo.setAttribute("position", new THREE.BufferAttribute(this.streakPos, 3));
     this.streaks = new THREE.Points(
       streakGeo,
       new THREE.PointsMaterial({
-        color: 0xbfe0ff, size: 0.012, transparent: true, opacity: 0,
+        color: 0xcfe8ff, size: 0.012, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
       })
     );
@@ -392,12 +393,14 @@ export class ShipFlight {
       this.accel = 3.7; // aceleração ligeiramente mais rápida
       this.supercruiseGain = 0.25; // metade do ganho de supercruise
       this.supercruiseMax = 1500; // teto de supercruise pela metade
+      this.combatBoostSpeed = 7.0; // cargueiro blindado com pós-combustor firme
       this.playerHp = 32;
       this.playerMaxHp = 32;
     } else {
       this.accel = 3.2;
       this.supercruiseGain = 0.5;
       this.supercruiseMax = 3000;
+      this.combatBoostSpeed = 8.2; // caça ágil: pós-combustor potente para superar cruzadores e contornar
       this.playerHp = 16;
       this.playerMaxHp = 16;
     }
@@ -939,20 +942,25 @@ export class ShipFlight {
     }
   }
 
-  // espalha as partículas num tubo à frente do nariz (prontas pra entrarem em quadro)
+  // espalha as partículas num volume amplo à frente e ao redor da nave
   _initStreaks() {
-    for (let i = 0; i < this.streakCount; i++) this._respawnStreak(i * 3);
+    for (let i = 0; i < this.streakCount; i++) this._respawnStreak(i * 3, true);
     this.streaks.geometry.attributes.position.needsUpdate = true;
   }
 
-  // recoloca uma partícula à frente da nave, espalhada num disco perpendicular
-  _respawnStreak(ix) {
+  // recoloca uma partícula à frente da nave num cone amplo que ultrapassa as asas e a câmera
+  _respawnStreak(ix, initSpread = false) {
     this._fwd.set(0, 0, -1).applyQuaternion(this.ship.quaternion);
     this._up.set(0, 1, 0).applyQuaternion(this.ship.quaternion);
     this._tmp.set(1, 0, 0).applyQuaternion(this.ship.quaternion); // direita
     const ang = Math.random() * Math.PI * 2;
-    const rad = 0.35 * (0.3 + Math.random() * 0.7);
-    const a = 1.4 * (0.4 + Math.random() * 0.9);
+    // Distribuição radial ampla: cobre as asas e todo o campo de visão da tela
+    const rad = 0.15 + Math.pow(Math.random(), 0.8) * 1.35;
+    // À frente do nariz (ou distribuído ao longo do cone na inicialização)
+    const a = initSpread
+      ? -1.5 + Math.random() * 6.0
+      : 2.8 + Math.random() * 3.2;
+
     this._tmp3
       .copy(this.ship.position)
       .addScaledVector(this._fwd, a)
@@ -963,28 +971,49 @@ export class ShipFlight {
     this.streakPos[ix + 2] = this._tmp3.z;
   }
 
-  // poeira/estrelas passando: estáticas no mundo, recicladas quando ficam pra trás
-  _updateStreaks(spN) {
-    const op = THREE.MathUtils.clamp((spN - 0.45) / 0.55, 0, 1); // só em alta velocidade
-    if (op <= 0.01) {
-      this.streaks.visible = false;
+  // poeira e feixes estelares passando: estritamente visíveis no boost (Shift+W)
+  _updateStreaks(spN, dt = 0.016, isBoosting = false, sp = 0) {
+    // Só ativa sob comando de boost (Shift+W) e velocidade real desenvolvida
+    const boostActive = isBoosting && Math.abs(sp) > 0.6;
+    if (!boostActive) {
+      if (this.streaks.visible) {
+        this.streaks.visible = false;
+      }
       return;
     }
-    this.streaks.visible = true;
-    this.streaks.material.opacity = op * 0.8;
+
+    if (!this.streaks.visible) {
+      this.streaks.visible = true;
+      this._initStreaks();
+    }
+
+    this.streaks.material.opacity = 0.85;
+
+    // Velocidade de fluxo das partículas para trás
+    const streamSpeed = Math.max(Math.abs(sp) * 2.8, 14.0);
+
     for (let i = 0; i < this.streakCount; i++) {
       const ix = i * 3;
+      // Desloca as partículas ativamente para trás no vetor de voo da nave
+      this.streakPos[ix] -= this._fwd.x * streamSpeed * dt;
+      this.streakPos[ix + 1] -= this._fwd.y * streamSpeed * dt;
+      this.streakPos[ix + 2] -= this._fwd.z * streamSpeed * dt;
+
       this._tmp2.set(this.streakPos[ix], this.streakPos[ix + 1], this.streakPos[ix + 2]).sub(this.ship.position);
       const along = this._tmp2.dot(this._fwd);
       const perp2 = this._tmp2.lengthSq() - along * along;
-      if (along < -0.6 || perp2 > 0.25) this._respawnStreak(ix); // passou: recicla à frente
+
+      // Ultrapassa a nave e a câmera atrás (along < -2.2) antes de reciclar à frente
+      if (along < -2.2 || along > 6.5 || perp2 > 3.5) {
+        this._respawnStreak(ix, false);
+      }
     }
     this.streaks.geometry.attributes.position.needsUpdate = true;
   }
 
   // faísca leve ocasional raspando a lateral (cosmético, sem dano)
-  _updateSparks(dt, spN) {
-    if (spN > 0.6 && Math.random() < 0.05) {
+  _updateSparks(dt, spN, isBoosting = false) {
+    if (isBoosting && spN > 0.8 && Math.random() < 0.05) {
       const s = this.sparks.find((x) => x.life <= 0);
       if (s) {
         this._tmp.set(1, 0, 0).applyQuaternion(this.ship.quaternion);
@@ -1099,7 +1128,7 @@ export class ShipFlight {
       const ctrlHeld = (k.has("ControlLeft") || k.has("ControlRight")) && !empActive;
       const fwdKey = k.has("KeyW") && !empActive;
       const revKey = k.has("KeyS") && !empActive;
-      let boosting = fwdKey && shiftHeld && !ctrlHeld && !this.supercruiseDisabled && !empActive;
+      let boosting = fwdKey && shiftHeld && !ctrlHeld && !empActive;
 
     // sinais -1..1 por eixo de rotação (sem interferência entre eles)
     let pitchIn = 0, yawIn = 0, rollIn = 0;
@@ -1240,18 +1269,24 @@ export class ShipFlight {
     } else {
       this._wasInDangerZone = false;
     }
-    const scCap = THREE.MathUtils.clamp(
-      this.boostSpeed + nearSurf * this.supercruiseGain, this.boostSpeed, this.supercruiseMax
-    );
+    const scCap = this.supercruiseDisabled
+      ? (this.combatBoostSpeed || 8.0)
+      : THREE.MathUtils.clamp(
+          this.boostSpeed + nearSurf * this.supercruiseGain, this.boostSpeed, this.supercruiseMax
+        );
 
       if (ctrlHeld) {
         this.speed = 0;
         this.velocity.set(0, 0, 0);
         this.angVel.set(0, 0, 0);
       } else if (boosting) {
-
-        // supercruise: spool-up rápido até o teto que escala com a distância
-        this.speed = THREE.MathUtils.lerp(this.speed, scCap, 1 - Math.exp(-this.scAccel * dt));
+        if (this.supercruiseDisabled) {
+          // Pós-combustor tático em combate (Shift+W): aceleração vigorosa até o teto de combate (~7.8-8.2 u/s)
+          this.speed = THREE.MathUtils.lerp(this.speed, scCap, 1 - Math.exp(-3.8 * dt));
+        } else {
+          // supercruise: spool-up rápido até o teto que escala com a distância
+          this.speed = THREE.MathUtils.lerp(this.speed, scCap, 1 - Math.exp(-this.scAccel * dt));
+        }
       } else if (fwdKey) {
         this.speed += this.accel * dt;
       } else if (revKey) {
@@ -1260,8 +1295,7 @@ export class ShipFlight {
         this.speed *= Math.max(0, 1 - this.speedDrag * dt); // coast: arrasto leve
       }
 
-    // sem boost, desacelera o excesso de volta ao cruzeiro (e o supercruise FREIA
-    // sozinho ao se aproximar, pois scCap encolhe junto com nearSurf → não atravessa)
+    // sem boost, desacelera o excesso de volta ao cruzeiro
     const softCap = boosting ? scCap : this.maxSpeed;
     if (this.speed > softCap)
       this.speed = THREE.MathUtils.lerp(this.speed, softCap, 1 - Math.exp(-3 * dt));
@@ -1409,8 +1443,9 @@ export class ShipFlight {
 
     // FOV dinâmico: "punch" com a velocidade (rush de boost) + abertura no supercruise
     if (this._baseFov) {
+      const boostPunch = (boosting && fwdKey) ? 5 : 0;
       const rush = THREE.MathUtils.clamp((sp - this.maxSpeed) / this.boostSpeed, 0, 1) * 10;
-      const targetFov = this._baseFov + rush + (supercruising ? 14 : 0);
+      const targetFov = this._baseFov + rush + boostPunch + (supercruising ? 14 : 0);
       this.camera.fov += (targetFov - this.camera.fov) * (1 - Math.exp(-4 * dt));
       this.camera.updateProjectionMatrix();
     }
@@ -1422,6 +1457,8 @@ export class ShipFlight {
         this.readout.textContent = t("ship.autoBrake", { speed: formatSpeedForwardOnly(this.speed) });
       } else if (supercruising) {
         this.readout.textContent = t("ship.supercruise", { speed: formatSpeedForwardOnly(this.speed) });
+      } else if (boosting && fwdKey) {
+        this.readout.textContent = `⚡ BOOST · ${formatSpeedForwardOnly(this.speed)}`;
       } else if (this.referenceBody) {
         const status = sp > escapeSpeed ? t("ship.escape") : t("ship.inOrbit");
         this.readout.textContent = `${formatSpeedForwardOnly(this.speed)} · ${status}`;
@@ -1430,10 +1467,11 @@ export class ShipFlight {
       }
 
 
-    // efeitos de navegação: partículas/faíscas SÓ no boost (Shift segurado)
-    const fx = boosting ? spN : 0;
-    this._updateStreaks(fx);
-    this._updateSparks(dt, fx);
+    // efeitos de navegação: partículas/faíscas estritamente no boost (Shift+W)
+    const isBoostFlight = boosting && fwdKey;
+    const fx = isBoostFlight ? Math.max(spN, 1.0) : spN;
+    this._updateStreaks(fx, dt, isBoostFlight, sp);
+    this._updateSparks(dt, fx, isBoostFlight);
     // rastro de dobra: anéis de distorção + traço de luz enquanto em supercruise
     // (persiste esmaecendo depois — dá referência de movimento no vazio)
     this._updateWarpWake(dt, sp, supercruising);

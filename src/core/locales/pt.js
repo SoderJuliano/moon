@@ -336,14 +336,17 @@ export const pt = {
   "mission.ghost.objDecoding": "Decodificando o diário de bordo…",
   "mission.ghost.reportDialog": "Entendido. Se o sinal foi ouvido… eles JÁ estão vindo. Prepare a nave.",
 
-  // ---- Missão: Os Gêmeos do Ocaso ----
-  "mission.twins.title": "Os Gêmeos do Ocaso",
+  // ---- Missão: Proteja a Lua (Os Gêmeos do Ocaso) ----
+  "mission.twins.title": "Proteja a Lua",
   "mission.twins.objInvasionWait": "⚠ Assinaturas de salto detectadas — batedores se aproximam…",
   "mission.twins.objInvasion": "Repila os batedores alienígenas",
-  "mission.twins.invasionVictoryDialog": "Batedores neutralizados… mas os sensores acusam DUAS assinaturas capitais. São ELES.",
-  "mission.twins.objBossWait": "⚠ ALERTA MÁXIMO — os Gêmeos do Ocaso entraram no sistema…",
-  "mission.twins.objBoss": "Destrua os cruzadores ECLIPSE e VÓRTICE",
-  "mission.twins.bossVictoryDialog": "Você… derrubou os dois?! O sinal do cemitério finalmente silenciou. O sistema é seu, piloto.",
+  "mission.twins.invasionVictoryDialog": "Batedores neutralizados! Sensores detectam que os cruzadores GÊMEOS estão convergindo para a LUA. Voe até a Lua imediatamente para interceptá-los!",
+  "mission.twins.objBossGotoMoon": "Proteja a Lua: voe até a órbita da Lua",
+  "mission.twins.moonArrivalDialog": "Piloto, você alcançou a Lua! Sensores gravitacionais no limite... Os Gêmeos estão rasgando o espaço!",
+  "mission.twins.objBossWait": "⚠ ALERTA MÁXIMO — Os Gêmeos emergem na Lua em {s}s…",
+  "mission.twins.objBoss": "Proteja a Lua: destrua os cruzadores ECLIPSE e VÓRTICE",
+  "mission.twins.bossVictoryDialog": "Você… derrubou os dois na Lua?! O sinal do cemitério finalmente silenciou. A Lua e o sistema solar estão a salvo, piloto.",
+  "mission.twins.marker": "Alvo: Lua (Interceptação dos Gêmeos)",
 
   // ---- Missão: Destroços da Batalha ----
   "mission.debris.grab": "Rebocar destroços",

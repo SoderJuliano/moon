@@ -31,15 +31,143 @@ const SIZE = 3.0; // eixo longo (~50× a nave do jogador)
 const SHIELD_R = SIZE * 0.62; // raio da bolha (envolve o casco todo)
 const HULL_R = SIZE * 0.42; // raio de acerto no casco
 const BASE_BOLT_DMG = 2; // dano base do canhão do boss
-const BASE_BOLT_SPEED = 24; // 20% mais lento que os 30 anteriores
-const BOLT_TTL = 3.5;
-const BASE_FIRE_EVERY = 1.35; // cadência base de disparo
-const CRUISE_SPEED = 1.8; // u/s — perseguição rápida
-const PREF_DIST_NEAR = 3.2; // distância de combate corpo a corpo
-const PREF_DIST_FAR = 7.5; // distância de bombardeio afastado
-const PASS_SPEED = 7.5; // u/s durante a passada acelerada
-const PASS_EVERY = [3.5, 5.5]; // investidas frequentes
-const PASS_DUR = 2.6; // s de cada passada
+const BASE_BOLT_SPEED = 16.0; // projéteis cadenciados para permitir esquiva e manobras
+const BOLT_TTL = 2.2; // disparos perdidos dissipam antes de poluírem o espaço
+const BASE_FIRE_EVERY = 1.8; // cadência mais espaçada permitindo contra-ataques
+const CRUISE_SPEED = 1.1; // u/s — perseguição solene e imponente de belonave capital
+const PREF_DIST_NEAR = 3.6; // distância de combate de perto
+const PREF_DIST_FAR = 8.0; // distância de bombardeio afastado
+const PASS_SPEED = 3.6; // u/s na investida: com Shift (~5.5-6.0 u/s) o jogador supera a velocidade e contorna os chefes
+const PASS_EVERY = [6.0, 9.5]; // investidas mais espaçadas
+const PASS_DUR = 1.8; // s de cada investida rápida
+
+function buildProceduralBossMesh(bossId) {
+  const root = new THREE.Group();
+  const isEclipse = bossId === "boss-eclipse";
+
+  // Cores temáticas para cada um dos Gêmeos
+  const hullColor = isEclipse ? 0x1b2028 : 0x181524;
+  const accentColor = isEclipse ? 0x2e3846 : 0x2a2238;
+  const glowColor = isEclipse ? 0xff3b25 : 0xbb33ff; // Eclipse = rubi estelar; Vórtice = roxo cósmico
+  const engineColor = isEclipse ? 0xff7722 : 0x44ddff;
+
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: hullColor,
+    metalness: 0.85,
+    roughness: 0.3,
+  });
+  const accentMat = new THREE.MeshStandardMaterial({
+    color: accentColor,
+    metalness: 0.7,
+    roughness: 0.4,
+  });
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: glowColor,
+  });
+  const engineMat = new THREE.MeshBasicMaterial({
+    color: engineColor,
+  });
+
+  // 1. Casco Central (fuselagem angular em cunha voltada para +Z)
+  const hullGeo = new THREE.ConeGeometry(0.55, SIZE * 0.75, 4);
+  hullGeo.rotateY(Math.PI / 4); // vira as quinas para formar um losango facetado
+  hullGeo.rotateX(Math.PI / 2); // aponta nariz para +Z
+  const mainHull = new THREE.Mesh(hullGeo, hullMat);
+  mainHull.scale.set(1.4, 0.42, 1.0); // perfil achatado de nave capital
+  mainHull.position.set(0, 0, 0.1);
+  root.add(mainHull);
+
+  // 2. Ponte de Comando Superior (Dorsal)
+  const bridgeGeo = new THREE.BoxGeometry(0.28, 0.16, 0.65);
+  const bridge = new THREE.Mesh(bridgeGeo, accentMat);
+  bridge.position.set(0, 0.16, -0.2);
+  root.add(bridge);
+
+  // Visor com brilho cósmico
+  const visorGeo = new THREE.BoxGeometry(0.2, 0.04, 0.05);
+  const visor = new THREE.Mesh(visorGeo, glowMat);
+  visor.position.set(0, 0.2, 0.14);
+  root.add(visor);
+
+  // 3. Blindagem Lateral / Asas táticas
+  if (isEclipse) {
+    const wingGeo = new THREE.BoxGeometry(0.65, 0.08, 1.1);
+    const leftWing = new THREE.Mesh(wingGeo, accentMat);
+    leftWing.position.set(-0.65, 0.02, -0.25);
+    leftWing.rotation.y = 0.25;
+    root.add(leftWing);
+
+    const rightWing = new THREE.Mesh(wingGeo, accentMat);
+    rightWing.position.set(0.65, 0.02, -0.25);
+    rightWing.rotation.y = -0.25;
+    root.add(rightWing);
+
+    // Canhões frontais pesados (Spinal Mounts)
+    const gunGeo = new THREE.CylinderGeometry(0.04, 0.045, 0.9, 8);
+    gunGeo.rotateX(Math.PI / 2);
+    const gunL = new THREE.Mesh(gunGeo, hullMat);
+    gunL.position.set(-0.35, -0.05, 0.55);
+    const gunR = new THREE.Mesh(gunGeo, hullMat);
+    gunR.position.set(0.35, -0.05, 0.55);
+    root.add(gunL);
+    root.add(gunR);
+  } else {
+    const wingGeo = new THREE.BoxGeometry(0.95, 0.06, 0.85);
+    const leftWing = new THREE.Mesh(wingGeo, accentMat);
+    leftWing.position.set(-0.75, 0.04, -0.1);
+    leftWing.rotation.z = -0.15;
+    leftWing.rotation.y = -0.3;
+    root.add(leftWing);
+
+    const rightWing = new THREE.Mesh(wingGeo, accentMat);
+    rightWing.position.set(0.75, 0.04, -0.1);
+    rightWing.rotation.z = 0.15;
+    rightWing.rotation.y = 0.3;
+    root.add(rightWing);
+
+    const finGeo = new THREE.BoxGeometry(0.05, 0.45, 0.5);
+    const finL = new THREE.Mesh(finGeo, accentMat);
+    finL.position.set(-0.45, 0.22, -0.4);
+    finL.rotation.z = -0.3;
+    const finR = new THREE.Mesh(finGeo, accentMat);
+    finR.position.set(0.45, 0.22, -0.4);
+    finR.rotation.z = 0.3;
+    root.add(finL);
+    root.add(finR);
+  }
+
+  // 4. Motores Traseiros Duplos (-Z)
+  const engineGeo = new THREE.CylinderGeometry(0.12, 0.16, 0.55, 10);
+  engineGeo.rotateX(Math.PI / 2);
+  const engL = new THREE.Mesh(engineGeo, hullMat);
+  engL.position.set(-0.32, 0.02, -0.85);
+  const engR = new THREE.Mesh(engineGeo, hullMat);
+  engR.position.set(0.32, 0.02, -0.85);
+  root.add(engL);
+  root.add(engR);
+
+  // Placas incandescentes dos bocais de propulsão
+  const plumeGeo = new THREE.CircleGeometry(0.12, 10);
+  const plumeL = new THREE.Mesh(plumeGeo, engineMat);
+  plumeL.rotation.y = Math.PI;
+  plumeL.position.set(-0.32, 0.02, -1.13);
+  const plumeR = new THREE.Mesh(plumeGeo, engineMat);
+  plumeR.rotation.y = Math.PI;
+  plumeR.position.set(0.32, 0.02, -1.13);
+  root.add(plumeL);
+  root.add(plumeR);
+
+  // 5. Linhas de energia / radiadores laterais brilhantes
+  const stripGeo = new THREE.BoxGeometry(0.03, 0.03, 0.8);
+  const stripL = new THREE.Mesh(stripGeo, glowMat);
+  stripL.position.set(-0.25, 0.12, 0.0);
+  const stripR = new THREE.Mesh(stripGeo, glowMat);
+  stripR.position.set(0.25, 0.12, 0.0);
+  root.add(stripL);
+  root.add(stripR);
+
+  return root;
+}
 
 export class BossShip {
   // opts: { id, name, modelUrl, yaw, pitch, roll }
@@ -60,6 +188,10 @@ export class BossShip {
     this.hp = BOSS_MAX_HP;
     this.loaded = false;
     this._loading = false;
+    this._hasModel = false;
+    this._fallbackModel = null;
+    this._realModel = null;
+    this._loadCallbacks = [];
     this.onDestroyed = null; // setados pelo FleetEncounter
     this.onPlayerHit = null; // (posMundo, dano, vel) => void
     this.onFlyby = null; // passada rasante perto do jogador (tremor + ronco)
@@ -73,6 +205,9 @@ export class BossShip {
 
     this._tmp = new THREE.Vector3();
     this._tmp2 = new THREE.Vector3();
+    this._tmpMoon = new THREE.Vector3();
+    this._tmpToMoon = new THREE.Vector3();
+    this.moon = null;
     this._fireCd = 1.0;
     this._holdFire = true;
 
@@ -115,17 +250,28 @@ export class BossShip {
     );
     this.group.add(this.invulnMesh);
 
-    // ---- ONDA DE CHOQUE EMP (bolha magnética que expande na quebra de escudo) -
-    const empGeo = new THREE.SphereGeometry(1, 32, 24);
-    const empMat = new THREE.MeshBasicMaterial({
-      color: 0x4dd8ff, wireframe: true, transparent: true, opacity: 0,
+    // ---- ONDA DE CHOQUE & ESTOURO DE ESCUDO (sem fios/rede: anel de plasma puro e flash) -
+    const shockRingGeo = new THREE.RingGeometry(0.85, 1.05, 48);
+    const shockRingMat = new THREE.MeshBasicMaterial({
+      color: 0x5be4ff, transparent: true, opacity: 0,
       blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
     });
-    this.empMesh = new THREE.Mesh(empGeo, empMat);
-    this.empMesh.visible = false;
-    scene.add(this.empMesh);
+    this.shockRing = new THREE.Mesh(shockRingGeo, shockRingMat);
+    this.shockRing.visible = false;
+    scene.add(this.shockRing);
+
+    const shockFlashGeo = new THREE.SphereGeometry(1, 24, 16);
+    const shockFlashMat = new THREE.MeshBasicMaterial({
+      color: 0x88f4ff, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.BackSide,
+    });
+    this.shockFlash = new THREE.Mesh(shockFlashGeo, shockFlashMat);
+    this.shockFlash.visible = false;
+    scene.add(this.shockFlash);
+
+    this.empMesh = this.shockRing; // alias de compatibilidade
     this._empLife = 0;
-    this._empTtl = 1.4;
+    this._empTtl = 1.3;
 
     // ondulações no ponto do impacto (sprites que expandem e somem)
     this.ripples = [];
@@ -142,21 +288,21 @@ export class BossShip {
       this.ripples.push({ s, life: 0 });
     }
 
-    // estilhaços do escudo quebrando (casca de pontos azuis voando)
-    const N = 100;
+    // estilhaços de escudo de energia quebrando (cristais de plasma brilhantes)
+    const N = 180;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * 3), 3));
     this._shatter = {
       pts: new THREE.Points(
         geo,
         new THREE.PointsMaterial({
-          color: 0x9fc6ff, size: 0.12, transparent: true, opacity: 0,
+          color: 0x8fe8ff, size: 0.25, transparent: true, opacity: 0,
           blending: THREE.AdditiveBlending, depthWrite: false,
         })
       ),
       vels: Array.from({ length: N }, () => new THREE.Vector3()),
       life: 0,
-      ttl: 1.5,
+      ttl: 1.6,
     };
     this._shatter.pts.visible = false;
     this._shatter.pts.frustumCulled = false;
@@ -206,39 +352,113 @@ export class BossShip {
     return Math.min(this.hp, BOSS_HULL_HP);
   }
 
+  _disposeHierarchy(obj) {
+    if (!obj) return;
+    obj.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m?.dispose());
+        } else {
+          child.material?.dispose();
+        }
+      }
+    });
+  }
+
+  ensureReady() {
+    if (this._hasModel || this.loaded) {
+      this.loaded = true;
+      return;
+    }
+    this._fallbackModel = buildProceduralBossMesh(this.id);
+    this.group.add(this._fallbackModel);
+    this._hasModel = true;
+    this.loaded = true;
+  }
+
   load(onDone) {
     if (this.loaded) {
       onDone?.();
       return;
     }
-    if (this._loading) return;
+    if (this._loading) {
+      if (onDone) this._loadCallbacks.push(onDone);
+      return;
+    }
     this._loading = true;
-    resolveAssetUrl(this.modelUrl).then((url) =>
-      new GLTFLoader().load(url, (gltf) => {
-        const model = gltf.scene;
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const scale = SIZE / Math.max(size.x, size.y, size.z);
-        const center = box.getCenter(new THREE.Vector3());
-        model.position.copy(center).multiplyScalar(-scale);
-        model.scale.setScalar(scale);
-        model.traverse((o) => {
-          if (o.isMesh && o.material) {
-            if (o.material.metalness !== undefined) o.material.metalness = Math.min(o.material.metalness, 0.85);
-            if (o.material.emissiveIntensity !== undefined)
-              o.material.emissiveIntensity = Math.min(o.material.emissiveIntensity, 1.2);
+    if (onDone) this._loadCallbacks.push(onDone);
+
+    const finishLoading = () => {
+      this.loaded = true;
+      const cbs = this._loadCallbacks;
+      this._loadCallbacks = [];
+      for (const cb of cbs) cb();
+    };
+
+    const activateFallback = (reason) => {
+      console.warn(`[BossShip] Ativando nave capital procedural para ${this.id}: ${reason}`);
+      this.ensureReady();
+      finishLoading();
+    };
+
+    // Timeout de segurança (4.5s): evita que o carregamento dos 92MB trave o encontro e o jogador
+    const loadTimer = setTimeout(() => {
+      if (!this._hasModel) {
+        activateFallback("timeout de download/parse excedido (>4.5s)");
+      }
+    }, 4500);
+
+    resolveAssetUrl(this.modelUrl)
+      .then((url) => {
+        new GLTFLoader().load(
+          url,
+          (gltf) => {
+            clearTimeout(loadTimer);
+            const model = gltf.scene;
+            const box = new THREE.Box3().setFromObject(model);
+            const size = box.getSize(new THREE.Vector3());
+            const scale = SIZE / Math.max(size.x, size.y, size.z);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.copy(center).multiplyScalar(-scale);
+            model.scale.setScalar(scale);
+            model.traverse((o) => {
+              if (o.isMesh && o.material) {
+                if (o.material.metalness !== undefined) o.material.metalness = Math.min(o.material.metalness, 0.85);
+                if (o.material.emissiveIntensity !== undefined)
+                  o.material.emissiveIntensity = Math.min(o.material.emissiveIntensity, 1.2);
+              }
+            });
+            const fix = new THREE.Group();
+            fix.add(model);
+            if (this.yaw || this.pitch || this.roll) {
+              fix.rotation.set(this.pitch, this.yaw, this.roll);
+            }
+
+            // Se o modelo procedural de emergência já estava ativo, substitui suavemente
+            if (this._fallbackModel) {
+              this.group.remove(this._fallbackModel);
+              this._disposeHierarchy(this._fallbackModel);
+              this._fallbackModel = null;
+            }
+            this.group.add(fix);
+            this._realModel = fix;
+            this._hasModel = true;
+            finishLoading();
+          },
+          undefined,
+          (err) => {
+            clearTimeout(loadTimer);
+            console.error(`[BossShip] Erro ao carregar GLTF (${this.modelUrl}):`, err);
+            activateFallback(`erro no GLTFLoader: ${err?.message || err}`);
           }
-        });
-        const fix = new THREE.Group();
-        fix.add(model);
-        if (this.yaw || this.pitch || this.roll) {
-          fix.rotation.set(this.pitch, this.yaw, this.roll);
-        }
-        this.group.add(fix);
-        this.loaded = true;
-        onDone?.();
+        );
       })
-    );
+      .catch((err) => {
+        clearTimeout(loadTimer);
+        console.error(`[BossShip] Erro em resolveAssetUrl (${this.modelUrl}):`, err);
+        activateFallback(`falha no resolvedor de asset: ${err?.message || err}`);
+      });
   }
 
   spawnAt(pos) {
@@ -251,7 +471,8 @@ export class BossShip {
     this._shieldGlow = 0;
     this.shieldMesh.visible = true;
     this.invulnMesh.visible = false;
-    this.empMesh.visible = false;
+    this.shockRing.visible = false;
+    this.shockFlash.visible = false;
     this.invulnerableUsed = false;
     this.invulnerableTimer = 0;
     this.group.visible = true;
@@ -265,7 +486,8 @@ export class BossShip {
     this.alive = false;
     this.group.visible = false;
     this.invulnMesh.visible = false;
-    this.empMesh.visible = false;
+    this.shockRing.visible = false;
+    this.shockFlash.visible = false;
     for (const b of this.bolts) {
       b.ttl = 0;
       b.mesh.visible = false;
@@ -354,11 +576,21 @@ export class BossShip {
     // Dispara a onda de choque magnética e o pulso EMP
     this.onShieldBreakEMP?.(this.group.position.clone());
     this._empLife = this._empTtl;
-    this.empMesh.position.copy(this.group.position);
-    this.empMesh.scale.setScalar(0.4);
-    this.empMesh.material.opacity = 1.0;
-    this.empMesh.visible = true;
 
+    // Anel de choque de plasma expansivo suave (sem aramado)
+    this.shockRing.position.copy(this.group.position);
+    this.shockRing.quaternion.copy(this.group.quaternion);
+    this.shockRing.scale.setScalar(SHIELD_R * 0.85);
+    this.shockRing.material.opacity = 1.0;
+    this.shockRing.visible = true;
+
+    // Flash de sobrecarga do escudo
+    this.shockFlash.position.copy(this.group.position);
+    this.shockFlash.scale.setScalar(SHIELD_R * 0.95);
+    this.shockFlash.material.opacity = 0.9;
+    this.shockFlash.visible = true;
+
+    // Estilhaços cristalinos luminosos do escudo estourando
     const sh = this._shatter;
     const posAttr = sh.pts.geometry.attributes.position;
     for (let i = 0; i < sh.vels.length; i++) {
@@ -371,7 +603,7 @@ export class BossShip {
         this.group.position.y + dir.y * SHIELD_R,
         this.group.position.z + dir.z * SHIELD_R
       );
-      dir.multiplyScalar(2.2 + Math.random() * 3.2);
+      dir.multiplyScalar(3.2 + Math.random() * 5.2);
     }
     posAttr.needsUpdate = true;
     sh.pts.material.opacity = 1;
@@ -449,9 +681,11 @@ export class BossShip {
       this._passT -= dt;
       this.group.position.addScaledVector(this._passDir, PASS_SPEED * dt);
       this._tmp2.copy(this.group.position).add(this._passDir);
-      this.group.lookAt(this._tmp2);
+      const mPass = new THREE.Matrix4().lookAt(this.group.position, this._tmp2, new THREE.Vector3(0, 1, 0));
+      const qPass = new THREE.Quaternion().setFromRotationMatrix(mPass);
+      this.group.quaternion.rotateTowards(qPass, 2.2 * dt);
     } else {
-      // Cruzeiro: persegue rápido mantendo a distância preferida dinâmica
+      // Cruzeiro: persegue mantendo a distância preferida dinâmica
       if (dist > this._prefDist + 0.4) {
         this.group.position.addScaledVector(this._tmp.clone().normalize(), CRUISE_SPEED * dt);
       } else if (dist < this._prefDist - 0.4) {
@@ -463,7 +697,10 @@ export class BossShip {
       const right = this._tmp2.set(0, 1, 0).cross(this._tmp).normalize();
       this.group.position.addScaledVector(right, this._strafeDir * 0.4 * dt);
 
-      this.group.lookAt(playerPos);
+      // Giro suave e majestoso de belonave capital (inércia angular) — permite ao jogador flanquear e dar a volta
+      const mLook = new THREE.Matrix4().lookAt(this.group.position, playerPos, new THREE.Vector3(0, 1, 0));
+      const qLook = new THREE.Quaternion().setFromRotationMatrix(mLook);
+      this.group.quaternion.rotateTowards(qLook, 1.25 * dt);
 
       // Arma a próxima passada / investida (3x mais frequente)
       this._passCd -= dt;
@@ -473,6 +710,18 @@ export class BossShip {
         this._flybyDone = false;
         this._tmp2.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize().multiplyScalar(0.9);
         this._passDir.copy(playerPos).add(this._tmp2).sub(this.group.position).normalize();
+      }
+    }
+
+    // Evita que o cruzador penetre na malha da Lua durante a batalha
+    if (this.moon) {
+      this.moon.worldPosition(this._tmpMoon);
+      const moonR = Math.max(60, this.moon.radius || 60);
+      this._tmpToMoon.subVectors(this.group.position, this._tmpMoon);
+      const mDist = this._tmpToMoon.length();
+      if (mDist < moonR + 18 && mDist > 0.001) {
+        this._tmpToMoon.normalize();
+        this.group.position.copy(this._tmpMoon).addScaledVector(this._tmpToMoon, moonR + 18);
       }
     }
 
@@ -523,16 +772,23 @@ export class BossShip {
       this.invulnMesh.visible = false;
     }
 
-    // onda de choque magnética EMP
+    // onda de choque de plasma e flash esférico puro (sem aramado)
     if (this._empLife > 0) {
       this._empLife -= dt;
       const progress = 1 - this._empLife / this._empTtl;
-      const scale = 0.5 + progress * 14.5;
-      this.empMesh.scale.setScalar(scale);
-      this.empMesh.material.opacity = Math.max(0, (this._empLife / this._empTtl) * 0.95);
-      this.empMesh.rotation.y += dt * 3.2;
-      this.empMesh.rotation.x += dt * 2.4;
-      if (this._empLife <= 0) this.empMesh.visible = false;
+      const ringScale = SHIELD_R * 0.85 + progress * 24.0;
+      this.shockRing.scale.setScalar(ringScale);
+      this.shockRing.material.opacity = Math.max(0, Math.pow(1 - progress, 1.8) * 0.95);
+      this.shockRing.rotation.z += dt * 1.5;
+
+      const flashProg = Math.min(1, (this._empTtl - this._empLife) / 0.35);
+      this.shockFlash.scale.setScalar(SHIELD_R * (0.95 + flashProg * 2.2));
+      this.shockFlash.material.opacity = Math.max(0, (1 - flashProg) * 0.85);
+
+      if (this._empLife <= 0) {
+        this.shockRing.visible = false;
+        this.shockFlash.visible = false;
+      }
     }
 
     for (const rip of this.ripples) {
@@ -546,12 +802,14 @@ export class BossShip {
     if (sh.life > 0) {
       sh.life -= dt;
       const posAttr = sh.pts.geometry.attributes.position;
+      const drag = Math.max(0, 1 - dt * 1.6);
       for (let i = 0; i < sh.vels.length; i++) {
         const v = sh.vels[i];
+        v.multiplyScalar(drag);
         posAttr.setXYZ(i, posAttr.getX(i) + v.x * dt, posAttr.getY(i) + v.y * dt, posAttr.getZ(i) + v.z * dt);
       }
       posAttr.needsUpdate = true;
-      sh.pts.material.opacity = Math.max(0, sh.life / sh.ttl);
+      sh.pts.material.opacity = Math.max(0, Math.pow(sh.life / sh.ttl, 1.5));
       if (sh.life <= 0) sh.pts.visible = false;
     }
   }

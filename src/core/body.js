@@ -344,6 +344,7 @@ export function attachMoon(planet, descriptor, mode, moonIndex = 0) {
   const planetRealRadius = bodyRadius(planet.descriptor.realRadiusKm, "real");
   const giantRadius = planetRealRadius * Math.max(40, 60 / planetRealRadius);
 
+  const switchTexture = makeTextureSwitcher(mesh, null, descriptor);
   const lod = makeDetailLOD(mesh, descriptor);
 
   const moon = {
@@ -375,6 +376,7 @@ export function attachMoon(planet, descriptor, mode, moonIndex = 0) {
     },
 
     applyMode(currentMode, instant = true) {
+      switchTexture(currentMode);
       if (currentMode === "real") {
         // fixo, FORA do planeta inflado, com as luas espalhadas em cascas por índice
         const orbit = moonOrbitRadius(planetFantasyRadius, descriptor.moonDistanceKm, currentMode);

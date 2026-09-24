@@ -135,7 +135,7 @@ export class CombatEncounter {
   // chegada E de fuga — na fuga a câmera acompanha o alien indo embora,
   // senão o jogador fica procurando pra onde ele foi
   get holdShip() {
-    return this.state === "opening" || this.state === "arrive" || this.state === "leaving";
+    return (this.state === "opening" || this.state === "arrive" || this.state === "leaving") && this._t < 12.0;
   }
 
   // dispara o encontro: portal abre à FRENTE do jogador (perto o bastante
@@ -242,13 +242,19 @@ export class CombatEncounter {
 
     this._t += dt;
     switch (this.state) {
-      case "opening":
+      case "opening": {
+        if (this._t >= OPEN_SECS + 2.0 && !this.alien.loaded) {
+          this.alien.ensureReady?.();
+          this.alien.loaded = true;
+        }
         if (this._t >= OPEN_SECS && this.alien.loaded) {
           this.alien.spawnAt(this.portal.group.position);
+          this.portal.pulse(0.9); // onda gravitacional secundária na saída da nave
           this.state = "arrive";
           this._t = 0;
         }
         break;
+      }
 
       case "arrive": {
         // a nave desliza do portal até a distância de combate, de frente

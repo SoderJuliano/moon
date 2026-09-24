@@ -189,6 +189,8 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   const fleet = new FleetEncounter(scene, camera, ship, {
     shield: playerShield,
     renderer, // pré-compila shaders/texturas dos bosses no preload
+    markers: markerSystem,
+    bodyById,
     onEnd: (result, mode) => {
       saveManager.saveNow(); // resultado sempre persiste
       if (mode === "miniboss" && result === "victory") {
@@ -217,9 +219,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       }
     }
   });
-  // sons de batalha (exceção autorizada): o canhão só SOA nos encontros épicos
+  // Som de canhão real de artilharia sempre que o canhão dispara
   cannon.sfxShot = () => {
-    if (fleet.active) playCannonShot();
+    playCannonShot();
   };
 
   // Scanner de objetos espaciais (recompensa do "Reboque espacial"): tipa as
@@ -652,11 +654,22 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
         ship.update(dt);
       }
 
-      // GPS: some durante a explosão E durante o combate (em combate a única
-      // seta de navegação é o marcador vermelho do inimigo)
-      const flying = ship.isActive && !ship.exploding;
+      // GPS: some durante a explosão e em combates menores. Na boss fight dos Gêmeos,
+      // o HUD de navegação filtra estritamente para exibir APENAS os 2 marcadores dos chefes, limpando planetas distantes.
       const anyCombatBefore = combat.active || fleet.active;
-      navHud.setVisible(flying && !anyCombatBefore);
+      const flying = ship.isActive && !ship.exploding;
+      const isBossFight = fleet.active && fleet.mode === "boss";
+      const hideNavHud = combat.active || (fleet.active && !isBossFight);
+      navHud.setVisible(flying && !hideNavHud);
+      if (isBossFight) {
+        navHud.setFilter((t) => t.id === "target-eclipse" || t.id === "target-vortice");
+        if (missions?.container) missions.container.style.display = "none";
+      } else {
+        navHud.setFilter(null);
+        if (missions?.container && missions.container.style.display === "none") {
+          missions.container.style.display = "";
+        }
+      }
       navHud.update(dt);
 
       // Combate PvE: contagem da emboscada + estado dos encontros (o 1v1 do

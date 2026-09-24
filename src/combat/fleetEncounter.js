@@ -43,12 +43,15 @@ const SINISTER = {
 export class FleetEncounter {
   // ship = ShipFlight; shield = PlayerShield|null; renderer = pré-compila
   // shaders dos bosses no preload; onEnd(result, mode)
-  constructor(scene, camera, ship, { onEnd = null, shield = null, renderer = null } = {}) {
+  constructor(scene, camera, ship, { onEnd = null, shield = null, renderer = null, markers = null, bodyById = null } = {}) {
     this.scene = scene;
     this.camera = camera;
     this.ship = ship;
     this.shield = shield;
     this.renderer = renderer;
+    this.markers = markers;
+    this.bodyById = bodyById;
+    this._bossMarkersActive = false;
     this.onEnd = onEnd;
 
     this.state = "idle";
@@ -165,7 +168,7 @@ export class FleetEncounter {
     return this.state !== "idle";
   }
   get holdShip() {
-    return this.state === "opening" || this.state === "arrive";
+    return (this.state === "opening" || this.state === "arrive") && this._t < 12.0;
   }
 
   // ---- triggers ------------------------------------------------------------------
@@ -200,6 +203,7 @@ export class FleetEncounter {
 
   _ensureBosses() {
     if (this.bosses) return;
+    const moon = this.bodyById?.get("moon");
     this.bosses = [
       new BossShip(this.scene, { id: "boss-eclipse", name: t("boss.eclipse"), modelUrl: "models/starship.glb" }),
       new BossShip(this.scene, {
@@ -210,6 +214,7 @@ export class FleetEncounter {
       }),
     ];
     for (const b of this.bosses) {
+      if (moon) b.moon = moon;
       b.onDestroyed = (boss) => {
         playExplosionBig();
         this._shake = Math.max(this._shake, 1.2);
@@ -274,6 +279,7 @@ export class FleetEncounter {
     const portalPos = shipObj.position.clone().addScaledVector(this._tmp, 9.5);
     this.bossPortal.openAt(portalPos, 3.2); // Portal com animação de ~2s
     playBossRupture();
+    this._shake = Math.max(this._shake, 1.1); // choque gravitacional inicial
     this.miniBoss.load(() => {});
     this._begin();
   }
@@ -297,11 +303,49 @@ export class FleetEncounter {
     }
 
     const shipObj = this.ship.ship;
-    this._tmp.set(0, 0, -1).applyQuaternion(shipObj.quaternion);
-    const portalPos = shipObj.position.clone().addScaledVector(this._tmp, 13);
+    const moon = this.bodyById?.get("moon");
+    let portalPos = null;
+
+    if (moon) {
+      const moonWorldPos = moon.worldPosition(new THREE.Vector3());
+      const moonR = Math.max(16, moon.radius || 16);
+      const toShip = new THREE.Vector3().subVectors(shipObj.position, moonWorldPos);
+      const distToMoon = toShip.length();
+
+      // Se a batalha for perto da Lua, garante que nave e portal fiquem bem fora da malha
+      if (distToMoon < moonR + 120) {
+        const safeAltitude = moonR + 25; // órbita confortável e desimpedida
+        const normalDir = distToMoon > 0.001 ? toShip.normalize() : new THREE.Vector3(0, 1, 0);
+
+        if (distToMoon < safeAltitude) {
+          shipObj.position.copy(moonWorldPos).addScaledVector(normalDir, safeAltitude);
+          if (this.ship.velocity) this.ship.velocity.set(0, 0, 0);
+        }
+
+        // Direção frontal projetada tangencialmente (espaço aberto)
+        this._tmp.set(0, 0, -1).applyQuaternion(shipObj.quaternion);
+        const inward = this._tmp.dot(normalDir);
+        if (inward < 0) {
+          this._tmp.addScaledVector(normalDir, -inward).normalize();
+          shipObj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), this._tmp);
+        }
+
+        portalPos = shipObj.position.clone()
+          .addScaledVector(this._tmp, 20)
+          .addScaledVector(normalDir, 6);
+      }
+    }
+
+    if (!portalPos) {
+      this._tmp.set(0, 0, -1).applyQuaternion(shipObj.quaternion);
+      portalPos = shipObj.position.clone().addScaledVector(this._tmp, 16);
+    }
+
     this.bossPortal.openAt(portalPos, 6.5); // GIGANTE — o rasgo domina a tela
     playBossRupture();
+    this._shake = Math.max(this._shake, 1.6); // choque de abertura de mega-buraco negro
     for (const b of this.bosses) b.load(() => {});
+    this._addBossMarkers();
     this._begin();
   }
 
@@ -377,6 +421,8 @@ export class FleetEncounter {
 
   _enemyDown(enemy) {
     this.enemies = this.enemies.filter((e) => e !== enemy && e.alive);
+    if (enemy?.id === "boss-eclipse") this.markers?.remove("target-eclipse");
+    if (enemy?.id === "boss-vortice") this.markers?.remove("target-vortice");
     if (this.mode === "invasion" || !(enemy instanceof BossShip)) {
       emit("stat", { key: "enemyShipsDestroyed" });
     }
@@ -465,6 +511,7 @@ export class FleetEncounter {
     // local da batalha: um pouco à frente do jogador (onde os destroços ficam)
     this._tmp.set(0, 0, -1).applyQuaternion(this.ship.ship.quaternion);
     this.lastBattlePos.copy(this.ship.ship.position).addScaledVector(this._tmp, 4);
+    this._removeBossMarkers();
     this.state = "idle";
     this.empCountdown = 0;
     this.empAlert.style.display = "none";
@@ -539,16 +586,32 @@ export class FleetEncounter {
     switch (this.state) {
       case "opening": {
         const allLoaded = this.enemies.every((e) => e.loaded);
-        if (this._t >= openSecs && allLoaded) {
+        const maxWait = openSecs + 2.0; // tolerância máxima de 2s após a expansão do portal
+        if (this._t >= maxWait && !allLoaded) {
+          console.warn(`[FleetEncounter] Timeout de carregamento dos assets (${this._t.toFixed(1)}s). Forçando prontidão emergencial.`);
+          for (const e of this.enemies) {
+            if (!e.loaded) {
+              e.ensureReady?.();
+              e.loaded = true;
+            }
+          }
+        }
+        const readyNow = this.enemies.every((e) => e.loaded);
+        if (this._t >= openSecs && readyNow) {
           if (this.mode === "boss") {
             // os dois saem do MESMO portal gigante, lado a lado
             this.enemies[0].spawnAt(this._tmp.copy(this.bossPortal.group.position).add(this._tmp2.set(-1.6, 0.5, 0)));
             this.enemies[1].spawnAt(this._tmp.copy(this.bossPortal.group.position).add(this._tmp2.set(1.6, -0.5, 0)));
+            this.bossPortal.pulse(1.25);
+            this._shake = Math.max(this._shake, 1.3);
           } else if (this.mode === "miniboss") {
             this.miniBoss.spawnAt(this.bossPortal.group.position);
+            this.bossPortal.pulse(1.0);
+            this._shake = Math.max(this._shake, 0.9);
           } else {
             this.enemies.forEach((s, i) => {
               s.spawnAt(this.smallPortals[i].group.position);
+              this.smallPortals[i].pulse(0.85);
               s._firstShot = false; // 3 tiros teleguiados de uma vez seria covardia
             });
           }
@@ -814,7 +877,44 @@ export class FleetEncounter {
     this.camera.position.z += (Math.random() - 0.5) * a;
   }
 
+  _addBossMarkers() {
+    if (!this.markers) return;
+    this._removeBossMarkers();
+    if (this.bosses?.[0]) {
+      const b0 = this.bosses[0];
+      this.markers.add({
+        id: "target-eclipse",
+        name: `◈ ${t("boss.eclipse")}`,
+        color: "#ff3b25",
+        kind: "objective",
+        getWorldPosition: (v) => (b0.alive && b0.group?.visible ? v.copy(b0.group.position) : v.set(99999, 99999, 99999)),
+      });
+    }
+    if (this.bosses?.[1]) {
+      const b1 = this.bosses[1];
+      this.markers.add({
+        id: "target-vortice",
+        name: `◈ ${t("boss.vortice")}`,
+        color: "#bb33ff",
+        kind: "objective",
+        getWorldPosition: (v) => (b1.alive && b1.group?.visible ? v.copy(b1.group.position) : v.set(99999, 99999, 99999)),
+      });
+    }
+    this._bossMarkersActive = true;
+  }
+
+  _removeBossMarkers() {
+    if (!this.markers || !this._bossMarkersActive) return;
+    this.markers.remove("target-eclipse");
+    this.markers.remove("target-vortice");
+    this._bossMarkersActive = false;
+  }
+
   _updateMarks(playerPos) {
+    if (this.mode === "boss") {
+      this.marks.forEach((mark) => (mark.style.display = "none"));
+      return;
+    }
     const alive = this.enemies.filter((e) => e.alive);
     this.marks.forEach((mark, i) => {
       const e = alive[i];
@@ -837,7 +937,10 @@ export class FleetEncounter {
       mark.style.display = "";
       mark.style.left = `${x}px`;
       mark.style.top = `${y}px`;
-      mark.querySelector(".enemy-mark-dist").textContent = `${e.group.position.distanceTo(playerPos).toFixed(1)}u`;
+      const isVortice = e.id === "boss-vortice";
+      mark.style.color = isVortice ? "#bb33ff" : "#ff5a6e";
+      const name = e.name ? `${e.name} · ` : "";
+      mark.querySelector(".enemy-mark-dist").textContent = `${name}${e.group.position.distanceTo(playerPos).toFixed(1)}u`;
     });
   }
 

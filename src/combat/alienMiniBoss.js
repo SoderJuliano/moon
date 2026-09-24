@@ -40,6 +40,47 @@ const CANNON_MUZZLES = [
   new THREE.Vector3( 0.34, 0.32, -0.06),
 ];
 
+function buildProceduralMiniBossMesh() {
+  const root = new THREE.Group();
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: 0x221332,
+    metalness: 0.85,
+    roughness: 0.25,
+  });
+  const glowMat = new THREE.MeshBasicMaterial({ color: 0xd844ff });
+  const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+  const discGeo = new THREE.CylinderGeometry(0.45, 0.55, 0.16, 16);
+  const disc = new THREE.Mesh(discGeo, hullMat);
+  root.add(disc);
+
+  const domeGeo = new THREE.SphereGeometry(0.28, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+  const dome = new THREE.Mesh(domeGeo, glowMat);
+  dome.position.y = 0.08;
+  root.add(dome);
+
+  const coreGeo = new THREE.SphereGeometry(0.12, 12, 10);
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  core.position.y = 0.12;
+  root.add(core);
+
+  for (let i = 0; i < 4; i++) {
+    const angle = (i * Math.PI) / 2;
+    const podGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.32, 8);
+    podGeo.rotateX(Math.PI / 2);
+    const pod = new THREE.Mesh(podGeo, hullMat);
+    pod.position.set(Math.cos(angle) * 0.44, -0.02, Math.sin(angle) * 0.44);
+    root.add(pod);
+
+    const tipGeo = new THREE.SphereGeometry(0.04, 8, 8);
+    const tip = new THREE.Mesh(tipGeo, glowMat);
+    tip.position.copy(pod.position).add(new THREE.Vector3(Math.cos(angle) * 0.18, 0, Math.sin(angle) * 0.18));
+    root.add(tip);
+  }
+
+  return root;
+}
+
 export class AlienMiniBoss {
   constructor(scene) {
     this.scene = scene;
@@ -55,6 +96,9 @@ export class AlienMiniBoss {
     this.hp = MINIBOSS_MAX_HP;
     this.loaded = false;
     this._loading = false;
+    this._hasModel = false;
+    this._fallbackModel = null;
+    this._loadCallbacks = [];
     this.onDestroyed = null; // setado pelo FleetEncounter
     this.onPlayerHit = null; // (posMundo, dano, vel, isStun) => void
     this.onShieldBreak = null;
@@ -170,37 +214,103 @@ export class AlienMiniBoss {
     return Math.min(this.hp, MINIBOSS_HULL_HP);
   }
 
+  _disposeHierarchy(obj) {
+    if (!obj) return;
+    obj.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m?.dispose());
+        } else {
+          child.material?.dispose();
+        }
+      }
+    });
+  }
+
+  ensureReady() {
+    if (this._hasModel || this.loaded) {
+      this.loaded = true;
+      return;
+    }
+    this._fallbackModel = buildProceduralMiniBossMesh();
+    this.group.add(this._fallbackModel);
+    this._hasModel = true;
+    this.loaded = true;
+  }
+
   load(onDone) {
     if (this.loaded) {
       onDone?.();
       return;
     }
-    if (this._loading) return;
+    if (this._loading) {
+      if (onDone) this._loadCallbacks.push(onDone);
+      return;
+    }
     this._loading = true;
+    if (onDone) this._loadCallbacks.push(onDone);
 
-    new GLTFLoader().load("models/navealiem/navealiem.glb", (gltf) => {
-      const model = gltf.scene;
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const scale = SIZE / Math.max(size.x, size.y, size.z);
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.copy(center).multiplyScalar(-scale);
-      model.scale.setScalar(scale);
-
-      model.traverse((o) => {
-        if (o.isMesh && o.material) {
-          if (o.material.metalness !== undefined) o.material.metalness = Math.min(o.material.metalness, 0.85);
-          if (o.material.emissiveIntensity !== undefined)
-            o.material.emissiveIntensity = Math.min(o.material.emissiveIntensity, 1.2);
-        }
-      });
-
-      const fix = new THREE.Group();
-      fix.add(model);
-      this.group.add(fix);
+    const finishLoading = () => {
       this.loaded = true;
-      onDone?.();
-    });
+      const cbs = this._loadCallbacks;
+      this._loadCallbacks = [];
+      for (const cb of cbs) cb();
+    };
+
+    const activateFallback = (reason) => {
+      console.warn(`[AlienMiniBoss] Ativando modelo procedural de emergência: ${reason}`);
+      this.ensureReady();
+      finishLoading();
+    };
+
+    // Timeout de segurança (4.0s)
+    const loadTimer = setTimeout(() => {
+      if (!this._hasModel) {
+        activateFallback("timeout de carregamento excedido (>4.0s)");
+      }
+    }, 4000);
+
+    new GLTFLoader().load(
+      "models/navealiem/navealiem.glb",
+      (gltf) => {
+        clearTimeout(loadTimer);
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const scale = SIZE / Math.max(size.x, size.y, size.z);
+        const center = box.getCenter(new THREE.Vector3());
+        model.position.copy(center).multiplyScalar(-scale);
+        model.scale.setScalar(scale);
+
+        model.traverse((o) => {
+          if (o.isMesh && o.material) {
+            if (o.material.metalness !== undefined) o.material.metalness = Math.min(o.material.metalness, 0.85);
+            if (o.material.emissiveIntensity !== undefined)
+              o.material.emissiveIntensity = Math.min(o.material.emissiveIntensity, 1.2);
+          }
+        });
+
+        const fix = new THREE.Group();
+        fix.add(model);
+
+        if (this._fallbackModel) {
+          this.group.remove(this._fallbackModel);
+          this._disposeHierarchy(this._fallbackModel);
+          this._fallbackModel = null;
+        }
+
+        this.group.add(fix);
+        this._hasModel = true;
+        finishLoading();
+      },
+      undefined,
+      (err) => {
+        clearTimeout(loadTimer);
+        console.error("[AlienMiniBoss] Falha ao carregar GLTF:", err);
+        activateFallback(`erro no GLTFLoader: ${err?.message || err}`);
+      }
+    );
   }
 
   spawnAt(pos) {
