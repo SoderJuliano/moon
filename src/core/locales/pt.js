@@ -188,6 +188,8 @@ export const pt = {
   "space.lightHours": "{n} h-luz",
 
   // ---- Controles Touch ----
+  "touch.hangar": "Hangar",
+  "touch.camera": "Câmera",
   "touch.pause": "Pausa",
   "touch.boost": "Turbo",
   "touch.accel": "Acelerar",
@@ -210,7 +212,7 @@ export const pt = {
   "exp.mainMenu": "Menu principal",
 
   "game.cannonHint": "<div><span class=\"key\">Espaço</span> dispara o canhão</div>",
-  "game.shipMenuHint": "<div><span class=\"key\">C</span> abre painel da nave</div>",
+  "game.shipMenuHint": "<div><span class=\"key\">H</span> abre painel da nave</div>",
   "pause.title": "Pausado",
   "pause.desc": "A nave fica parada no espaço enquanto você decide.",
   "pause.controlsTitle": "Comandos da nave",
@@ -223,8 +225,10 @@ export const pt = {
   "pause.key.shiftw": "supercruise",
   "pause.key.esc": "pausa",
   "pause.key.c": "alterna câmera / cockpit",
+  "pause.key.h": "painel da nave / hangar",
   "pause.showSecondaryHud": "Mostrar missões secundárias no HUD",
   "pause.firstPersonView": "Câmera em primeira pessoa (Cockpit)",
+  "pause.hangar": "Hangar / Naves",
   "pause.resume": "Continuar voando",
   "pause.achievements": "Conquistas",
   "pause.mainMenu": "Menu principal",

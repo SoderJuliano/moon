@@ -187,6 +187,9 @@ export const en = {
   "space.lightHours": "{n} light-hours",
 
   // ---- Touch Controls ----
+  // ---- Touch Controls ----
+  "touch.hangar": "Hangar",
+  "touch.camera": "Camera",
   "touch.pause": "Pause",
   "touch.boost": "Turbo",
   "touch.accel": "Accelerate",
@@ -209,7 +212,7 @@ export const en = {
   "exp.mainMenu": "Main menu",
 
   "game.cannonHint": "<div><span class=\"key\">Space</span> fires the cannon</div>",
-  "game.shipMenuHint": "<div><span class=\"key\">C</span> opens ship panel</div>",
+  "game.shipMenuHint": "<div><span class=\"key\">H</span> opens ship panel</div>",
   "pause.title": "Paused",
   "pause.desc": "The ship remains stationary in space while you decide.",
   "pause.controlsTitle": "Ship controls",
@@ -222,8 +225,10 @@ export const en = {
   "pause.key.shiftw": "supercruise",
   "pause.key.esc": "pause",
   "pause.key.c": "toggle cockpit / camera",
+  "pause.key.h": "ship panel / hangar",
   "pause.showSecondaryHud": "Show secondary missions on HUD",
   "pause.firstPersonView": "First-person cockpit camera",
+  "pause.hangar": "Hangar / Ships",
   "pause.resume": "Continue flying",
   "pause.achievements": "Achievements",
   "pause.mainMenu": "Main menu",

@@ -2830,6 +2830,235 @@ canvas {
   justify-content: center;
 }
 
+/* Abas de navegação Mobile */
+.ship-menu-tabs {
+  display: none;
+  background: rgba(10, 16, 28, 0.95);
+  border-bottom: 1px solid rgba(48, 76, 120, 0.3);
+  padding: 6px 12px;
+  gap: 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.ship-tab-btn {
+  flex: 1;
+  min-height: 38px;
+  padding: 6px 12px;
+  background: rgba(18, 28, 48, 0.7);
+  border: 1px solid rgba(48, 76, 120, 0.35);
+  border-radius: 6px;
+  color: #8fa0c0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.ship-tab-btn:hover {
+  background: rgba(30, 48, 80, 0.85);
+  color: #e2ecfc;
+}
+
+.ship-tab-btn.active {
+  background: rgba(48, 88, 150, 0.5);
+  border-color: #4c7abf;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(76, 120, 191, 0.25);
+}
+
+/* ==========================================================================
+   ADAPTAÇÃO RESPONSIVA PARA MOBILE (TELAS PEQUENAS / HORIZONTAL / VERTICAL)
+   ========================================================================== */
+@media (max-width: 960px), (max-height: 560px) {
+  .ship-menu-overlay {
+    padding: 0;
+  }
+
+  .ship-menu-container {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
+  }
+
+  .ship-menu-header {
+    padding: 8px 14px;
+  }
+
+  .ship-menu-header .system-tag {
+    font-size: 9px;
+  }
+
+  .ship-menu-header h2 {
+    font-size: 14px;
+    margin-top: 2px;
+  }
+
+  .ship-menu-header .close-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .ship-menu-tabs {
+    display: flex;
+  }
+
+  .ship-menu-main {
+    flex-direction: column;
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* Em mobile, apenas o painel da aba ativa fica visível em tela cheia */
+  .ship-menu-main .panel-left,
+  .ship-menu-main .panel-center,
+  .ship-menu-main .panel-right {
+    display: none;
+    width: 100%;
+    height: 100%;
+    flex: 1;
+    border: none;
+    padding: 10px 14px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ship-menu-main.tab-left .panel-left {
+    display: flex;
+  }
+
+  .ship-menu-main.tab-center .panel-center {
+    display: flex;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .ship-menu-main.tab-right .panel-right {
+    display: flex;
+  }
+
+  /* Painel Central / Visualizador 3D */
+  .panel-center .ship-title-container {
+    position: relative;
+    padding: 8px 14px 2px 14px;
+    background: linear-gradient(180deg, rgba(8, 12, 22, 0.95), transparent);
+    z-index: 10;
+  }
+
+  .panel-center .ship-display-name {
+    font-size: 18px;
+    margin: 1px 0 0 0;
+  }
+
+  .panel-center .ship-story {
+    font-size: 11px;
+    line-height: 1.3;
+    max-width: 100%;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 2px;
+  }
+
+  .panel-center .ship-canvas-container {
+    flex: 1;
+    min-height: 100px;
+  }
+
+  .panel-center .ship-render-hint {
+    padding: 2px 0;
+    font-size: 9px;
+  }
+
+  .ship-activate-row {
+    padding: 4px 14px;
+    min-height: 30px;
+  }
+
+  .activate-ship-btn {
+    padding: 7px 16px;
+    font-size: 11px;
+    min-height: 34px;
+  }
+
+  .ship-locked-banner {
+    padding: 4px 10px;
+    font-size: 10px;
+  }
+
+  .panel-center .ships-title {
+    margin: 4px 14px 4px 14px;
+    font-size: 10px;
+  }
+
+  .ship-carousel {
+    padding: 0 14px 10px 14px;
+    gap: 8px;
+  }
+
+  .ship-car-card {
+    min-width: 125px;
+    padding: 8px 10px;
+  }
+
+  .ship-car-name {
+    font-size: 12px;
+  }
+
+  .ship-car-reg {
+    font-size: 9px;
+  }
+
+  /* Slots e Detalhes de Equipamento */
+  .ship-slots-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .ship-slot-card {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+
+  .slot-thumb-container {
+    width: 32px;
+    height: 32px;
+  }
+
+  .detail-panel {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .detail-image-container {
+    height: 90px;
+  }
+
+  .detail-name {
+    font-size: 14px;
+  }
+
+  .detail-desc {
+    font-size: 12px;
+  }
+
+  .detail-lore {
+    font-size: 10px;
+  }
+}
+
 /* painel de recompensa da caçada (a nave nova) */
 .hunt-reward-icon {
   font-size: 44px;

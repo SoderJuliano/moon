@@ -32,7 +32,8 @@ export function createTouchControls() {
   root.className = "touch-ui";
   root.innerHTML = `
     <div class="touch-top-bar">
-      <button class="touch-btn touch-cam" data-keys="KeyC" aria-label="Câmera">🎥</button>
+      <button class="touch-btn touch-hangar" data-keys="KeyH" aria-label="${t("touch.hangar")}">🚀</button>
+      <button class="touch-btn touch-cam" data-keys="KeyC" aria-label="${t("touch.camera")}">🎥</button>
       <button class="touch-btn touch-pause" data-keys="Escape" aria-label="${t("touch.pause")}">❚❚</button>
     </div>
     <div class="touch-cluster">
@@ -45,7 +46,7 @@ export function createTouchControls() {
   document.body.appendChild(root);
 
   // --- Botões: segurar = tecla pressionada; soltar/cancelar = solta ----------
-  for (const btn of root.querySelectorAll(".touch-btn:not(.touch-pause):not(.touch-cam)")) {
+  for (const btn of root.querySelectorAll(".touch-btn:not(.touch-pause):not(.touch-cam):not(.touch-hangar)")) {
     const codes = btn.dataset.keys.split(" ");
     const press = (e) => {
       e.preventDefault();
@@ -60,13 +61,24 @@ export function createTouchControls() {
     btn.addEventListener("touchend", release);
     btn.addEventListener("touchcancel", release);
   }
-  // Pausa e Câmera são toques únicos (não segurar)
+  // Pausa, Hangar e Câmera são toques únicos (não segurar)
   const pauseBtn = root.querySelector(".touch-pause");
-  pauseBtn.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    key("keydown", "Escape");
-    setTimeout(() => key("keyup", "Escape"), 50);
-  });
+  if (pauseBtn) {
+    pauseBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      key("keydown", "Escape");
+      setTimeout(() => key("keyup", "Escape"), 50);
+    });
+  }
+
+  const hangarBtn = root.querySelector(".touch-hangar");
+  if (hangarBtn) {
+    hangarBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      key("keydown", "KeyH");
+      setTimeout(() => key("keyup", "KeyH"), 50);
+    });
+  }
 
   const camBtn = root.querySelector(".touch-cam");
   if (camBtn) {

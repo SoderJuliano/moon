@@ -324,17 +324,13 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     if (e.code === "KeyG" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") scanner.toggle();
   });
 
-  // Hangar/Ship Menu: abre/fecha com a tecla C
+  // Hangar/Ship Menu: abre/fecha com a tecla H
   window.addEventListener("keydown", (e) => {
-    if (e.code === "KeyC" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") {
-      // POSSE (não instalação): mesmo com o canhão em outra nave o hangar abre
-      const hasPlasma = !!(save.ship?.weapons?.plasmaCannonOwned || save.ship?.weapons?.plasmaCannon);
-      if (hasPlasma) {
-        if (shipMenu.isOpen) {
-          shipMenu.close();
-        } else if (!paused && !achScreen.isOpen) {
-          shipMenu.open();
-        }
+    if (e.code === "KeyH" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") {
+      if (shipMenu.isOpen) {
+        shipMenu.close();
+      } else if (!paused && !achScreen.isOpen) {
+        shipMenu.open();
       }
     }
   });
@@ -434,6 +430,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       </div>
       <div class="modal-row pause-actions">
         <button class="modal-btn yes" data-act="resume">${t("pause.resume")}</button>
+        <button class="modal-btn" data-act="hangar">🚀 ${t("pause.hangar")}</button>
         <button class="modal-btn" data-act="achievements">${t("pause.achievements")}</button>
         <button class="modal-btn" data-act="menu">${t("pause.mainMenu")}</button>
       </div>
@@ -584,6 +581,10 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   pauseOverlay.addEventListener("click", (e) => {
     const act = e.target?.dataset?.act;
     if (act === "resume") setPaused(false);
+    if (act === "hangar") {
+      setPaused(false);
+      shipMenu.open();
+    }
     if (act === "achievements") achScreen.open();
     if (act === "menu") {
       saveManager.saveNow(); // não perde nada ao sair pro menu

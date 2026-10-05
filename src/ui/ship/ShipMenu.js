@@ -25,6 +25,8 @@ export class ShipMenu {
     this.overlay.style.display = "none";
     document.body.appendChild(this.overlay);
 
+    this.currentTab = "center"; // "center" (naves/hangar), "right" (equipamentos), "left" (estatísticas)
+
     this._buildLayout();
     this._bindEvents();
   }
@@ -41,7 +43,14 @@ export class ShipMenu {
           <button class="close-btn" title="Fechar (Esc)">✕</button>
         </div>
 
-        <div class="ship-menu-main">
+        <!-- Mobile Navigation Tabs -->
+        <div class="ship-menu-tabs">
+          <button class="ship-tab-btn active" data-tab="center">${t("tabHangar")}</button>
+          <button class="ship-tab-btn" data-tab="right">${t("tabSlots")}</button>
+          <button class="ship-tab-btn" data-tab="left">${t("tabStats")}</button>
+        </div>
+
+        <div class="ship-menu-main tab-center">
           <!-- Left Panel: Stats and Controls -->
           <div class="panel-left">
             <div class="panel-section-title">${t("sectionStats")}</div>
@@ -110,6 +119,31 @@ export class ShipMenu {
 
   _bindEvents() {
     this.overlay.querySelector(".close-btn").onclick = () => this.close();
+    
+    // Mobile Tabs Switching
+    const tabBtns = this.overlay.querySelectorAll(".ship-tab-btn");
+    for (const btn of tabBtns) {
+      btn.onclick = () => {
+        const tab = btn.dataset.tab;
+        this._switchTab(tab);
+      };
+    }
+  }
+
+  _switchTab(tab) {
+    this.currentTab = tab;
+    const main = this.overlay.querySelector(".ship-menu-main");
+    if (main) {
+      main.classList.remove("tab-center", "tab-right", "tab-left");
+      main.classList.add(`tab-${tab}`);
+    }
+    const btns = this.overlay.querySelectorAll(".ship-tab-btn");
+    for (const b of btns) {
+      b.classList.toggle("active", b.dataset.tab === tab);
+    }
+    if (tab === "center") {
+      setTimeout(() => this.shipRenderer?.resize?.(), 50);
+    }
   }
 
   // ---- naves (carrossel + ativação) -----------------------------------------
@@ -303,6 +337,7 @@ export class ShipMenu {
   open() {
     this.isOpen = true;
     this.overlay.style.display = "flex";
+    this._switchTab("center");
     const hangar = ensureHangar(this.save);
     this.viewShipId = hangar.active;
     this.shipRenderer.init(shipDef(this.viewShipId));

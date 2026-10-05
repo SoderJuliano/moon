@@ -7,6 +7,9 @@ export const TRANSLATIONS = {
   pt: {
     menuTitle: "PAINEL DE EQUIPAMENTOS DA NAVE",
     shipName: "Astra Mk-I",
+    tabHangar: "🚀 Naves",
+    tabSlots: "⚙️ Equipamentos",
+    tabStats: "📊 Atributos",
     sectionStats: "ATRIBUTOS DA NAVE",
     sectionSlots: "SLOTS DE EQUIPAMENTO",
     sectionShips: "NAVES NO HANGAR",
@@ -165,6 +168,9 @@ export const TRANSLATIONS = {
   en: {
     menuTitle: "SHIP EQUIPMENT PANEL",
     shipName: "Astra Mk-I",
+    tabHangar: "🚀 Ships",
+    tabSlots: "⚙️ Equipment",
+    tabStats: "📊 Attributes",
     sectionStats: "SHIP ATTRIBUTES",
     sectionSlots: "EQUIPMENT SLOTS",
     sectionShips: "SHIPS IN HANGAR",
