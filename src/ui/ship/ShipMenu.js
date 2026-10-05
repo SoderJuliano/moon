@@ -59,19 +59,23 @@ export class ShipMenu {
 
           <!-- Center Panel: 3D Ship Renderer -->
           <div class="panel-center">
-            <div class="ship-title-container">
-              <span class="ship-model-label"></span>
-              <h1 class="ship-display-name"></h1>
-              <p class="ship-story"></p>
+            <div class="ship-center-viewport">
+              <div class="ship-title-container">
+                <span class="ship-model-label"></span>
+                <h1 class="ship-display-name"></h1>
+                <p class="ship-story"></p>
+              </div>
+              <div class="ship-canvas-container"></div>
+              <div class="ship-render-hint">
+                <span>Drag to Rotate</span>
+                <span>Scroll to Zoom</span>
+              </div>
             </div>
-            <div class="ship-canvas-container"></div>
-            <div class="ship-render-hint">
-              <span>Drag to Rotate</span>
-              <span>Scroll to Zoom</span>
+            <div class="ship-center-controls">
+              <div class="ship-activate-row"></div>
+              <div class="panel-section-title ships-title">${t("sectionShips")}</div>
+              <div class="ship-carousel"></div>
             </div>
-            <div class="ship-activate-row"></div>
-            <div class="panel-section-title ships-title">${t("sectionShips")}</div>
-            <div class="ship-carousel"></div>
           </div>
 
           <!-- Right Panel: Equipment Slots & Details -->
