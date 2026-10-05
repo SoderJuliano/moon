@@ -708,53 +708,83 @@ export function playFighterCannonShot() {
   }
 }
 
-// CANHÃO DA NAVE TECNOLÓGICA (XR-07) — Canhão Railgun cinético de hipervelocidade:
-// Detonação explosiva intensa + soco de impacto cinético + eco metálico
-export function playBaseTechShot() {
+// ==============================================================================
+// TIRO BLASTER DE STAR WARS (Nave Principal XR-07 em 1ª Pessoa)
+// Síntese autêntica inspirada no som lendário de Ben Burtt (cabo de alta tensão
+// percutido + laser de plasma sci-fi):
+//  1. Sweep de frequência hiperbólico descendente (2600Hz -> 320Hz em 65ms)
+//  2. Modulação ressonante metálica ("PEW-TWANG" de feixe concentrado)
+//  3. Concussão de plasma no grave (135Hz -> 44Hz) para impacto sônico limpo
+// ==============================================================================
+export function playStarWarsBlasterShot(vol = 1.0) {
   const c = ctx();
   if (!c) return;
-  const t = c.currentTime + 0.003;
+  const t = c.currentTime + 0.002;
+
   const master = c.createGain();
-  master.gain.value = 0.9;
+  master.gain.value = 0.88 * vol;
   master.connect(c.destination);
 
-  // Detonação eletromagnética / pólvora hipersônica
-  const nz = c.createBufferSource();
-  nz.buffer = noiseBuf(c);
-  const nLp = c.createBiquadFilter();
-  nLp.type = "lowpass";
-  nLp.frequency.setValueAtTime(1600, t);
-  nLp.frequency.exponentialRampToValueAtTime(380, t + 0.14);
-  const nG = c.createGain();
-  nG.gain.setValueAtTime(1.0, t);
-  nG.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-  nz.connect(nLp); nLp.connect(nG); nG.connect(master);
-  nz.start(t); nz.stop(t + 0.18);
+  // 1. O "PEW" clássico descendente de laser Star Wars
+  const laser = c.createOscillator();
+  laser.type = "sawtooth";
+  laser.frequency.setValueAtTime(2600, t);
+  laser.frequency.exponentialRampToValueAtTime(320, t + 0.075);
+  laser.frequency.exponentialRampToValueAtTime(140, t + 0.13);
 
-  // Soco sísmico cinético (115Hz -> 34Hz)
-  const sub = c.createOscillator();
-  sub.type = "sine";
-  sub.frequency.setValueAtTime(115, t);
-  sub.frequency.exponentialRampToValueAtTime(34, t + 0.08);
-  const shaper = c.createWaveShaper();
-  shaper.curve = getBossSoftClipCurve();
-  const subG = c.createGain();
-  subG.gain.setValueAtTime(1.0, t);
-  subG.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-  sub.connect(shaper); shaper.connect(subG); subG.connect(master);
-  sub.start(t); sub.stop(t + 0.3);
+  // Filtro ressonante com "twang" característico
+  const filter = c.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(2200, t);
+  filter.frequency.exponentialRampToValueAtTime(420, t + 0.08);
+  filter.Q.value = 4.2;
 
-  // Ressonância metálica do cano longo
+  const laserGain = c.createGain();
+  laserGain.gain.setValueAtTime(0.95, t);
+  laserGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+  laser.connect(filter);
+  filter.connect(laserGain);
+  laserGain.connect(master);
+  laser.start(t);
+  laser.stop(t + 0.15);
+
+  // 2. Ressonância metálica secundária ("chirp" harmônico agudo)
   const ring = c.createOscillator();
-  ring.type = "triangle";
-  ring.frequency.setValueAtTime(190, t);
-  ring.frequency.exponentialRampToValueAtTime(60, t + 0.16);
-  const ringG = c.createGain();
-  ringG.gain.setValueAtTime(0.65, t);
-  ringG.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-  ring.connect(ringG); ringG.connect(master);
-  ring.start(t); ring.stop(t + 0.22);
+  ring.type = "sine";
+  ring.frequency.setValueAtTime(1850, t);
+  ring.frequency.exponentialRampToValueAtTime(280, t + 0.06);
+
+  const ringGain = c.createGain();
+  ringGain.gain.setValueAtTime(0.65, t);
+  ringGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+  ring.connect(ringGain);
+  ringGain.connect(master);
+  ring.start(t);
+  ring.stop(t + 0.10);
+
+  // 3. Soco de plasma no peito (sub-grave rápido e seco)
+  const punch = c.createOscillator();
+  punch.type = "triangle";
+  punch.frequency.setValueAtTime(135, t);
+  punch.frequency.exponentialRampToValueAtTime(44, t + 0.07);
+
+  const punchGain = c.createGain();
+  punchGain.gain.setValueAtTime(0.8, t);
+  punchGain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+
+  punch.connect(punchGain);
+  punchGain.connect(master);
+  punch.start(t);
+  punch.stop(t + 0.13);
 }
+
+// CANHÃO DA NAVE TECNOLÓGICA (XR-07) — Redireciona para o som autêntico de Star Wars
+export function playBaseTechShot() {
+  playStarWarsBlasterShot();
+}
+
 
 // CANHÃO DO ÔNIBUS ESPACIAL (Shuttle) — Obuseiro pesado de 155mm:
 // Detonação sísmica colossal com soco violento de ar e eco rolando

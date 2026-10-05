@@ -31,7 +31,10 @@ export function createTouchControls() {
   const root = document.createElement("div");
   root.className = "touch-ui";
   root.innerHTML = `
-    <button class="touch-btn touch-pause" data-keys="Escape" aria-label="${t("touch.pause")}">❚❚</button>
+    <div class="touch-top-bar">
+      <button class="touch-btn touch-cam" data-keys="KeyC" aria-label="Câmera">🎥</button>
+      <button class="touch-btn touch-pause" data-keys="Escape" aria-label="${t("touch.pause")}">❚❚</button>
+    </div>
     <div class="touch-cluster">
       <button class="touch-btn touch-boost" data-keys="ShiftLeft KeyW" aria-label="${t("touch.boost")}">»</button>
       <button class="touch-btn touch-accel" data-keys="KeyW" aria-label="${t("touch.accel")}">▲</button>
@@ -42,7 +45,7 @@ export function createTouchControls() {
   document.body.appendChild(root);
 
   // --- Botões: segurar = tecla pressionada; soltar/cancelar = solta ----------
-  for (const btn of root.querySelectorAll(".touch-btn")) {
+  for (const btn of root.querySelectorAll(".touch-btn:not(.touch-pause):not(.touch-cam)")) {
     const codes = btn.dataset.keys.split(" ");
     const press = (e) => {
       e.preventDefault();
@@ -57,10 +60,22 @@ export function createTouchControls() {
     btn.addEventListener("touchend", release);
     btn.addEventListener("touchcancel", release);
   }
-  // Pausa é um toque, não um "segurar": solta o Escape logo após (o handler do
-  // jogo age no keydown; manter o code preso no Set de teclas não faz sentido)
+  // Pausa e Câmera são toques únicos (não segurar)
   const pauseBtn = root.querySelector(".touch-pause");
-  pauseBtn.addEventListener("touchstart", () => setTimeout(() => key("keyup", "Escape"), 50));
+  pauseBtn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    key("keydown", "Escape");
+    setTimeout(() => key("keyup", "Escape"), 50);
+  });
+
+  const camBtn = root.querySelector(".touch-cam");
+  if (camBtn) {
+    camBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      key("keydown", "KeyC");
+      setTimeout(() => key("keyup", "KeyC"), 50);
+    });
+  }
 
   // --- Arrasto no canvas = virar a nave (setas com zona morta) ---------------
   // Escutamos só o canvas: botões de missão/HUD ficam por cima no DOM e não

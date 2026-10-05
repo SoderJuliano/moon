@@ -222,6 +222,7 @@ export const pt = {
   "pause.key.qe": "rolagem",
   "pause.key.shiftw": "supercruise",
   "pause.key.esc": "pausa",
+  "pause.key.c": "alterna câmera / cockpit",
   "pause.showSecondaryHud": "Mostrar missões secundárias no HUD",
   "pause.firstPersonView": "Câmera em primeira pessoa (Cockpit)",
   "pause.resume": "Continuar voando",

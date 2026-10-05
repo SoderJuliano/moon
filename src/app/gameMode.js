@@ -34,8 +34,14 @@ import { CombatEncounter } from "../combat/combatMode.js";
 import { CombatMusic } from "../combat/combatMusic.js";
 import { FleetEncounter } from "../combat/fleetEncounter.js";
 import { BossMusic } from "../combat/bossMusic.js";
-import { playCannonShot, setBattleSfxPaused } from "../combat/battleSfx.js";
 import { PlayerShield } from "../systems/playerShield.js";
+import {
+  playCannonShot,
+  playStarWarsBlasterShot,
+  playShuttleShot,
+  playFighterCannonShot,
+  setBattleSfxPaused,
+} from "../combat/battleSfx.js";
 import { MissionManager, MISSION } from "../missions/missionManager.js";
 import { createStrangeObjectsMission } from "../missions/strangeObjects.js";
 import { createSpaceRocksMission, createRockChores } from "../missions/spaceRocks.js";
@@ -128,6 +134,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     getEntryInfo: (id) => ENTRY_OVERRIDES[id],
   });
   ship.setEnabled(true);
+  window.__ship = ship;
+  window.__scene = scene;
+  window.__camera = camera;
   // nave ativa do hangar
   const activeDef = activeShipDef(save);
   ship.setModelUrl(activeDef.modelPath, activeDef.yaw, activeDef.pitch, activeDef.id, activeDef.roll || 0);
@@ -219,9 +228,14 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       }
     }
   });
-  // Som de canhão real de artilharia sempre que o canhão dispara
-  cannon.sfxShot = () => {
-    playCannonShot();
+  // Som de disparo: Star Wars blaster para a nave principal (xr07), canhão de navio real para as outras
+  cannon.sfxShot = (shipId) => {
+    const id = shipId || ship.activeShipId;
+    if (id === "xr07") {
+      playStarWarsBlasterShot();
+    } else {
+      playCannonShot();
+    }
   };
 
   // Scanner de objetos espaciais (recompensa do "Reboque espacial"): tipa as
@@ -398,6 +412,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
               <div><span class="key">Z</span> ${t("pause.key.z")}</div>
               <div><span class="key">Q</span><span class="key">E</span> ${t("pause.key.qe")}</div>
               <div><span class="key">Shift</span>+<span class="key">W</span> ${t("pause.key.shiftw")}</div>
+              <div><span class="key">C</span> ${t("pause.key.c")}</div>
               <div><span class="key">Esc</span> ${t("pause.key.esc")}</div>
             </div>
           </div>
@@ -442,6 +457,14 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     saveManager.saveNow();
   };
   fpToggle.addEventListener("change", onFpToggleChange);
+
+  // Sincroniza o toggle do menu de pausa quando a câmera for trocada via tecla C ou botão touch
+  on("firstPersonChanged", ({ active }) => {
+    save.settings = save.settings || {};
+    save.settings.firstPersonCockpit = !!active;
+    if (fpToggle) fpToggle.checked = !!active;
+    saveManager.saveNow();
+  });
   fpToggle.addEventListener("input", onFpToggleChange);
 
   // progresso das missões ATIVAS/DISPONÍVEIS (primárias e secundárias)
@@ -513,6 +536,51 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     setSfxPaused(on); // contexto dos efeitos de interface (jingle) idem
     setBattleSfxPaused(on); // sons de batalha (canhões/ronco) congelam junto
   }
+
+  // --- Pausa automática de áudio quando o app/aba está minimizado ou em segundo plano ---
+  let suspendedByBackground = false;
+  const suspendAllAudio = () => {
+    if (audio.ctx && audio.ctx.state === "running") {
+      audio.ctx.suspend().catch(() => {});
+    }
+    setSfxPaused(true);
+    setBattleSfxPaused(true);
+  };
+  const resumeAllAudio = () => {
+    if (audio.ctx && audio.ctx.state === "suspended") {
+      audio.ctx.resume().catch(() => {});
+    }
+    setSfxPaused(false);
+    setBattleSfxPaused(false);
+  };
+
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      if (!paused) {
+        suspendedByBackground = true;
+        suspendAllAudio();
+      }
+    } else {
+      if (suspendedByBackground && !paused) {
+        suspendedByBackground = false;
+        resumeAllAudio();
+      }
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("pagehide", () => {
+    if (!paused) {
+      suspendedByBackground = true;
+      suspendAllAudio();
+    }
+  });
+  window.addEventListener("pageshow", () => {
+    if (suspendedByBackground && !paused) {
+      suspendedByBackground = false;
+      resumeAllAudio();
+    }
+  });
   pauseOverlay.addEventListener("click", (e) => {
     const act = e.target?.dataset?.act;
     if (act === "resume") setPaused(false);
@@ -605,11 +673,14 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     ship.velocity.fromArray(save.ship.velocity || [0, 0, 0]);
     ship.speed = save.ship.speed || 0;
     ship.intro = null; // sem tween cinematográfico: já estamos "no meio do voo"
-    // câmera direto atrás da nave (o chase assume no primeiro frame)
-    _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
-    camera.position.copy(ship.ship.position).addScaledVector(_shipFwd, -0.35);
-    camera.position.y += 0.12;
-    camera.lookAt(ship.ship.position);
+    if (ship.isFirstPerson) {
+      ship.setFirstPerson(true);
+    } else {
+      _shipFwd.set(0, 0, -1).applyQuaternion(ship.ship.quaternion);
+      camera.position.copy(ship.ship.position).addScaledVector(_shipFwd, -0.35);
+      camera.position.y += 0.12;
+      camera.lookAt(ship.ship.position);
+    }
   }
 
   // Setup completo (nome + snapshot da nave prontos): libera a nuvem e envia

@@ -82,6 +82,7 @@ export function createScene() {
     10_000_000
   );
   camera.position.set(0, 120, 320);
+  scene.add(camera);
 
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -125,10 +126,17 @@ export function createScene() {
   );
   scene.add(glow);
 
-  window.addEventListener("resize", () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+  const onResize = () => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(w, h);
+  };
+  window.addEventListener("resize", onResize);
+  window.addEventListener("orientationchange", () => {
+    setTimeout(onResize, 100);
+    setTimeout(onResize, 300);
   });
 
   return { scene, camera, renderer, controls, sunLight, glow };

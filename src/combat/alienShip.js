@@ -22,7 +22,7 @@ const BOLT_SPEED = 14; // mais lento que o do jogador (dá pra desviar)
 const BOLT_TTL = 3.5;
 const FIRE_EVERY = 2.9; // s entre tiros (1 bolt por vez)
 const PLAYER_HIT_RADIUS = 0.1; // raio de acerto contra a nave do jogador
-const STRAFE_DIST = 3.2; // distância de combate preferida
+const STRAFE_DIST = 2.3; // distância de combate preferida (mais perto e visível)
 const CHASE_SPEED = 2.2; // u/s de correção de posição
 
 function buildProceduralScoutMesh() {
@@ -73,6 +73,16 @@ export class AlienShip {
     this._fireCd = 0;
     this._firstShot = true;
     this._holdFire = true; // só atira quando o encontro liberar
+
+    // Manobra de investida / passada rasante rápida perto do player (sem marcador)
+    this.flybyActive = false;
+    this._flybyT = 0;
+    this._flybyDuration = 2.4;
+    this._flybySoundTriggered = false;
+    this._flybyP0 = new THREE.Vector3();
+    this._flybyP1 = new THREE.Vector3();
+    this._flybyP2 = new THREE.Vector3();
+    this.onFlybyNear = null;
 
     // bolts inimigos: 1 por disparo, cor de energia alien (violeta quente)
     const geo = new THREE.CylinderGeometry(0.006, 0.006, 0.11, 6);
@@ -242,6 +252,32 @@ export class AlienShip {
     b.mesh.visible = true;
   }
 
+  startFlyby(playerPos, playerForward, playerRight) {
+    if (this.flybyActive || !this.alive || !this.group.visible) return false;
+    this.flybyActive = true;
+    this._flybyT = 0;
+    this._flybyDuration = 2.4;
+    this._flybySoundTriggered = false;
+
+    this._flybyP0.copy(this.group.position);
+
+    // Passa cortando a ~0.45u a 0.6u da nave do jogador
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const upOffset = (Math.random() - 0.25) * 0.3;
+    const fwdOffset = 0.2;
+    this._flybyP1.copy(playerPos)
+      .addScaledVector(playerRight, side * 0.52)
+      .addScaledVector(playerForward, fwdOffset);
+    this._flybyP1.y += upOffset;
+
+    // Ponto de saída além do jogador
+    this._flybyP2.copy(playerPos)
+      .addScaledVector(playerForward, 7.5)
+      .addScaledVector(playerRight, side * 2.2);
+
+    return true;
+  }
+
   // fase de luta: strafe + mira + tiros. playerPos null = sem alvo (fuga):
   // nada de movimento/mira aqui — o CombatEncounter conduz a nave ao portal.
   update(dt, playerPos) {
@@ -253,6 +289,36 @@ export class AlienShip {
     if (this.group.scale.x < 1) {
       const s = Math.min(1, this.group.scale.x + dt * 0.9);
       this.group.scale.setScalar(s);
+    }
+
+    // Manobra de passada rasante veloz perto do jogador
+    if (this.flybyActive) {
+      this._flybyT += dt / this._flybyDuration;
+      const t = Math.min(1, this._flybyT);
+      const u = 1 - t;
+      const nextPos = this._tmp.copy(this._flybyP0).multiplyScalar(u * u)
+        .addScaledVector(this._flybyP1, 2 * u * t)
+        .addScaledVector(this._flybyP2, t * t);
+
+      const velDir = this._tmp2.copy(nextPos).sub(this.group.position);
+      if (velDir.lengthSq() > 0.00001) {
+        this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), velDir.normalize());
+      }
+      this.group.position.copy(nextPos);
+
+      const dist = this.group.position.distanceTo(playerPos);
+      if (!this._flybySoundTriggered && dist < 0.85) {
+        this._flybySoundTriggered = true;
+        this.onFlybyNear?.();
+      }
+
+      if (this._flybyT >= 1) {
+        this.flybyActive = false;
+        this._strafeA = Math.atan2(this.group.position.z - playerPos.z, this.group.position.x - playerPos.x);
+      }
+
+      this._updateBolts(dt, playerPos);
+      return;
     }
 
     // órbita-strafe: gira devagar ao redor do jogador na distância de combate

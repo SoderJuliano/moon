@@ -175,7 +175,11 @@ export class PlasmaCannon {
     if (this.ship?.cockpitView && this.ship?.isFirstPerson) {
       this.ship.cockpitView.playShootSfx(this.ship.activeShipId);
     } else if (this.sfxShot) {
-      this.sfxShot();
+      this.sfxShot(this.ship?.activeShipId);
+    }
+    // Efeito de recuo nos canhões 3D de 1ª pessoa
+    if (this.ship?.isFirstPerson) {
+      this.ship.triggerCockpitRecoil?.();
     }
     const ship = this.ship.ship;
     this._tmp.set(0, 0, -1).applyQuaternion(ship.quaternion); // forward

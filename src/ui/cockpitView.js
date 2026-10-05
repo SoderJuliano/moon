@@ -1,24 +1,19 @@
-// CockpitView — Módulo de visualização em 1ª Pessoa / Cockpit / Câmera de Ação Espacial.
+// CockpitView — Módulo de visualização em 1ª Pessoa / Cockpit Espacial Panorâmico.
 //
-// Três estilos conforme a nave ativa:
-//  • XR-07 (Nave Base): Cockpit envidraçado com 3 janelas [Lateral Esquerda][Frente][Lateral Direita],
-//    com divisórias estruturais metálicas, mira HUD no vidro e visão dos tiros saindo de baixo das asas.
-//  • Ônibus Espacial (Shuttle): Cockpit de nave pesada com 3 janelas reforçadas [Esquerda][Frente][Direita],
-//    painéis de voo orbitais e tiro central concentrado no nariz.
-//  • Caça Estelar (SW-X): Visão estilo "Gravação Espacial" (Câmera de Ação Externa) com HUD [● REC],
-//    sem moldura de vidro tradicional, com os 4 canhões montados nas 4 pontas das asas visíveis nos
-//    4 cantos da tela e os 4 feixes de laser disparando em direção à mira central.
-//
-// Efeitos Especiais Integrados:
-//  • Supercruise: Distorção relativística do espaço com raios de dobra expandindo do centro (efeito filme).
-//  • Aceleração normal: Riscos de poeira cósmica / partículas passando rápido pela tela ao acelerar.
-//  • Dano frontal / Impacto: Flash vermelho no visor, glitch de energia no vidro e som de blindagem atingida.
-//  • Áudio em 1ª pessoa: Sons de canhão específicos para o caça, nave base tecnológica e ônibus espacial.
+// Visão de dentro para fora no estilo clássico de jogos espaciais e simuladores:
+//  • O universo fica 100% visível, amplo e cristalino, sem divisórias, colunas ou linhas no meio da visão;
+//  • Os canhões 3D aparecem montados nas laterais externas da tela (via CockpitCannons);
+//  • HUD minimalista e translúcido na parte inferior/superior com telemetria tática;
+//  • Mira central circular limpa com pip suave (sem linhas cortando a tela);
+//  • Efeitos especiais integrados:
+//    - Dobra espacial / Supercruise relativístico (Warp Tunnel com raios cósmicos expandindo);
+//    - Partículas de velocidade / poeira cósmica passando rápido em aceleração e boost;
+//    - Flash vermelho de blindagem e áudio de impacto em caso de dano frontal;
+//    - Sons autênticos de disparo (Star Wars para XR-07, canhão de artilharia naval real para as demais).
 
 import {
-  playFighterCannonShot,
-  playBaseTechShot,
-  playShuttleShot,
+  playStarWarsBlasterShot,
+  playCannonShot,
   playArmorImpact,
 } from "../combat/battleSfx.js";
 
@@ -42,13 +37,11 @@ export class CockpitView {
     this.root.className = "cockpit-root";
     this.root.style.display = "none";
 
-    // 1) Overlays de Cockpit de 3 Janelas (XR-07 e Ônibus Espacial)
+    // 1) Cockpit Panorâmico com console inferior translúcido (XR-07 e Ônibus Espacial)
+    // 100% aberto: SEM colunas, SEM divisórias e SEM linhas no meio da tela
     this.canopyCanopy = document.createElement("div");
     this.canopyCanopy.className = "cockpit-canopy-frame";
     this.canopyCanopy.innerHTML = `
-      <div class="canopy-pillar pillar-left"></div>
-      <div class="canopy-pillar pillar-right"></div>
-      <div class="canopy-header"></div>
       <div class="canopy-dash">
         <div class="dash-panel panel-l">
           <div class="dash-lbl">PROPULSÃO</div>
@@ -57,9 +50,6 @@ export class CockpitView {
         </div>
         <div class="dash-center">
           <div class="dash-crosshair"></div>
-          <div class="dash-horizon">
-            <div class="horizon-line"></div>
-          </div>
         </div>
         <div class="dash-panel panel-r">
           <div class="dash-lbl">INTEGRIDADE</div>
@@ -67,45 +57,28 @@ export class CockpitView {
           <div class="dash-val dash-hull-val">100%</div>
         </div>
       </div>
-      <div class="glass-pane pane-left"><span class="pane-tag">L-WIN</span></div>
-      <div class="glass-pane pane-center"><span class="pane-tag">FWD-CANOPY</span></div>
-      <div class="glass-pane pane-right"><span class="pane-tag">R-WIN</span></div>
-      <div class="glass-reflection"></div>
     `;
 
-    // 2) Overlay de Câmera de Ação Espacial [● REC] (Caça SW-X)
+    // 2) Cockpit Tático do Caça Estelar (SW-X)
+    // HUD de combate translúcido com mira circular limpa e visão 100% livre do espaço
     this.actionCam = document.createElement("div");
-    this.actionCam.className = "action-cam-frame";
+    this.actionCam.className = "fighter-cockpit-frame";
     this.actionCam.innerHTML = `
-      <div class="rec-badge">
-        <span class="rec-dot"></span>
-        <span class="rec-txt">REC</span>
-        <span class="rec-timer">00:00:00</span>
+      <div class="fighter-hud-top">
+        <div class="fighter-tag">SW-X // CAÇA ESTELAR</div>
+        <div class="fighter-spd cam-status-spd">0.0 km/s</div>
       </div>
-      <div class="cam-telemetry-tl">
-        <div>CAM-EXT-DORSAL // 60FPS</div>
-        <div>OPTICAL STABILIZER: ACTIVE</div>
+      <div class="fighter-crosshair">
+        <div class="fighter-reticle-ring"></div>
+        <div class="fighter-crosshair-pip"></div>
       </div>
-      <div class="cam-telemetry-tr">
-        <div class="cam-status-guns">4-GUN ARRAY: ARMED</div>
-        <div class="cam-status-spd">SPD: 0.00c</div>
+      <div class="fighter-hud-bottom">
+        <div class="fighter-status-label">INTEGRIDADE DO CASCO</div>
+        <div class="fighter-hull-bar"><div class="fighter-hull-fill dash-hull-fill"></div></div>
       </div>
-      <div class="cam-crosshair">
-        <div class="cam-reticle-circle"></div>
-        <div class="cam-reticle-brackets"></div>
-        <div class="cam-lead-target"></div>
-      </div>
-      <div class="cam-cannon-markers">
-        <div class="cannon-mark mark-tl"><span class="gun-lbl">G1 [TOP-L]</span></div>
-        <div class="cannon-mark mark-tr"><span class="gun-lbl">G2 [TOP-R]</span></div>
-        <div class="cannon-mark mark-bl"><span class="gun-lbl">G3 [BTM-L]</span></div>
-        <div class="cannon-mark mark-br"><span class="gun-lbl">G4 [BTM-R]</span></div>
-      </div>
-      <div class="cam-scanlines"></div>
-      <div class="cam-vignette"></div>
     `;
 
-    // 3) Efeito de Dano / Impacto Frontal
+    // 3) Efeito de Dano / Impacto Frontal (Visor vermelho piscando)
     this.damageOverlay = document.createElement("div");
     this.damageOverlay.className = "cockpit-damage-overlay";
 
@@ -116,14 +89,13 @@ export class CockpitView {
 
     this._dashThrust = this.root.querySelector(".dash-thrust");
     this._dashSpeed = this.root.querySelector(".dash-speed-val");
-    this._dashHullFill = this.root.querySelector(".dash-hull-fill");
+    this._dashHullFill = this.root.querySelectorAll(".dash-hull-fill");
     this._dashHullVal = this.root.querySelector(".dash-hull-val");
-    this._recTimer = this.root.querySelector(".rec-timer");
     this._camSpd = this.root.querySelector(".cam-status-spd");
   }
 
   _initCanvas() {
-    // Canvas para efeitos de dobra espacial (Supercruise) e aceleração
+    // Canvas para efeitos de dobra espacial (Supercruise) e poeira de aceleração
     this.canvas = document.createElement("canvas");
     this.canvas.className = "cockpit-fx-canvas";
     this.root.appendChild(this.canvas);
@@ -145,7 +117,7 @@ export class CockpitView {
       });
     }
 
-    // Partículas de poeira cósmica rápida na aceleração normal
+    // Partículas de poeira cósmica rápida na aceleração normal e boost
     this.dustParticles = [];
     for (let i = 0; i < 45; i++) {
       this.dustParticles.push({
@@ -195,12 +167,11 @@ export class CockpitView {
   }
 
   playShootSfx(shipId = this.activeShipId) {
-    if (shipId === "naveSW") {
-      playFighterCannonShot();
-    } else if (shipId === "shuttle") {
-      playShuttleShot();
+    if (shipId === "xr07") {
+      playStarWarsBlasterShot();
     } else {
-      playBaseTechShot();
+      // Para as outras naves: som de canhão de verdade (artilharia naval pesada)
+      playCannonShot();
     }
   }
 
@@ -213,23 +184,20 @@ export class CockpitView {
     if (!this.active) return;
     this._time += dt;
 
-    // Atualiza timecode da câmera de ação
-    this._recSeconds += dt;
-    const hrs = String(Math.floor(this._recSeconds / 3600)).padStart(2, "0");
-    const mins = String(Math.floor((this._recSeconds % 3600) / 60)).padStart(2, "0");
-    const secs = String(Math.floor(this._recSeconds % 60)).padStart(2, "0");
-    if (this._recTimer) this._recTimer.textContent = `${hrs}:${mins}:${secs}`;
-
     // Velocidade e telemetria nos painéis
     const spdPct = Math.min(speed / maxSpeed, 1);
     const spdKms = (speed * 1000).toFixed(1);
     if (this._dashSpeed) this._dashSpeed.textContent = `${spdKms} km/s`;
     if (this._dashThrust) this._dashThrust.style.width = `${Math.round(spdPct * 100)}%`;
-    if (this._camSpd) this._camSpd.textContent = `SPD: ${(speed / 10).toFixed(2)}c`;
+    if (this._camSpd) this._camSpd.textContent = `${spdKms} km/s`;
 
     // Vida da nave
     const hpFrac = Math.max(0, Math.min(playerHp / playerMaxHp, 1));
-    if (this._dashHullFill) this._dashHullFill.style.width = `${Math.round(hpFrac * 100)}%`;
+    if (this._dashHullFill) {
+      this._dashHullFill.forEach((el) => {
+        el.style.width = `${Math.round(hpFrac * 100)}%`;
+      });
+    }
     if (this._dashHullVal) this._dashHullVal.textContent = `${Math.round(hpFrac * 100)}%`;
 
     // Flash de dano frontal

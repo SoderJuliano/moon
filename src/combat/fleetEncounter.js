@@ -87,6 +87,7 @@ export class FleetEncounter {
     this._lockGap = 0; // tempo desde a última colada
     this._lockedBefore = false; // 1ª colada pode ser "apareceu na tela"
     this._lockTarget = null;
+    this._flybyTimer = 5; // temporizador para manobra rasante espetacular de batedor
     this._mouse = { x: 0, y: 0, lastMove: 0 };
     window.addEventListener("mousemove", (e) => {
       this._mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -114,12 +115,12 @@ export class FleetEncounter {
     document.body.appendChild(this.bossBars);
     this._barEls = [];
 
-    // marcadores de inimigo (um por alvo — única seta de navegação em combate)
+    // marcadores de inimigo (retículo sci-fi vazado sem centro sólido)
     this.marks = [];
     for (let i = 0; i < 3; i++) {
       const m = document.createElement("div");
       m.className = "enemy-mark";
-      m.innerHTML = '<span class="enemy-mark-dot">◆</span><span class="enemy-mark-dist"></span>';
+      m.innerHTML = '<div class="enemy-reticle"><span class="reticle-corner tl"></span><span class="reticle-corner tr"></span><span class="reticle-corner bl"></span><span class="reticle-corner br"></span></div><span class="enemy-mark-dist"></span>';
       m.style.display = "none";
       document.body.appendChild(m);
       this.marks.push(m);
@@ -181,6 +182,10 @@ export class FleetEncounter {
       for (const s of this.scouts) {
         s.onDestroyed = () => this._enemyDown(s);
         s.onPlayerHit = (pos) => this._playerHit(pos, 1);
+        s.onFlybyNear = () => {
+          playFlybyRumble();
+          this._shake = Math.max(this._shake, 0.85);
+        };
       }
     }
     this.enemies = [...this.scouts];
@@ -661,6 +666,22 @@ export class FleetEncounter {
         for (const e of this.enemies) e.update(dt, playerPos, this.ship);
         this._mouseSteer(dt);
         this._aimAssist(dt, playerPos);
+
+        // Manobra periódica de passada rasante veloz de uma das 3 naves no modo invasão
+        if (this.mode === "invasion" && this.scouts) {
+          this._flybyTimer -= dt;
+          if (this._flybyTimer <= 0) {
+            this._flybyTimer = 10 + Math.random() * 6; // a cada 10 a 16 segundos
+            const aliveScouts = this.scouts.filter((s) => s.alive && !s.flybyActive);
+            if (aliveScouts.length > 0) {
+              const lucky = aliveScouts[Math.floor(Math.random() * aliveScouts.length)];
+              const shipObj = this.ship.ship;
+              const fwd = this._tmp.set(0, 0, -1).applyQuaternion(shipObj.quaternion).clone();
+              const right = this._tmp2.set(1, 0, 0).applyQuaternion(shipObj.quaternion).clone();
+              lucky.startFlyby(shipObj.position, fwd, right);
+            }
+          }
+        }
         break;
     }
 
@@ -919,6 +940,12 @@ export class FleetEncounter {
     this.marks.forEach((mark, i) => {
       const e = alive[i];
       if (!e || this.state === "idle") {
+        mark.style.display = "none";
+        return;
+      }
+      const dist = e.group.position.distanceTo(playerPos);
+      // Quando a nave passa rasgando perto da câmera ou a curta distância (<1.1u), não exibe marcador para visão limpa
+      if (e.flybyActive || dist < 1.1) {
         mark.style.display = "none";
         return;
       }
