@@ -1016,6 +1016,151 @@ canvas {
   gap: 6px;
 }
 
+/* Controle de volume no Menu de Pausa */
+.pause-volume-control {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+
+.pause-volume-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pause-vol-mute-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  border: none;
+  color: #dce7f5;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pause-vol-mute-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+#pauseVolIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  line-height: 1;
+}
+
+#pauseVolIcon svg {
+  display: block;
+}
+
+.pause-volume-percent {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent, #6ea8ff);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: right;
+}
+
+.pause-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pause-vol-btn {
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: #e8ecf5;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.pause-vol-btn:hover {
+  background: rgba(110, 168, 255, 0.2);
+  border-color: rgba(110, 168, 255, 0.5);
+  color: #fff;
+  transform: scale(1.04);
+}
+
+.pause-vol-btn:active {
+  transform: scale(0.96);
+  background: rgba(110, 168, 255, 0.3);
+}
+
+.pause-vol-slider {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--accent, #6ea8ff);
+  transition: background 0.15s;
+}
+
+.pause-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #6ea8ff;
+  border: 2px solid #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(110, 168, 255, 0.6);
+  transition: transform 0.1s, background 0.15s;
+}
+
+.pause-vol-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.18);
+  background: #8fc0ff;
+}
+
+.pause-vol-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #6ea8ff;
+  border: 2px solid #ffffff;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(110, 168, 255, 0.6);
+  transition: transform 0.1s, background 0.15s;
+}
+
+.pause-vol-slider::-moz-range-thumb:hover {
+  transform: scale(1.18);
+  background: #8fc0ff;
+}
+
 .pause-settings .setting-row {
   margin: 0;
   font-size: 12px;
@@ -1093,6 +1238,19 @@ canvas {
   }
   .pause-settings .setting-row {
     font-size: 11px;
+  }
+  .pause-volume-control {
+    padding: 5px 8px;
+    gap: 4px;
+  }
+  .pause-vol-mute-btn {
+    font-size: 11px;
+  }
+  .pause-vol-btn {
+    width: 22px;
+    height: 22px;
+    min-width: 22px;
+    font-size: 12px;
   }
   .pause-modal .modal-row.pause-actions {
     margin-top: 8px;
@@ -2095,11 +2253,15 @@ canvas {
 .touch-top-bar .touch-btn {
   width: 38px;
   height: 38px;
-  font-size: 13px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   opacity: 0.82;
 }
-.touch-cam {
-  font-size: 14px;
+.touch-cam,
+.touch-hangar {
+  font-size: 11px;
+  font-weight: 700;
 }
 /* Telefone em pé: pede pra deitar (o jogo é pensado pra paisagem) */
 .touch-rotate-hint {

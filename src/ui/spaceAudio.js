@@ -44,6 +44,8 @@ export class SpaceAudio {
     this.ctx = null;
     this.noise = null;
     this.master = null;
+    this.volumeGain = null;
+    this.volume = 1.0;
     this._tmp = new THREE.Vector3();
   }
 
@@ -59,12 +61,29 @@ export class SpaceAudio {
       if (!AC) return false;
       this.ctx = new AC();
       this.noise = makeNoiseBuffer(this.ctx);
+      this.volumeGain = this.ctx.createGain();
+      this.volumeGain.gain.value = this.volume;
+      this.volumeGain.connect(this.ctx.destination);
       this.master = this.ctx.createGain();
       this.master.gain.value = 0.9;
-      this.master.connect(this.ctx.destination);
+      this.master.connect(this.volumeGain);
     }
     if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
     return true;
+  }
+
+  getDestination() {
+    if (this._ensureContext()) {
+      return this.volumeGain;
+    }
+    return null;
+  }
+
+  setVolume(vol) {
+    this.volume = Math.max(0, Math.min(1, Number(vol)));
+    if (this.volumeGain && this.ctx) {
+      this.volumeGain.gain.setValueAtTime(this.volume, this.ctx.currentTime);
+    }
   }
 
   _buildTrack(t) {

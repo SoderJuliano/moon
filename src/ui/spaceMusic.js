@@ -40,8 +40,10 @@ const PLUCKS = [
 
 export class DeepSpaceMusic {
   // getCtx: () => AudioContext|null — compartilha o contexto do SpaceAudio
-  constructor(getCtx) {
+  // getDest: () => AudioNode|null — nó de saída mestre (opcional, fallback ctx.destination)
+  constructor(getCtx, getDest = null) {
     this.getCtx = getCtx;
+    this.getDest = getDest;
     this.started = false;
     this._chord = 0;
     this._pad = null; // { gain, oscs } do acorde atual (pro fade-out)
@@ -54,7 +56,8 @@ export class DeepSpaceMusic {
 
     this.master = ctx.createGain();
     this.master.gain.value = 0; // sobe suave via ducking-target no update
-    this.master.connect(ctx.destination);
+    const dest = (this.getDest && this.getDest()) || ctx.destination;
+    this.master.connect(dest);
 
     // passa-baixas dos pads com uma respiração lenta no corte (LFO ~0.05Hz)
     this.filter = ctx.createBiquadFilter();

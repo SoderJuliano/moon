@@ -564,8 +564,8 @@ export class ShipFlight {
       if (this.canDisengage && (this.active || this.exploding)) this.disengage();
       return;
     }
-    // Tecla C: atalho universal para alternar entre 3ª pessoa e Cockpit em 1ª pessoa
-    if (e.code === "KeyC") {
+    // Tecla V: alternar entre 3ª pessoa e Cockpit em 1ª pessoa
+    if (e.code === "KeyV") {
       if (this.active && !this.exploding) {
         this.setFirstPerson(!this.isFirstPerson);
       }
@@ -1507,7 +1507,7 @@ export class ShipFlight {
       } else if (supercruising) {
         this.readout.textContent = t("ship.supercruise", { speed: formatSpeedForwardOnly(this.speed) });
       } else if (boosting && fwdKey) {
-        this.readout.textContent = `⚡ BOOST · ${formatSpeedForwardOnly(this.speed)}`;
+        this.readout.textContent = `BOOST · ${formatSpeedForwardOnly(this.speed)}`;
       } else if (this.referenceBody) {
         const status = sp > escapeSpeed ? t("ship.escape") : t("ship.inOrbit");
         this.readout.textContent = `${formatSpeedForwardOnly(this.speed)} · ${status}`;

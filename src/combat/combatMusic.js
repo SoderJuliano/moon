@@ -27,8 +27,9 @@ const ROOTS = [55.0, 49.0, 43.65, 41.2];
 const BASS_PATTERN = [1, 1, 2, 1, 1, 2, 1, 1.5];
 
 export class CombatMusic {
-  constructor(getCtx) {
+  constructor(getCtx, getDest = null) {
     this.getCtx = getCtx;
+    this.getDest = getDest;
     this.active = false;
     this.started = false;
     this._next = 0; // ctx.currentTime da próxima colcheia
@@ -44,7 +45,8 @@ export class CombatMusic {
     this.tone.type = "lowpass";
     this.tone.frequency.value = 2400;
     this.tone.connect(this.master);
-    this.master.connect(ctx.destination);
+    const dest = (this.getDest && this.getDest()) || ctx.destination;
+    this.master.connect(dest);
 
     // ruído compartilhado dos hats
     const len = Math.floor(ctx.sampleRate * 0.5);

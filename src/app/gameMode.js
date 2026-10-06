@@ -29,7 +29,7 @@ import { addPlayer } from "../game/players.js";
 import { AchievementSystem } from "../game/achievementSystem.js";
 import { emit, on } from "../game/events.js";
 import { DiscoveryPopup } from "../ui/discoveryPopup.js";
-import { setSfxPaused } from "../ui/sfx.js";
+import { setSfxPaused, setSfxVolume } from "../ui/sfx.js";
 import { CombatEncounter } from "../combat/combatMode.js";
 import { CombatMusic } from "../combat/combatMusic.js";
 import { FleetEncounter } from "../combat/fleetEncounter.js";
@@ -41,6 +41,7 @@ import {
   playShuttleShot,
   playFighterCannonShot,
   setBattleSfxPaused,
+  setBattleSfxVolume,
 } from "../combat/battleSfx.js";
 import { MissionManager, MISSION } from "../missions/missionManager.js";
 import { createStrangeObjectsMission } from "../missions/strangeObjects.js";
@@ -324,9 +325,9 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
     if (e.code === "KeyG" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") scanner.toggle();
   });
 
-  // Hangar/Ship Menu: abre/fecha com a tecla H
+  // Hangar/Ship Menu: abre/fecha com a tecla C
   window.addEventListener("keydown", (e) => {
-    if (e.code === "KeyH" && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") {
+    if ((e.code === "KeyC" || e.code === "KeyH") && e.target?.tagName !== "INPUT" && e.target?.tagName !== "TEXTAREA") {
       if (shipMenu.isOpen) {
         shipMenu.close();
       } else if (!paused && !achScreen.isOpen) {
@@ -366,10 +367,22 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   // Trilha deep-space lofi (SÓ do jogo): entra junto com a cena, no mesmo
   // AudioContext do ambiente, e SILENCIA quando alguma vibração de corpo
   // (Júpiter/Saturno/Sol) sobe — o fenômeno tem prioridade sobre a música.
-  const music = new DeepSpaceMusic(() => audio.ctx);
-  const combatMusic = new CombatMusic(() => audio.ctx); // batida do PvE (entra/sai com o combate)
-  const bossMusic = new BossMusic(() => audio.ctx); // TEMA DE BOSS (só na luta dos Gêmeos)
+  const music = new DeepSpaceMusic(() => audio.ctx, () => audio.getDestination());
+  const combatMusic = new CombatMusic(() => audio.ctx, () => audio.getDestination()); // batida do PvE (entra/sai com o combate)
+  const bossMusic = new BossMusic(() => audio.ctx, () => audio.getDestination()); // TEMA DE BOSS (só na luta dos Gêmeos)
   const _shipFwd = new THREE.Vector3(); // forward da nave (p/ os encontros)
+
+  // Controle de volume master (padrão 100% / max, configurável no menu de pause e persistido no save)
+  let currentVolume = typeof save.settings?.volume === "number" ? Math.max(0, Math.min(1, save.settings.volume)) : 1.0;
+  let lastNonZeroVolume = currentVolume > 0 ? currentVolume : 1.0;
+
+  const applyMasterVolume = (vol) => {
+    currentVolume = Math.max(0, Math.min(1, Number(vol)));
+    audio.setVolume(currentVolume);
+    setSfxVolume(currentVolume);
+    setBattleSfxVolume(currentVolume);
+  };
+  applyMasterVolume(currentVolume);
 
   // --- Pausa (Esc): Continuar / Menu principal + teclado -----------------------
   // Os comandos da nave vivem AQUI (seção "Teclado"), não num quadro flutuante:
@@ -409,10 +422,25 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
               <div><span class="key">Q</span><span class="key">E</span> ${t("pause.key.qe")}</div>
               <div><span class="key">Shift</span>+<span class="key">W</span> ${t("pause.key.shiftw")}</div>
               <div><span class="key">C</span> ${t("pause.key.c")}</div>
+              <div><span class="key">V</span> ${t("pause.key.v")}</div>
               <div><span class="key">Esc</span> ${t("pause.key.esc")}</div>
             </div>
           </div>
           <div class="pause-section pause-settings">
+            <div class="pause-volume-control">
+              <div class="pause-volume-header">
+                <button type="button" class="pause-vol-mute-btn" id="pauseVolMute" title="${t("pause.volumeToggle")}" aria-label="${t("pause.volumeToggle")}">
+                  <span id="pauseVolIcon" class="pause-vol-icon" aria-hidden="true"></span>
+                  <span>${t("pause.volume")}</span>
+                </button>
+                <span class="pause-volume-percent" id="pauseVolPercent">100%</span>
+              </div>
+              <div class="pause-volume-row">
+                <button type="button" class="pause-vol-btn" id="pauseVolDown" title="${t("pause.volumeDown")}" aria-label="${t("pause.volumeDown")}">−</button>
+                <input type="range" class="pause-vol-slider" id="pauseVolSlider" min="0" max="100" step="5" value="100" aria-label="${t("pause.volume")}" />
+                <button type="button" class="pause-vol-btn" id="pauseVolUp" title="${t("pause.volumeUp")}" aria-label="${t("pause.volumeUp")}">+</button>
+              </div>
+            </div>
             <label class="setting-row">
               <input type="checkbox" data-setting="showSecondaryHud" />
               ${t("pause.showSecondaryHud")}
@@ -430,7 +458,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       </div>
       <div class="modal-row pause-actions">
         <button class="modal-btn yes" data-act="resume">${t("pause.resume")}</button>
-        <button class="modal-btn" data-act="hangar">🚀 ${t("pause.hangar")}</button>
+        <button class="modal-btn" data-act="hangar">${t("pause.hangar")}</button>
         <button class="modal-btn" data-act="achievements">${t("pause.achievements")}</button>
         <button class="modal-btn" data-act="menu">${t("pause.mainMenu")}</button>
       </div>
@@ -441,6 +469,74 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
   const missBox = pauseOverlay.querySelector(".pause-missions");
   const secToggle = pauseOverlay.querySelector('[data-setting="showSecondaryHud"]');
   const fpToggle = pauseOverlay.querySelector('[data-setting="firstPersonCockpit"]');
+  const volMuteBtn = pauseOverlay.querySelector("#pauseVolMute");
+  const volIcon = pauseOverlay.querySelector("#pauseVolIcon");
+  const volPercent = pauseOverlay.querySelector("#pauseVolPercent");
+  const volDownBtn = pauseOverlay.querySelector("#pauseVolDown");
+  const volUpBtn = pauseOverlay.querySelector("#pauseVolUp");
+  const volSlider = pauseOverlay.querySelector("#pauseVolSlider");
+
+  function updateVolumeUI() {
+    const pct = Math.round(currentVolume * 100);
+    if (volSlider) volSlider.value = pct;
+    if (volPercent) volPercent.textContent = `${pct}%`;
+    if (volIcon) {
+      if (pct === 0) {
+        volIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`;
+      } else if (pct < 50) {
+        volIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
+      } else {
+        volIcon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
+      }
+    }
+  }
+
+  const persistVolume = () => {
+    save.settings = save.settings || {};
+    save.settings.volume = currentVolume;
+    saveManager.saveNow();
+  };
+
+  volSlider?.addEventListener("input", (e) => {
+    const val = Number(e.target.value) / 100;
+    applyMasterVolume(val);
+    if (val > 0) lastNonZeroVolume = val;
+    updateVolumeUI();
+  });
+
+  volSlider?.addEventListener("change", () => {
+    persistVolume();
+  });
+
+  volDownBtn?.addEventListener("click", () => {
+    let pct = Math.round(currentVolume * 100) - 10;
+    if (pct < 0) pct = 0;
+    applyMasterVolume(pct / 100);
+    if (pct > 0) lastNonZeroVolume = pct / 100;
+    updateVolumeUI();
+    persistVolume();
+  });
+
+  volUpBtn?.addEventListener("click", () => {
+    let pct = Math.round(currentVolume * 100) + 10;
+    if (pct > 100) pct = 100;
+    applyMasterVolume(pct / 100);
+    lastNonZeroVolume = pct / 100;
+    updateVolumeUI();
+    persistVolume();
+  });
+
+  volMuteBtn?.addEventListener("click", () => {
+    if (currentVolume > 0) {
+      lastNonZeroVolume = currentVolume;
+      applyMasterVolume(0);
+    } else {
+      applyMasterVolume(lastNonZeroVolume || 1.0);
+    }
+    updateVolumeUI();
+    persistVolume();
+  });
+
   secToggle.addEventListener("change", () => {
     save.settings = save.settings || {};
     save.settings.showSecondaryHud = secToggle.checked;
@@ -521,6 +617,7 @@ export function startGameMode({ resume = "auto", playerName = null, playerPasswo
       renderMissions();
       secToggle.checked = save.settings?.showSecondaryHud !== false;
       fpToggle.checked = !!save.settings?.firstPersonCockpit;
+      updateVolumeUI();
       renderStats(); // estatísticas atualizadas a cada abertura da pausa
     }
     // pausa/retoma TODO o áudio de uma vez: drones dos planetas, sonificação

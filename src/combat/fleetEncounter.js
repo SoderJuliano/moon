@@ -301,7 +301,7 @@ export class FleetEncounter {
     }
     if (this.bossDefeats > 0) {
       const pct = Math.round(handicap * 100);
-      this.bossAssistBadge.innerHTML = `💀 <b>${t("fleet.bossDefeatsBadge", { count: this.bossDefeats, pct })}</b>`;
+      this.bossAssistBadge.innerHTML = `<b>${t("fleet.bossDefeatsBadge", { count: this.bossDefeats, pct })}</b>`;
       this.bossAssistBadge.style.display = "";
     } else {
       this.bossAssistBadge.style.display = "none";
@@ -770,7 +770,7 @@ export class FleetEncounter {
         ui.el.className = "boss-bar invulnerable";
         ui.fill.className = "boss-fill invulnerable";
         ui.fill.style.width = "100%";
-        ui.stage.textContent = `🛡️ ${t("fleet.invulnerable")} (${b.invulnerableTimer.toFixed(1)}s)`;
+        ui.stage.textContent = `${t("fleet.invulnerable")} (${b.invulnerableTimer.toFixed(1)}s)`;
       } else if (b.shielded) {
         ui.el.className = "boss-bar";
         ui.fill.className = "boss-fill shield";

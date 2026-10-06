@@ -144,7 +144,7 @@ export class MissionManager {
   // Chime de HUD acompanha (feedback de interface — não é som de mundo).
   // speaker opcional troca o remetente (ex.: o astronauta da caçada).
   stationSay(text, secs = 5, speaker = null) {
-    this.toast.textContent = speaker ? `${speaker}: ${text}` : `📡 ${t("mission.station")}: ${text}`;
+    this.toast.textContent = speaker ? `${speaker}: ${text}` : `${t("mission.station")}: ${text}`;
     this.toast.style.display = "";
     this._toastT = secs;
     playChime();

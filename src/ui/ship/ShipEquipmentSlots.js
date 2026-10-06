@@ -35,7 +35,7 @@ export class ShipEquipmentSlots {
         html += `
           <div class="ship-slot-card empty ${selectedClass}" data-id="${slot.id}">
             <div class="slot-thumb-container empty">
-              <div class="empty-icon">🔲</div>
+              <div class="empty-icon">—</div>
             </div>
             <div class="slot-info">
               <span class="slot-name">${t("emptySlot")}</span>

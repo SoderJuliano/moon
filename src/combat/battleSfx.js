@@ -10,6 +10,25 @@
 // contexto próprio pausável junto com o Esc (setBattleSfxPaused).
 
 let _ctx = null;
+let _masterGain = null;
+let _battleVolume = 1.0;
+
+function getDestination(c) {
+  if (!_masterGain || _masterGain.context !== c) {
+    _masterGain = c.createGain();
+    _masterGain.gain.value = _battleVolume;
+    _masterGain.connect(c.destination);
+  }
+  return _masterGain;
+}
+
+export function setBattleSfxVolume(vol) {
+  _battleVolume = Math.max(0, Math.min(1, Number(vol)));
+  if (_masterGain && _ctx) {
+    _masterGain.gain.setValueAtTime(_battleVolume, _ctx.currentTime);
+  }
+}
+
 function ctx() {
   if (!_ctx) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -59,7 +78,7 @@ export function playCannonShot() {
   comp.ratio.setValueAtTime(6.0, t);
   comp.attack.setValueAtTime(0.001, t);
   comp.release.setValueAtTime(0.2, t);
-  comp.connect(c.destination);
+  comp.connect(getDestination(c));
 
   const master = c.createGain();
   master.gain.setValueAtTime(0.85, t);
@@ -151,7 +170,7 @@ export function playHeavyCannon(vol = 1) {
   const comp = c.createDynamicsCompressor();
   comp.threshold.setValueAtTime(-3, t);
   comp.ratio.setValueAtTime(6.0, t);
-  comp.connect(c.destination);
+  comp.connect(getDestination(c));
 
   const master = c.createGain();
   master.gain.value = 0.95 * vol;
@@ -213,7 +232,7 @@ export function playShieldHit() {
   const t = c.currentTime + 0.005;
   const master = c.createGain();
   master.gain.value = 0.3;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   const o = c.createOscillator();
   o.type = "sine";
@@ -248,7 +267,7 @@ export function playShieldBreak() {
   const t0 = c.currentTime + 0.01;
   const master = c.createGain();
   master.gain.value = 0.55;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   for (let i = 0; i < 7; i++) { // cacos: pings curtos em queda
     const t = t0 + i * 0.045;
@@ -293,7 +312,7 @@ export function playExplosionBig() {
   const t = c.currentTime + 0.01;
   const master = c.createGain();
   master.gain.value = 0.7;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   const sub = c.createOscillator();
   sub.type = "sine";
@@ -327,7 +346,7 @@ export function playFlybyRumble() {
   const DUR = 2.6;
   const master = c.createGain();
   master.gain.value = 0.85;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   const nz = c.createBufferSource(); // o corpo do ronco
   nz.buffer = noiseBuf(c);
@@ -390,7 +409,7 @@ export function playBossRupture() {
   comp.ratio.setValueAtTime(5.5, t0);
   comp.attack.setValueAtTime(0.002, t0);
   comp.release.setValueAtTime(0.28, t0);
-  comp.connect(c.destination);
+  comp.connect(getDestination(c));
 
   const master = c.createGain();
   master.gain.setValueAtTime(0.95, t0);
@@ -571,7 +590,7 @@ export function playEmpShockwave() {
   const t = c.currentTime + 0.005;
   const master = c.createGain();
   master.gain.value = 0.85;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   // Zumbido elétrico agudo modulado
   const o = c.createOscillator();
@@ -625,7 +644,7 @@ export function playAlienQuadShot() {
   const t0 = c.currentTime + 0.003;
   const master = c.createGain();
   master.gain.value = 0.65;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   for (let i = 0; i < 4; i++) {
     const t = t0 + i * 0.055;
@@ -664,7 +683,7 @@ export function playFighterCannonShot() {
   const t0 = c.currentTime + 0.003;
   const master = c.createGain();
   master.gain.value = 0.85;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   for (let i = 0; i < 2; i++) {
     const t = t0 + i * 0.065; // cadência pesada de canhão duplo
@@ -723,7 +742,7 @@ export function playStarWarsBlasterShot(vol = 1.0) {
 
   const master = c.createGain();
   master.gain.value = 0.88 * vol;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   // 1. O "PEW" clássico descendente de laser Star Wars
   const laser = c.createOscillator();
@@ -794,7 +813,7 @@ export function playShuttleShot() {
   const t = c.currentTime + 0.003;
   const master = c.createGain();
   master.gain.value = 0.95;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   // Explosão pesada de 155mm
   const nz = c.createBufferSource();
@@ -842,7 +861,7 @@ export function playArmorImpact() {
   const t = c.currentTime + 0.004;
   const master = c.createGain();
   master.gain.value = 0.55;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   // Clang metálico
   const o = c.createOscillator();

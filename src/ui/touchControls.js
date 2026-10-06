@@ -32,8 +32,8 @@ export function createTouchControls() {
   root.className = "touch-ui";
   root.innerHTML = `
     <div class="touch-top-bar">
-      <button class="touch-btn touch-hangar" data-keys="KeyH" aria-label="${t("touch.hangar")}">🚀</button>
-      <button class="touch-btn touch-cam" data-keys="KeyC" aria-label="${t("touch.camera")}">🎥</button>
+      <button class="touch-btn touch-hangar" data-keys="KeyC" aria-label="${t("touch.hangar")}">HGR</button>
+      <button class="touch-btn touch-cam" data-keys="KeyV" aria-label="${t("touch.camera")}">CAM</button>
       <button class="touch-btn touch-pause" data-keys="Escape" aria-label="${t("touch.pause")}">❚❚</button>
     </div>
     <div class="touch-cluster">
@@ -41,7 +41,7 @@ export function createTouchControls() {
       <button class="touch-btn touch-accel" data-keys="KeyW" aria-label="${t("touch.accel")}">▲</button>
       <button class="touch-btn touch-fire" data-keys="Space" aria-label="${t("touch.fire")}">◎</button>
     </div>
-    <div class="touch-rotate-hint">${t("touch.rotateHint")} 📱↻</div>
+    <div class="touch-rotate-hint">${t("touch.rotateHint")} ↻</div>
   `;
   document.body.appendChild(root);
 
@@ -75,8 +75,8 @@ export function createTouchControls() {
   if (hangarBtn) {
     hangarBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
-      key("keydown", "KeyH");
-      setTimeout(() => key("keyup", "KeyH"), 50);
+      key("keydown", "KeyC");
+      setTimeout(() => key("keyup", "KeyC"), 50);
     });
   }
 
@@ -84,8 +84,8 @@ export function createTouchControls() {
   if (camBtn) {
     camBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
-      key("keydown", "KeyC");
-      setTimeout(() => key("keyup", "KeyC"), 50);
+      key("keydown", "KeyV");
+      setTimeout(() => key("keyup", "KeyV"), 50);
     });
   }
 

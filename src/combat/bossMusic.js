@@ -25,8 +25,9 @@ const ROOTS = [73.42, 58.27, 49.0, 55.0];
 const THIRDS = [1.189, 1.26, 1.189, 1.26];
 
 export class BossMusic {
-  constructor(getCtx) {
+  constructor(getCtx, getDest = null) {
     this.getCtx = getCtx;
+    this.getDest = getDest;
     this.active = false;
     this.started = false;
     this._next = 0;
@@ -41,7 +42,8 @@ export class BossMusic {
     this.tone.type = "lowpass";
     this.tone.frequency.value = 2600;
     this.tone.connect(this.master);
-    this.master.connect(ctx.destination);
+    const dest = (this.getDest && this.getDest()) || ctx.destination;
+    this.master.connect(dest);
 
     const len = Math.floor(ctx.sampleRate * 0.5);
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);

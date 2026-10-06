@@ -184,11 +184,11 @@ export function createVoyagerMission(scene, voyagersSystem) {
             // Repara a respectiva Voyager
             if (targetV.id === "voyager1") {
               ctx.save.flags.voyager1Repaired = true;
-              ctx.mgr.stationSay(t("mission.voyager.v1Repaired"), 6, `📡 Voyager 1`);
+              ctx.mgr.stationSay(t("mission.voyager.v1Repaired"), 6, "Voyager 1");
               ctx.markers.remove(markerId(targetV));
             } else {
               ctx.save.flags.voyager2Repaired = true;
-              ctx.mgr.stationSay(t("mission.voyager.v2Repaired"), 6, `📡 Voyager 2`);
+              ctx.mgr.stationSay(t("mission.voyager.v2Repaired"), 6, "Voyager 2");
               ctx.markers.remove(markerId(targetV));
             }
 

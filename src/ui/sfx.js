@@ -11,6 +11,24 @@
 // (a tela de tecnologia só fecha com clique — gesto válido).
 
 let _ctx = null;
+let _masterGain = null;
+let _sfxVolume = 1.0;
+
+function getDestination(c) {
+  if (!_masterGain || _masterGain.context !== c) {
+    _masterGain = c.createGain();
+    _masterGain.gain.value = _sfxVolume;
+    _masterGain.connect(c.destination);
+  }
+  return _masterGain;
+}
+
+export function setSfxVolume(vol) {
+  _sfxVolume = Math.max(0, Math.min(1, Number(vol)));
+  if (_masterGain && _ctx) {
+    _masterGain.gain.setValueAtTime(_sfxVolume, _ctx.currentTime);
+  }
+}
 
 function ctx() {
   if (!_ctx) {
@@ -33,7 +51,7 @@ export function playChime() {
   if (!c) return;
   const master = c.createGain();
   master.gain.value = 0.5;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
   const t = c.currentTime + 0.01;
   bell(c, master, 784, t, 0.6, 0.16); // G5
   bell(c, master, 1046.5, t + 0.1, 0.7, 0.14); // C6
@@ -111,7 +129,7 @@ export function playPortalRupture() {
   comp.ratio.setValueAtTime(4.0, t0);
   comp.attack.setValueAtTime(0.005, t0);
   comp.release.setValueAtTime(0.28, t0);
-  comp.connect(c.destination);
+  comp.connect(getDestination(c));
 
   const master = c.createGain();
   master.gain.setValueAtTime(0.9, t0);
@@ -291,7 +309,7 @@ export function playScanPulse() {
   if (!c) return;
   const master = c.createGain();
   master.gain.value = 0.5;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   // eco curto pra dar o "rabo" espacial do ping
   const delay = c.createDelay(0.5);
@@ -303,7 +321,7 @@ export function playScanPulse() {
   const wet = c.createGain();
   wet.gain.value = 0.35;
   delay.connect(wet);
-  wet.connect(c.destination);
+  wet.connect(getDestination(c));
   master.connect(delay);
 
   const t = c.currentTime + 0.02;
@@ -343,7 +361,7 @@ export function playDiscovery() {
   if (!c) return;
   const master = c.createGain();
   master.gain.value = 0.5;
-  master.connect(c.destination);
+  master.connect(getDestination(c));
 
   const delay = c.createDelay(1);
   delay.delayTime.value = 0.23;
@@ -354,7 +372,7 @@ export function playDiscovery() {
   const wet = c.createGain();
   wet.gain.value = 0.4;
   delay.connect(wet);
-  wet.connect(c.destination);
+  wet.connect(getDestination(c));
   master.connect(delay);
 
   const t0 = c.currentTime + 0.03;
